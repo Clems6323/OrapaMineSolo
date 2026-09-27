@@ -30,6 +30,7 @@ from orapa_mine.ui.board_render import lighten as _lighten
 from orapa_mine.ui.board_render import piece_color as _piece_color
 
 _RAY_SPEED = 620.0  # pixels par seconde pour l'animation du rayon
+_HISTORY_ROW_H = 22  # hauteur d'une ligne d'historique (px)
 
 
 @dataclass
@@ -85,6 +86,10 @@ class GameScreen:
 
         # Aide « comment jouer » (overlay).
         self.show_help = False
+
+        # Défilement de l'historique (offset en pixels depuis le haut).
+        self.history_scroll = 0.0
+        self.history_stick_bottom = True
 
         pygame.font.init()
         self.font = pygame.font.SysFont("arial", 18)
@@ -142,6 +147,15 @@ class GameScreen:
         bottom = theme.BOARD_Y + self.grid.height * theme.CELL
         self.input_rect = pygame.Rect(inner, bottom - 92, theme.PANEL_WIDTH - 36, 32)
 
+        # Zone d'historique : s'étire entre l'en-tête et la zone de saisie,
+        # donc s'adapte à la hauteur de la grille choisie.
+        self.history_header_y = theme.BOARD_Y + 142
+        content_top = self.history_header_y + 24
+        content_bottom = self.input_rect.top - 28  # laisse la place au libellé
+        self.history_rect = pygame.Rect(
+            inner, content_top, theme.PANEL_WIDTH - 36, max(48, content_bottom - content_top)
+        )
+
     # --- Événements --------------------------------------------------------
 
     def handle_event(self, event: pygame.event.Event) -> None:
@@ -150,8 +164,20 @@ class GameScreen:
             self.hovered_cell = self._cell_at(event.pos)
         elif event.type == pygame.MOUSEBUTTONDOWN:
             self._on_click(event)
+        elif event.type == pygame.MOUSEWHEEL:
+            if not self.show_help and self.history_rect.collidepoint(pygame.mouse.get_pos()):
+                self._scroll_history(event.y)
         elif event.type == pygame.KEYDOWN:
             self._on_key(event)
+
+    def _scroll_history(self, dy: int) -> None:
+        content_h = len(self.game.shots) * _HISTORY_ROW_H + 8
+        max_scroll = max(0.0, content_h - self.history_rect.height)
+        if max_scroll <= 0:
+            return
+        # Molette vers le haut (dy > 0) -> remonter dans l'historique.
+        self.history_scroll = min(max_scroll, max(0.0, self.history_scroll - dy * _HISTORY_ROW_H * 2))
+        self.history_stick_bottom = self.history_scroll >= max_scroll - 1
 
     def _on_click(self, event: pygame.event.Event) -> None:
         pos = event.pos
@@ -497,12 +523,8 @@ class GameScreen:
         ab = self.font_small.render("Abandonner", True, theme.TEXT)
         surface.blit(ab, ab.get_rect(center=self.abandon_rect.center))
 
-        y = theme.BOARD_Y + 142
-        surface.blit(self.font.render("Historique", True, theme.TEXT), (x, y))
-        y += 26
-        for shot in self.game.shots[-9:]:
-            self._draw_history_row(surface, x, y, shot)
-            y += 22
+        surface.blit(self.font.render("Historique", True, theme.TEXT), (x, self.history_header_y))
+        self._draw_history(surface)
 
         # Zone de proposition (saisie d'un point d'entrée à interroger).
         label = self.font_small.render("Proposer un point (ex. 5 ou C) :", True, theme.TEXT_DIM)
@@ -554,6 +576,40 @@ class GameScreen:
             y += 22
         close = self.font_small.render("[H] ou clic pour fermer", True, theme.TEXT_DIM)
         surface.blit(close, close.get_rect(centerx=panel.centerx, bottom=panel.bottom - 12))
+
+    def _draw_history(self, surface: pygame.Surface) -> None:
+        rect = self.history_rect
+        pygame.draw.rect(surface, theme.INPUT_BG, rect, border_radius=6)
+        pygame.draw.rect(surface, theme.BOARD_BORDER, rect, width=1, border_radius=6)
+
+        shots = self.game.shots
+        if not shots:
+            empty = self.font_small.render("Aucune question posée.", True, theme.TEXT_DIM)
+            surface.blit(empty, (rect.x + 12, rect.y + 10))
+            return
+
+        content_h = len(shots) * _HISTORY_ROW_H + 8
+        max_scroll = max(0.0, content_h - rect.height)
+        if self.history_stick_bottom:
+            self.history_scroll = max_scroll
+        else:
+            self.history_scroll = min(self.history_scroll, max_scroll)
+
+        previous_clip = surface.get_clip()
+        surface.set_clip(rect.inflate(-3, -3))
+        y0 = rect.y + 6 - self.history_scroll
+        for i, shot in enumerate(shots):
+            ry = y0 + i * _HISTORY_ROW_H
+            if ry + _HISTORY_ROW_H >= rect.y and ry <= rect.bottom:
+                self._draw_history_row(surface, rect.x + 8, int(ry), shot)
+        surface.set_clip(previous_clip)
+
+        # Barre de défilement (si le contenu déborde).
+        if max_scroll > 0:
+            thumb_h = max(24.0, rect.height * rect.height / content_h)
+            thumb_y = rect.y + (self.history_scroll / max_scroll) * (rect.height - thumb_h)
+            thumb = pygame.Rect(rect.right - 7, int(thumb_y), 4, int(thumb_h))
+            pygame.draw.rect(surface, theme.BOARD_BORDER, thumb, border_radius=2)
 
     def _draw_history_row(self, surface: pygame.Surface, x: int, y: int, shot: RayShot) -> None:
         entry = theme.entry_label(shot.entry, shot.direction, self.grid.width, self.grid.height)
