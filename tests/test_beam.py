@@ -88,6 +88,19 @@ def test_beam_records_color_steps_and_exit_direction():
     assert result.color_steps[-1] == "rouge"
 
 
+def test_bounce_colors_pivot_cell_at_contact():
+    # Rebond 180° sur une face plate rouge : la couleur doit être prise dès la
+    # case de rebroussement, pas un segment plus loin.
+    grid = Grid(width=6, height=6)
+    grid.place_gem(cat.RED.at(Position(3, 0)))  # case pleine rouge en (3,1)
+    result = fire_beam(grid, entry=Position(0, 1), direction=Direction.DOWN)
+    assert result.exit_point == Position(0, 1)  # revient à l'entrée
+    assert result.color == "rouge"
+    # path = [(0,1),(1,1),(2,1),(1,1),(0,1)] ; le pivot (2,1) est l'index 2.
+    assert result.path[2] == Position(2, 1)
+    assert result.color_steps[2] == "rouge"  # couleur prise au contact
+
+
 def test_beam_absorbed_by_black_body_has_no_exit():
     grid = Grid(width=8, height=8)
     grid.place_gem(cat.BLACK_BODY.at(Position(3, 3)))

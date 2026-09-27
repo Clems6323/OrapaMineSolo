@@ -324,7 +324,22 @@ class GameScreen:
             exr, exc = result.exit_direction.value
             cx, cy = theme.cell_center(result.exit_point)
             points.append((cx + exc * theme.CELL / 2, cy + exr * theme.CELL / 2))
-        return points
+        return self._extend_bounces(points)
+
+    @staticmethod
+    def _extend_bounces(points: list[tuple[float, float]]) -> list[tuple[float, float]]:
+        """Pousse chaque point de rebroussement (rebond 180°) jusqu'à la face de
+        la gemme : sinon le rayon s'arrête au centre de la case précédente, ce
+        qui laisse un vide visible avant la pièce."""
+        result = list(points)
+        for i in range(1, len(points) - 1):
+            if points[i - 1] == points[i + 1]:  # aller-retour : demi-tour en i
+                ax, ay = points[i - 1]
+                bx, by = points[i]
+                vx, vy = bx - ax, by - ay
+                norm = math.hypot(vx, vy) or 1.0
+                result[i] = (bx + vx / norm * theme.CELL / 2, by + vy / norm * theme.CELL / 2)
+        return result
 
     def _build_seg_colors(self, result: BeamResult, n_points: int) -> list[tuple[int, int, int]]:
         """Couleur RGB de chaque segment du rayon (transparent avant la 1re gemme)."""

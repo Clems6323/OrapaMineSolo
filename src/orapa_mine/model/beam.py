@@ -135,7 +135,12 @@ def fire_beam(grid: Grid, entry: Position, direction: Direction) -> BeamResult:
         new_heading = half.reflect(heading)
         if new_heading is heading.reverse():
             # Face plate : renvoi à 180°, le rayon n'entre pas dans la case.
+            # La couleur est prise au contact : on met à jour la couleur « en
+            # sortie » de la dernière case parcourue (le point de rebroussement)
+            # pour qu'elle change dès le contact et non un segment plus tard.
             heading = new_heading
+            if color_steps:
+                color_steps[-1] = mix_colors(frozenset(colors))
         else:
             # Arête diagonale : le rayon entre dans la case et tourne à 90°.
             heading = new_heading
