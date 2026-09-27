@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+*.egg-info/
+build/
+dist/
+
+# Livret de règles officiel (copyright Gameology/Miraludo) : ne pas publier.
+docs/ORAPA MINE_REGLES_WEB.pdf
+
+# Réglages Claude Code personnels (local).
+.claude/settings.local.json
