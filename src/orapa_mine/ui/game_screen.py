@@ -23,8 +23,9 @@ import pygame
 from orapa_mine.model.beam import BeamResult, fire_beam
 from orapa_mine.model.game import GameState, RayShot
 from orapa_mine.model.gems import Direction, Piece, PlacedGem, Position
+from orapa_mine.model import serialization
 from orapa_mine.model.grid import Grid
-from orapa_mine.ui import board_render, theme
+from orapa_mine.ui import board_render, dialogs, theme
 from orapa_mine.ui.board_render import darken as _darken
 from orapa_mine.ui.board_render import lighten as _lighten
 from orapa_mine.ui.board_render import piece_color as _piece_color
@@ -57,8 +58,10 @@ class GameScreen:
     def __init__(self, game: GameState, palette_pieces: list[Piece]) -> None:
         self.game = game
         self.grid = game.hidden_grid  # cachée (debug uniquement)
+        self.palette_pieces = palette_pieces
         self.hypothesis = Grid(width=self.grid.width, height=self.grid.height)
         self.reveal = False
+        self.save_progress = True  # sauver aussi historique + pièces posées
 
         # Sélection / pose de pièces.
         self.selected: Piece | None = None
@@ -144,12 +147,15 @@ class GameScreen:
         self.help_rect = pygame.Rect(px + theme.PANEL_WIDTH - 44, theme.BOARD_Y + 16, 28, 28)
         self.submit_rect = pygame.Rect(inner, theme.BOARD_Y + 92, 180, 34)
         self.abandon_rect = pygame.Rect(inner + 190, theme.BOARD_Y + 92, 92, 34)
+        # Ligne sauvegarde : case « progression » + bouton Sauvegarder.
+        self.progress_toggle_rect = pygame.Rect(inner, theme.BOARD_Y + 136, 20, 20)
+        self.save_rect = pygame.Rect(inner + 150, theme.BOARD_Y + 132, 132, 28)
         bottom = theme.BOARD_Y + self.grid.height * theme.CELL
         self.input_rect = pygame.Rect(inner, bottom - 92, theme.PANEL_WIDTH - 36, 32)
 
         # Zone d'historique : s'étire entre l'en-tête et la zone de saisie,
         # donc s'adapte à la hauteur de la grille choisie.
-        self.history_header_y = theme.BOARD_Y + 142
+        self.history_header_y = theme.BOARD_Y + 174
         content_top = self.history_header_y + 24
         content_bottom = self.input_rect.top - 28  # laisse la place au libellé
         self.history_rect = pygame.Rect(
@@ -204,6 +210,12 @@ class GameScreen:
         if self.abandon_rect.collidepoint(pos):
             self.finished = ("giveup", self.game.score)
             return
+        if self.progress_toggle_rect.collidepoint(pos):
+            self.save_progress = not self.save_progress
+            return
+        if self.save_rect.collidepoint(pos):
+            self._save()
+            return
         entry = self._entry_at(pos)
         if entry is not None:
             self._fire_test(self.entries[entry])
@@ -226,6 +238,8 @@ class GameScreen:
             return
         if event.key == pygame.K_h:
             self.show_help = True
+        elif event.key == pygame.K_s:
+            self._save()
         elif event.key == pygame.K_d:
             self.reveal = not self.reveal
         elif event.key == pygame.K_r and self.selected is not None:
@@ -291,6 +305,27 @@ class GameScreen:
             return
         self.game.play_shot(ep.entry, ep.direction)
         self.message = None
+
+    def _save(self) -> None:
+        path = dialogs.ask_save_path()
+        if not path:
+            return
+        data = serialization.to_dict(
+            width=self.grid.width,
+            height=self.grid.height,
+            palette_pieces=self.palette_pieces,
+            hidden_grid=self.grid,
+            include_progress=self.save_progress,
+            game=self.game,
+            hypothesis_grid=self.hypothesis,
+        )
+        try:
+            dialogs.write_json(path, data)
+        except OSError as exc:
+            self.message, self.message_color = f"Échec de la sauvegarde : {exc}", theme.LOSE_COLOR
+            return
+        kind = "avec progression" if self.save_progress else "configuration seule"
+        self.message, self.message_color = f"Partie sauvegardée ({kind}).", theme.WIN_COLOR
 
     def _submit(self) -> None:
         won = self.game.submit_guess(list(self.hypothesis.gems))
@@ -476,6 +511,20 @@ class GameScreen:
         ab = self.font_small.render("Abandonner", True, theme.TEXT)
         surface.blit(ab, ab.get_rect(center=self.abandon_rect.center))
 
+        # Ligne sauvegarde : case « progression » + bouton Sauvegarder.
+        pygame.draw.rect(surface, theme.INPUT_BG, self.progress_toggle_rect, border_radius=4)
+        pygame.draw.rect(surface, theme.BOARD_BORDER, self.progress_toggle_rect, width=1, border_radius=4)
+        if self.save_progress:
+            pygame.draw.rect(surface, theme.SLOT_SELECTED, self.progress_toggle_rect.inflate(-8, -8), border_radius=2)
+        surface.blit(
+            self.font_small.render("Progression", True, theme.TEXT),
+            (self.progress_toggle_rect.right + 8, self.progress_toggle_rect.y + 2),
+        )
+        pygame.draw.rect(surface, theme.SLOT_BG, self.save_rect, border_radius=6)
+        pygame.draw.rect(surface, theme.BOARD_BORDER, self.save_rect, width=1, border_radius=6)
+        sv = self.font_small.render("Sauvegarder", True, theme.TEXT)
+        surface.blit(sv, sv.get_rect(center=self.save_rect.center))
+
         surface.blit(self.font.render("Historique", True, theme.TEXT), (x, self.history_header_y))
         self._draw_history(surface)
 
@@ -607,7 +656,13 @@ _HELP: list[tuple[str, str]] = [
     (
         "Gagner",
         "Quand tu es sûr de toi, clique « Proposer la solution ». Le score est le "
-        "nombre de questions posées. Raccourcis : [H] aide, [D] debug.",
+        "nombre de questions posées. Raccourcis : [H] aide, [S] sauvegarder, [D] debug.",
+    ),
+    (
+        "Sauvegarder / charger",
+        "« Sauvegarder » enregistre la partie ; coche « Progression » pour y "
+        "inclure l'historique et tes pièces posées. Recharge-la depuis le menu "
+        "de départ (« Charger une partie… »).",
     ),
 ]
 
