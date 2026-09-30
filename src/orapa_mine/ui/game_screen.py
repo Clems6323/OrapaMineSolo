@@ -20,9 +20,9 @@ from dataclasses import dataclass
 
 import pygame
 
-from orapa_mine.model.beam import BeamResult, fire_beam
+from orapa_mine.model.beam import BeamResult, fire_beam, mix_colors
 from orapa_mine.model.game import GameState, RayShot
-from orapa_mine.model.gems import Direction, Piece, PlacedGem, Position
+from orapa_mine.model.gems import Direction, GemColor, Piece, PlacedGem, Position
 from orapa_mine.model import serialization
 from orapa_mine.model.grid import Grid
 from orapa_mine.ui import board_render, dialogs, theme
@@ -32,6 +32,7 @@ from orapa_mine.ui.board_render import piece_color as _piece_color
 
 _RAY_SPEED = 620.0  # pixels par seconde pour l'animation du rayon
 _HISTORY_ROW_H = 22  # hauteur d'une ligne d'historique (px)
+_PAGE_BREAK = -1000  # sentinelle : force un saut de page dans l'aide
 
 
 @dataclass
@@ -87,8 +88,9 @@ class GameScreen:
         # Signal de fin de partie lu par l'app : ("win"|"giveup", score) ou None.
         self.finished: tuple[str, int] | None = None
 
-        # Aide « comment jouer » (overlay).
+        # Aide « comment jouer » (overlay paginé).
         self.show_help = False
+        self.help_page = 0
 
         # Défilement de l'historique (offset en pixels depuis le haut).
         self.history_scroll = 0.0
@@ -187,9 +189,15 @@ class GameScreen:
 
     def _on_click(self, event: pygame.event.Event) -> None:
         pos = event.pos
-        if self.show_help:  # tout clic ferme l'aide
+        if self.show_help:  # navigation dans l'aide, sinon fermeture
             if event.button == 1:
-                self.show_help = False
+                layout = self._help_layout(pygame.display.get_surface().get_size())
+                if layout["prev"].collidepoint(pos):
+                    self.help_page = max(0, self.help_page - 1)
+                elif layout["next"].collidepoint(pos):
+                    self.help_page = min(len(layout["pages"]) - 1, self.help_page + 1)
+                else:
+                    self.show_help = False
             return
         if event.button == 3:  # clic droit : retirer une hypothèse
             self._remove_at(self._cell_at(pos))
@@ -198,6 +206,7 @@ class GameScreen:
             return
         if self.help_rect.collidepoint(pos):
             self.show_help = True
+            self.help_page = 0
             return
         # Zone de saisie ?
         if self.input_rect.collidepoint(pos):
@@ -232,12 +241,18 @@ class GameScreen:
         if self.show_help:
             if event.key in (pygame.K_h, pygame.K_ESCAPE):
                 self.show_help = False
+            elif event.key == pygame.K_LEFT:
+                self.help_page = max(0, self.help_page - 1)
+            elif event.key == pygame.K_RIGHT:
+                pages = self._help_layout(pygame.display.get_surface().get_size())["pages"]
+                self.help_page = min(len(pages) - 1, self.help_page + 1)
             return
         if self.input_active:
             self._input_key(event)
             return
         if event.key == pygame.K_h:
             self.show_help = True
+            self.help_page = 0
         elif event.key == pygame.K_s:
             self._save()
         elif event.key == pygame.K_d:
@@ -547,37 +562,112 @@ class GameScreen:
             (theme.BOARD_X, theme.board_bottom(self.grid.height) + theme.ENTRY_MARGIN + 4),
         )
 
-    def _draw_help(self, surface: pygame.Surface) -> None:
-        w, h = surface.get_size()
-        backdrop = pygame.Surface((w, h), pygame.SRCALPHA)
-        backdrop.fill((6, 8, 14, 210))
-        surface.blit(backdrop, (0, 0))
+    # --- Aide paginée ------------------------------------------------------
 
-        panel_w = min(660, w - 80)
-        margin = 26
-        # Pré-calcule les lignes pour dimensionner le panneau.
-        lines: list[tuple[str, tuple[int, int, int]]] = []
-        for heading, body in _HELP:
-            lines.append((heading, theme.SLOT_SELECTED))
-            for wrapped in _wrap(body, self.font_small, panel_w - 2 * margin):
-                lines.append((wrapped, theme.TEXT))
-            lines.append(("", theme.TEXT))
-        panel_h = 92 + len(lines) * 22
+    _TITLE_H = 52
+    _FOOTER_H = 42
+    _MARGIN = 26
+
+    def _help_rows(self, content_width: int) -> list[tuple[int, "object"]]:
+        """Construit la liste des lignes de l'aide (hauteur, fonction de dessin)."""
+        rows: list[tuple[int, object]] = []
+
+        def heading(text: str) -> None:
+            rows.append((28, lambda s, x, y, t=text: s.blit(self.font.render(t, True, theme.SLOT_SELECTED), (x, y))))
+
+        def line(text: str) -> None:
+            rows.append((22, lambda s, x, y, t=text: s.blit(self.font_small.render(t, True, theme.TEXT), (x, y))))
+
+        for head, body in _HELP:
+            if head == "Couleurs":
+                rows.append((_PAGE_BREAK, None))  # la légende couleurs reste groupée
+            heading(head)
+            if head == "Couleurs":
+                line("Le rayon se teinte au contact ; mélange peinture, le blanc éclaircit.")
+                line("Aucune gemme touchée → rayon transparent.")
+                for combo in _COLOR_COMBOS:
+                    rows.append((26, self._combo_drawer(combo)))
+            else:
+                for wrapped in _wrap(body, self.font_small, content_width):
+                    line(wrapped)
+            rows.append((12, lambda s, x, y: None))  # espace
+        return rows
+
+    def _combo_drawer(self, combo: frozenset):
+        """Retourne une fonction dessinant une ligne « couleurs = résultat »."""
+
+        def draw(surface: pygame.Surface, x: int, y: int) -> None:
+            cx = x
+            inputs = [c for c in _COLOR_ORDER if c in combo]
+            for i, gem_color in enumerate(inputs):
+                if i > 0:
+                    surface.blit(self.font_small.render("+", True, theme.TEXT_DIM), (cx, y + 1))
+                    cx += 13
+                _swatch(surface, cx, y, theme.GEM_FILL[gem_color])
+                cx += 20
+            surface.blit(self.font_small.render("=", True, theme.TEXT_DIM), (cx, y + 1))
+            cx += 18
+            name = mix_colors(combo) or "transparent"
+            _swatch(surface, cx, y, theme.ray_rgb(mix_colors(combo)))
+            cx += 24
+            surface.blit(self.font_small.render(name, True, theme.TEXT), (cx, y + 1))
+
+        return draw
+
+    def _help_layout(self, size: tuple[int, int]) -> dict:
+        w, h = size
+        panel_w = min(680, w - 80)
+        max_panel_h = h - 60
+        content_w = panel_w - 2 * self._MARGIN
+        max_content_h = max_panel_h - self._TITLE_H - self._FOOTER_H
+
+        rows = self._help_rows(content_w)
+        pages = _paginate(rows, max_content_h)
+        content_h = max((sum(rh for rh, _ in pg) for pg in pages), default=0)
+        panel_h = self._TITLE_H + content_h + self._FOOTER_H
         px = (w - panel_w) // 2
         py = (h - panel_h) // 2
         panel = pygame.Rect(px, py, panel_w, panel_h)
+        prev_rect = pygame.Rect(px + self._MARGIN, panel.bottom - 36, 40, 28)
+        next_rect = pygame.Rect(panel.right - self._MARGIN - 40, panel.bottom - 36, 40, 28)
+        return {"panel": panel, "pages": pages, "prev": prev_rect, "next": next_rect}
+
+    def _draw_help(self, surface: pygame.Surface) -> None:
+        w, h = surface.get_size()
+        backdrop = pygame.Surface((w, h), pygame.SRCALPHA)
+        backdrop.fill((6, 8, 14, 214))
+        surface.blit(backdrop, (0, 0))
+
+        layout = self._help_layout((w, h))
+        panel, pages = layout["panel"], layout["pages"]
+        self.help_page = max(0, min(self.help_page, len(pages) - 1))
         pygame.draw.rect(surface, theme.PANEL_BG, panel, border_radius=12)
         pygame.draw.rect(surface, theme.BOARD_BORDER, panel, width=2, border_radius=12)
 
-        surface.blit(self.font_big.render("Comment jouer", True, theme.TEXT), (px + margin, py + 20))
-        y = py + 66
-        for text, color in lines:
-            if text:
-                font = self.font if color == theme.SLOT_SELECTED else self.font_small
-                surface.blit(font.render(text, True, color), (px + margin, y))
-            y += 22
-        close = self.font_small.render("[H] ou clic pour fermer", True, theme.TEXT_DIM)
-        surface.blit(close, close.get_rect(centerx=panel.centerx, bottom=panel.bottom - 12))
+        surface.blit(self.font_big.render("Comment jouer", True, theme.TEXT), (panel.x + self._MARGIN, panel.y + 16))
+
+        y = panel.y + self._TITLE_H
+        x = panel.x + self._MARGIN
+        for row_h, draw in pages[self.help_page]:
+            draw(surface, x, y)
+            y += row_h
+
+        # Pied de page : navigation.
+        prev_rect, next_rect = layout["prev"], layout["next"]
+        multi = len(pages) > 1
+        self._nav_button(surface, prev_rect, "<", enabled=self.help_page > 0 and multi)
+        self._nav_button(surface, next_rect, ">", enabled=self.help_page < len(pages) - 1)
+        footer = f"Page {self.help_page + 1}/{len(pages)}   ·   ←/→ pages   ·   [H] fermer"
+        label = self.font_small.render(footer, True, theme.TEXT_DIM)
+        surface.blit(label, label.get_rect(centerx=panel.centerx, centery=prev_rect.centery))
+
+    def _nav_button(self, surface: pygame.Surface, rect: pygame.Rect, glyph: str, enabled: bool) -> None:
+        bg = theme.SLOT_BG if enabled else theme.PANEL_BG
+        pygame.draw.rect(surface, bg, rect, border_radius=6)
+        pygame.draw.rect(surface, theme.BOARD_BORDER, rect, width=1, border_radius=6)
+        color = theme.TEXT if enabled else theme.TEXT_DIM
+        g = self.font.render(glyph, True, color)
+        surface.blit(g, g.get_rect(center=rect.center))
 
     def _draw_history(self, surface: pygame.Surface) -> None:
         rect = self.history_rect
@@ -626,12 +716,24 @@ class GameScreen:
 
 # --- Aide « comment jouer » --------------------------------------------------
 
+# Ordre d'affichage des couleurs sources et liste de toutes les combinaisons.
+_COLOR_ORDER = (GemColor.RED, GemColor.YELLOW, GemColor.BLUE, GemColor.WHITE)
+_R, _J, _B, _W = _COLOR_ORDER
+_COLOR_COMBOS: list[frozenset] = [
+    frozenset({_R}), frozenset({_J}), frozenset({_B}), frozenset({_W}),
+    frozenset({_R, _J}), frozenset({_R, _B}), frozenset({_J, _B}),
+    frozenset({_R, _W}), frozenset({_J, _W}), frozenset({_B, _W}),
+    frozenset({_R, _J, _B}), frozenset({_R, _J, _W}),
+    frozenset({_R, _B, _W}), frozenset({_J, _B, _W}),
+    frozenset({_R, _J, _B, _W}),
+]
+
 _HELP: list[tuple[str, str]] = [
     ("But", "Localise la position exacte de toutes les gemmes cachées de la mine."),
     (
         "Poser des hypothèses",
         "Choisis une pièce dans la palette, puis clique sur le plateau pour la "
-        "poser. [R] tourne/retourne la pièce, le clic droit la retire.",
+        "poser.",
     ),
     (
         "Tester ton hypothèse",
@@ -656,13 +758,17 @@ _HELP: list[tuple[str, str]] = [
     (
         "Gagner",
         "Quand tu es sûr de toi, clique « Proposer la solution ». Le score est le "
-        "nombre de questions posées. Raccourcis : [H] aide, [S] sauvegarder, [D] debug.",
+        "nombre de questions posées.",
     ),
     (
         "Sauvegarder / charger",
         "« Sauvegarder » enregistre la partie ; coche « Progression » pour y "
         "inclure l'historique et tes pièces posées. Recharge-la depuis le menu "
         "de départ (« Charger une partie… »).",
+    ),
+    (
+        "Raccourcis",
+        "[H] aide, [S] sauvegarder, [D] debug. R] tourne/retourne la pièce, le clic droit la retire."
     ),
 ]
 
@@ -682,6 +788,37 @@ def _wrap(text: str, font: "pygame.font.Font", max_width: int) -> list[str]:
     if current:
         lines.append(current)
     return lines
+
+
+def _swatch(surface: pygame.Surface, x: int, y: int, rgb: tuple[int, int, int], size: int = 16) -> None:
+    """Dessine un petit carré de couleur (avec liseré) pour la légende des couleurs."""
+    rect = pygame.Rect(x, y, size, size)
+    pygame.draw.rect(surface, rgb, rect, border_radius=3)
+    pygame.draw.rect(surface, theme.BOARD_BORDER, rect, width=1, border_radius=3)
+
+
+def _paginate(rows: list, max_height: int) -> list[list]:
+    """Répartit les lignes (hauteur, dessin) en pages qui tiennent dans `max_height`.
+
+    Une ligne de hauteur `_PAGE_BREAK` force le début d'une nouvelle page.
+    """
+    pages: list[list] = []
+    current: list = []
+    used = 0
+    for row_h, draw in rows:
+        if row_h == _PAGE_BREAK:
+            if current:
+                pages.append(current)
+                current, used = [], 0
+            continue
+        if current and used + row_h > max_height:
+            pages.append(current)
+            current, used = [], 0
+        current.append((row_h, draw))
+        used += row_h
+    if current:
+        pages.append(current)
+    return pages or [[]]
 
 
 # --- Helpers géométrie du rayon ---------------------------------------------
