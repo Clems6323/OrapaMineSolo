@@ -10,7 +10,9 @@ import pygame
 
 from orapa_mine.ai.generator import Difficulty
 from orapa_mine.model import gems_catalog as cat
-from orapa_mine.ui import theme
+from orapa_mine.model import serialization
+from orapa_mine.model.serialization import LoadedGame
+from orapa_mine.ui import dialogs, theme
 
 SIZE = (760, 660)
 
@@ -25,6 +27,8 @@ class ConfigScreen:
         self.sizes = [("Petit", 8, 6), ("Standard", 10, 8), ("Grand", 12, 10)]
         self.size_index = 1
         self.result: Difficulty | None = None
+        self.loaded: LoadedGame | None = None
+        self.error: str | None = None
 
         pygame.font.init()
         self.font_big = pygame.font.SysFont("arial", 40, bold=True)
@@ -40,7 +44,8 @@ class ConfigScreen:
         self.size_rects = [
             pygame.Rect(start_x + i * (bw + gap), 372, bw, 60) for i in range(3)
         ]
-        self.start_rect = pygame.Rect(cx - 130, 552, 260, 58)
+        self.start_rect = pygame.Rect(cx - 270, 552, 250, 58)
+        self.load_rect = pygame.Rect(cx + 20, 552, 250, 58)
 
     # --- Événements --------------------------------------------------------
 
@@ -54,10 +59,21 @@ class ConfigScreen:
             self.corps_noir = not self.corps_noir
         elif self.start_rect.collidepoint(p):
             self._begin()
+        elif self.load_rect.collidepoint(p):
+            self._load()
         else:
             for i, rect in enumerate(self.size_rects):
                 if rect.collidepoint(p):
                     self.size_index = i
+
+    def _load(self) -> None:
+        path = dialogs.ask_open_path()
+        if not path:
+            return
+        try:
+            self.loaded = serialization.from_dict(dialogs.read_json(path))
+        except (OSError, ValueError, KeyError) as exc:
+            self.error = f"Chargement impossible : {exc}"
 
     def _begin(self) -> None:
         pieces = [cat.RED, cat.YELLOW, cat.BLUE, cat.WHITE_BIG, cat.WHITE_SMALL]
@@ -113,6 +129,15 @@ class ConfigScreen:
         pygame.draw.rect(surface, theme.BOARD_BORDER, self.start_rect, width=1, border_radius=10)
         label = self.font.render("Commencer", True, theme.TEXT)
         surface.blit(label, label.get_rect(center=self.start_rect.center))
+
+        pygame.draw.rect(surface, theme.SLOT_BG, self.load_rect, border_radius=10)
+        pygame.draw.rect(surface, theme.BOARD_BORDER, self.load_rect, width=1, border_radius=10)
+        load_label = self.font.render("Charger une partie…", True, theme.TEXT)
+        surface.blit(load_label, load_label.get_rect(center=self.load_rect.center))
+
+        if self.error:
+            err = self.font_small.render(self.error, True, theme.LOSE_COLOR)
+            surface.blit(err, err.get_rect(centerx=cx, y=624))
 
     def _checkbox(self, surface: pygame.Surface, rect: pygame.Rect, on: bool, text: str) -> None:
         pygame.draw.rect(surface, theme.INPUT_BG, rect, border_radius=4)

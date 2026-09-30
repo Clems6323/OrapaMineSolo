@@ -55,7 +55,9 @@ class OrapaMineApp:
 
     def _handle_transitions(self) -> None:
         screen = self.current
-        if isinstance(screen, ConfigScreen) and screen.result is not None:
+        if isinstance(screen, ConfigScreen) and screen.loaded is not None:
+            self._start_loaded(screen.loaded)
+        elif isinstance(screen, ConfigScreen) and screen.result is not None:
             self._start_game(screen.result)
         elif isinstance(screen, GameScreen) and screen.finished is not None:
             outcome, score = screen.finished
@@ -73,6 +75,13 @@ class OrapaMineApp:
         game = GameState(hidden_grid=grid)
         self.current = GameScreen(game, palette_pieces=difficulty.pieces)
         self._resize(theme.window_size(grid.width, grid.height))
+
+    def _start_loaded(self, loaded) -> None:
+        screen = GameScreen(loaded.game, palette_pieces=loaded.palette_pieces)
+        screen.hypothesis = loaded.hypothesis
+        screen.used_names = {gem.piece.name for gem in loaded.hypothesis.gems}
+        self.current = screen
+        self._resize(theme.window_size(loaded.width, loaded.height))
 
     def _show_end(self, won: bool, score: int, hidden_grid) -> None:
         self.current = EndScreen(won=won, score=score, hidden_grid=hidden_grid)

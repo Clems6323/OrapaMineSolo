@@ -46,8 +46,14 @@ uv run pytest                 # lance les tests
 5. **Propose la solution** quand tu es sûr. Le score est le nombre de questions
    posées — moins il y en a, mieux c'est.
 
-Raccourcis en jeu : **[H]** aide, **[D]** révéler les gemmes (debug),
-**[R]** tourner une pièce, clic droit retirer, **Échap** désélectionner.
+**Sauvegarder / charger** : le bouton **Sauvegarder** enregistre la partie dans
+un fichier `.json` ; coche **Progression** pour y inclure aussi l'historique et
+tes pièces posées (sinon seule la configuration à deviner est enregistrée).
+Recharge une partie depuis le menu de départ avec **Charger une partie…**.
+
+Raccourcis en jeu : **[H]** aide, **[S]** sauvegarder, **[D]** révéler les
+gemmes (debug), **[R]** tourner une pièce, clic droit retirer, **Échap**
+désélectionner.
 
 ## Structure
 
