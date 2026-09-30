@@ -751,11 +751,6 @@ _HELP: list[tuple[str, str]] = [
         "sorties et couleurs listées dans l'Historique.",
     ),
     (
-        "Couleurs",
-        "Le rayon mélange les couleurs comme de la peinture (rouge+jaune=orange, "
-        "jaune+bleu=vert, rouge+bleu=violet…) ; le blanc éclaircit la teinte.",
-    ),
-    (
         "Gagner",
         "Quand tu es sûr de toi, clique « Proposer la solution ». Le score est le "
         "nombre de questions posées.",
@@ -765,6 +760,11 @@ _HELP: list[tuple[str, str]] = [
         "« Sauvegarder » enregistre la partie ; coche « Progression » pour y "
         "inclure l'historique et tes pièces posées. Recharge-la depuis le menu "
         "de départ (« Charger une partie… »).",
+    ),
+    (
+        "Couleurs",
+        "Le rayon mélange les couleurs comme de la peinture (rouge+jaune=orange, "
+        "jaune+bleu=vert, rouge+bleu=violet…) ; le blanc éclaircit la teinte.",
     ),
     (
         "Raccourcis",
