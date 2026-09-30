@@ -108,6 +108,11 @@ def cell_center(pos: Position) -> tuple[float, float]:
     return (BOARD_X + pos.col * CELL + CELL / 2, BOARD_Y + pos.row * CELL + CELL / 2)
 
 
+def point_px(row: float, col: float) -> tuple[float, float]:
+    """Pixel d'un point en coordonnées de case flottantes (ligne, colonne)."""
+    return (BOARD_X + col * CELL + CELL / 2, BOARD_Y + row * CELL + CELL / 2)
+
+
 # Polygone (liste de coins) à remplir pour une demi-case donnée.
 _HALF_POLY = {
     HalfCell.FULL: ("NW", "NE", "SE", "SW"),

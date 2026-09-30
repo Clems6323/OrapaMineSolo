@@ -70,10 +70,13 @@ class BeamResult:
     - `absorbed` : True si le rayon a été absorbé par un corps noir.
     - `exit_direction` : direction de trajet à la sortie (pour étiqueter le
       bord de sortie côté UI) ; None si absorbé/bouclé.
-    - `path` : cases parcourues (utile pour l'animation UI et les tests).
-    - `color_steps` : couleur accumulée du rayon **après** chaque case de
-      `path` (parallèle à `path`) ; permet à l'UI de teinter le rayon segment
-      par segment au fur et à mesure qu'il touche des gemmes.
+    - `path` : cases parcourues (utile pour les tests / usages grossiers).
+    - `color_steps` : couleur accumulée **après** chaque case de `path`.
+    - `vertices` : polyligne exacte du rayon en coordonnées de case
+      (ligne, colonne) flottantes — centres de case aux virages, milieux de
+      face aux rebonds 180°. C'est ce que l'UI doit dessiner.
+    - `segment_colors` : couleur (nom, ou None si transparent) de chaque segment
+      de `vertices` (longueur = len(vertices) - 1).
     """
 
     exit_point: Position | None
@@ -82,6 +85,8 @@ class BeamResult:
     exit_direction: Direction | None = None
     path: list[Position] = field(default_factory=list)
     color_steps: list[str | None] = field(default_factory=list)
+    vertices: list[tuple[float, float]] = field(default_factory=list)
+    segment_colors: list[str | None] = field(default_factory=list)
 
 
 def fire_beam(grid: Grid, entry: Position, direction: Direction) -> BeamResult:
@@ -92,66 +97,92 @@ def fire_beam(grid: Grid, entry: Position, direction: Direction) -> BeamResult:
     sur une arête, renvoi 180° sur une face plate, absorption pour un corps
     noir) et prend éventuellement sa couleur (une fois par couleur distincte).
     """
-    pos = entry - direction  # case fictive juste à l'extérieur de l'entrée
     heading = direction
     colors: set[GemColor] = set()
     path: list[Position] = []
     color_steps: list[str | None] = []
+    vertices: list[tuple[float, float]] = []
+    segment_colors: list[str | None] = []
     last_inside = entry
 
-    def record(cell: Position) -> None:
-        path.append(cell)
-        color_steps.append(mix_colors(frozenset(colors)))
+    def collect(gem) -> None:
+        if gem.kind is not GemKind.DIAMOND and gem.color is not None:
+            colors.add(gem.color)
+
+    def add_vertex(row: float, col: float, segment_color: str | None) -> None:
+        vertices.append((row, col))
+        segment_colors.append(segment_color)
+
+    dr, dc = heading.value
+    pos = Position(entry.row - dr, entry.col - dc)  # case fictive à l'extérieur
+    # Premier sommet : demi-case avant l'entrée (le rayon arrive du bord).
+    vertices.append((entry.row - dr * 0.5, entry.col - dc * 0.5))
+
+    def result(exit_point, absorbed=False) -> BeamResult:
+        return BeamResult(
+            exit_point=exit_point,
+            color=mix_colors(frozenset(colors)),
+            absorbed=absorbed,
+            exit_direction=heading if (exit_point is not None and not absorbed) else None,
+            path=path,
+            color_steps=color_steps,
+            vertices=vertices,
+            segment_colors=segment_colors,
+        )
 
     # Garde-fou anti-boucle : borne large mais finie.
     max_steps = grid.width * grid.height * 8 + 16
     for _ in range(max_steps):
+        dr, dc = heading.value
         nxt = pos + heading
         if not grid.is_inside(nxt):
-            return BeamResult(
-                exit_point=last_inside,
-                color=mix_colors(frozenset(colors)),
-                exit_direction=heading,
-                path=path,
-                color_steps=color_steps,
-            )
+            if grid.is_inside(pos):
+                add_vertex(pos.row + dr * 0.5, pos.col + dc * 0.5, mix_colors(frozenset(colors)))
+                return result(pos)
+            return result(entry)  # rebond immédiat au bord (cas rare)
 
         half = grid.surface.get(nxt)
-        if half is None:  # case vide : on avance
+        if half is None:  # case vide : on avance jusqu'à son centre
             pos = nxt
             last_inside = nxt
-            record(nxt)
+            path.append(nxt)
+            color_steps.append(mix_colors(frozenset(colors)))
+            add_vertex(nxt.row, nxt.col, mix_colors(frozenset(colors)))
             continue
 
         gem = grid.owner[nxt]
         if gem.kind is GemKind.BLACK_BODY:
-            return BeamResult(
-                exit_point=None, color=None, absorbed=True, path=path, color_steps=color_steps
-            )
+            add_vertex(pos.row + dr * 0.5, pos.col + dc * 0.5, mix_colors(frozenset(colors)))
+            return result(None, absorbed=True)
 
-        if gem.kind is not GemKind.DIAMOND and gem.color is not None:
-            colors.add(gem.color)
-
+        before = mix_colors(frozenset(colors))
+        collect(gem)
+        after = mix_colors(frozenset(colors))
         new_heading = half.reflect(heading)
-        if new_heading is heading.reverse():
-            # Face plate : renvoi à 180°, le rayon n'entre pas dans la case.
-            # La couleur est prise au contact : on met à jour la couleur « en
-            # sortie » de la dernière case parcourue (le point de rebroussement)
-            # pour qu'elle change dès le contact et non un segment plus tard.
-            heading = new_heading
-            if color_steps:
-                color_steps[-1] = mix_colors(frozenset(colors))
-        else:
+
+        if new_heading is not heading.reverse():
             # Arête diagonale : le rayon entre dans la case et tourne à 90°.
+            # Le segment d'arrivée garde l'ancienne couleur (teinte prise au virage).
+            add_vertex(nxt.row, nxt.col, before)
+            path.append(nxt)
+            color_steps.append(after)
             heading = new_heading
             pos = nxt
             last_inside = nxt
-            record(nxt)
+            continue
+
+        # Face plate : rebond 180° sur la face de `nxt` (le rayon n'y entre pas).
+        add_vertex(pos.row + dr * 0.5, pos.col + dc * 0.5, before)  # arrivée = ancienne teinte
+        if color_steps:
+            color_steps[-1] = after
+        heading = heading.reverse()
+        # Si la case de rebroussement `pos` est elle-même un miroir (le rayon y
+        # avait dévié), il doit y redévier au lieu de la traverser.
+        pos_half = grid.surface.get(pos)
+        if pos_half is not None:
+            collect(grid.owner[pos])
+            heading = pos_half.reflect(heading)
+            add_vertex(pos.row, pos.col, after)  # segment de retour déjà teinté
 
     # Boucle infinie détectée : pas de sortie exploitable.
-    return BeamResult(
-        exit_point=None,
-        color=mix_colors(frozenset(colors)),
-        path=path,
-        color_steps=color_steps,
-    )
+    return result(None)

@@ -274,8 +274,8 @@ class GameScreen:
 
     def _fire_test(self, ep: EntryPoint) -> None:
         result = fire_beam(self.hypothesis, ep.entry, ep.direction)
-        self._ray_points = self._build_ray_points(ep, result)
-        self._ray_seg_colors = self._build_seg_colors(result, len(self._ray_points))
+        self._ray_points = [theme.point_px(r, c) for r, c in result.vertices]
+        self._ray_seg_colors = [theme.ray_rgb(name) for name in result.segment_colors]
         self._ray_absorbed = result.absorbed
         self._ray_total_len = _polyline_length(self._ray_points)
         self._ray_progress = 0.0
@@ -332,53 +332,6 @@ class GameScreen:
         return candidate if self.grid.is_inside(candidate) else None
 
     # --- Rayon (géométrie d'animation) -------------------------------------
-
-    def _build_ray_points(self, ep: EntryPoint, result: BeamResult) -> list[tuple[float, float]]:
-        drow, dcol = ep.direction.value
-        ecx, ecy = theme.cell_center(ep.entry)
-        points: list[tuple[float, float]] = [
-            (ecx - dcol * theme.CELL / 2, ecy - drow * theme.CELL / 2)
-        ]
-        points += [theme.cell_center(p) for p in result.path]
-        # Tronçon de sortie : dans la **vraie direction de sortie** (le rayon a
-        # pu dévier sur la dernière case), sinon il traverserait la gemme.
-        if (
-            not result.absorbed
-            and result.exit_point is not None
-            and result.exit_direction is not None
-        ):
-            exr, exc = result.exit_direction.value
-            cx, cy = theme.cell_center(result.exit_point)
-            points.append((cx + exc * theme.CELL / 2, cy + exr * theme.CELL / 2))
-        return self._extend_bounces(points)
-
-    @staticmethod
-    def _extend_bounces(points: list[tuple[float, float]]) -> list[tuple[float, float]]:
-        """Pousse chaque point de rebroussement (rebond 180°) jusqu'à la face de
-        la gemme : sinon le rayon s'arrête au centre de la case précédente, ce
-        qui laisse un vide visible avant la pièce."""
-        result = list(points)
-        for i in range(1, len(points) - 1):
-            if points[i - 1] == points[i + 1]:  # aller-retour : demi-tour en i
-                ax, ay = points[i - 1]
-                bx, by = points[i]
-                vx, vy = bx - ax, by - ay
-                norm = math.hypot(vx, vy) or 1.0
-                result[i] = (bx + vx / norm * theme.CELL / 2, by + vy / norm * theme.CELL / 2)
-        return result
-
-    def _build_seg_colors(self, result: BeamResult, n_points: int) -> list[tuple[int, int, int]]:
-        """Couleur RGB de chaque segment du rayon (transparent avant la 1re gemme)."""
-        steps = result.color_steps
-        colors: list[tuple[int, int, int]] = []
-        for j in range(max(0, n_points - 1)):
-            if j == 0:
-                colors.append(theme.RAY_TRANSPARENT)  # entrée -> 1re case
-            else:
-                idx = min(j - 1, len(steps) - 1) if steps else -1
-                name = steps[idx] if idx >= 0 else None
-                colors.append(theme.ray_rgb(name))
-        return colors
 
     def update(self, dt: float) -> None:
         if self._ray_progress < self._ray_total_len:

@@ -101,6 +101,27 @@ def test_bounce_colors_pivot_cell_at_contact():
     assert result.color_steps[2] == "rouge"  # couleur prise au contact
 
 
+def test_bounce_back_into_mirror_redeflects():
+    # Dévie à 90° sur une pièce, rebond 180° sur la pièce juste après : le rayon
+    # doit RE-dévier à 90° sur la première pièce (et non la traverser).
+    grid = Grid(width=10, height=8)
+    grid.place_gem(cat.BLUE.at(Position(4, 2)))    # RA_SW en (4,4)
+    grid.place_gem(cat.YELLOW.at(Position(3, 5)))  # RA_NW en (4,5), renvoie à 180°
+    result = fire_beam(grid, entry=Position(0, 4), direction=Direction.DOWN)
+    assert result.exit_point == Position(0, 4)
+    assert result.exit_direction is Direction.UP
+    assert result.color == "vert"  # bleu puis jaune
+    assert not result.absorbed
+
+
+def test_ray_vertices_and_segment_colors_are_consistent():
+    grid = Grid(width=8, height=8)
+    grid.place_gem(cat.RED.at(Position(3, 0)))
+    result = fire_beam(grid, entry=Position(0, 1), direction=Direction.DOWN)
+    assert len(result.segment_colors) == len(result.vertices) - 1
+    assert len(result.vertices) >= 2
+
+
 def test_beam_absorbed_by_black_body_has_no_exit():
     grid = Grid(width=8, height=8)
     grid.place_gem(cat.BLACK_BODY.at(Position(3, 3)))
