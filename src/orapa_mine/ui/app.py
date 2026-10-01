@@ -15,7 +15,6 @@ import pygame
 from orapa_mine.ai.generator import Difficulty, generate_hidden_grid
 from orapa_mine.model import gems_catalog as cat
 from orapa_mine.model.game import GameState
-from orapa_mine.ui import theme
 from orapa_mine.ui.config_screen import ConfigScreen
 from orapa_mine.ui.creator_screen import CreatorScreen
 from orapa_mine.ui.end_screen import EndScreen
@@ -86,7 +85,7 @@ class OrapaMineApp:
         grid = generate_hidden_grid(difficulty=difficulty, rng=rng)
         game = GameState(hidden_grid=grid)
         self.current = GameScreen(game, palette_pieces=difficulty.pieces)
-        self._resize(theme.window_size(grid.width, grid.height))
+        self._resize(self.current.size)
 
     def _start_creator(self, difficulty: Difficulty) -> None:
         # Reprend la sélection du menu comme valeurs de départ ; l'utilisateur
@@ -106,14 +105,14 @@ class OrapaMineApp:
     def _start_from_grid(self, grid, palette_pieces) -> None:
         game = GameState(hidden_grid=grid)
         self.current = GameScreen(game, palette_pieces=palette_pieces)
-        self._resize(theme.window_size(grid.width, grid.height))
+        self._resize(self.current.size)
 
     def _start_loaded(self, loaded) -> None:
         screen = GameScreen(loaded.game, palette_pieces=loaded.palette_pieces)
         screen.hypothesis = loaded.hypothesis
         screen.used_names = {gem.piece.name for gem in loaded.hypothesis.gems}
         self.current = screen
-        self._resize(theme.window_size(loaded.width, loaded.height))
+        self._resize(self.current.size)
 
     def _show_end(self, won: bool, score: int, hidden_grid) -> None:
         self.current = EndScreen(won=won, score=score, hidden_grid=hidden_grid)

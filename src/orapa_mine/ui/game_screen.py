@@ -101,6 +101,8 @@ class GameScreen:
         self.font_small = pygame.font.SysFont("arial", 15)
         self.font_big = pygame.font.SysFont("arial", 26, bold=True)
 
+        # Mise en page adaptative (taille de case + positions selon l'écran).
+        self.size = theme.window_size(self.grid.width, self.grid.height)
         self.entries = self._build_entries()
         self.entry_by_label = {ep.label: ep for ep in self.entries}
         self.slots = self._build_palette(palette_pieces)
@@ -130,34 +132,26 @@ class GameScreen:
         return entries
 
     def _build_palette(self, pieces: list[Piece]) -> list[Slot]:
-        slots: list[Slot] = []
-        y = theme.palette_top(self.grid.height)
-        slot_w, slot_h, gap = 82, theme.PALETTE_HEIGHT - 8, 10
-        x = theme.BOARD_X
-        for piece in pieces:
-            slots.append(Slot(piece, pygame.Rect(x, y, slot_w, slot_h)))
-            x += slot_w + gap
-        return slots
+        rects = theme.palette_slots(len(pieces))
+        return [Slot(piece, rect) for piece, rect in zip(pieces, rects)]
 
     def _layout_panel(self) -> None:
-        px = theme.BOARD_X + self.grid.width * theme.CELL + theme.PANEL_MARGIN
+        self.panel = theme.PANEL.copy()
+        px = self.panel.x
         self.panel_x = px
-        self.panel = pygame.Rect(
-            px, theme.BOARD_Y, theme.PANEL_WIDTH, self.grid.height * theme.CELL
-        )
         inner = px + 18
-        self.help_rect = pygame.Rect(px + theme.PANEL_WIDTH - 44, theme.BOARD_Y + 16, 28, 28)
-        self.submit_rect = pygame.Rect(inner, theme.BOARD_Y + 92, 180, 34)
-        self.abandon_rect = pygame.Rect(inner + 190, theme.BOARD_Y + 92, 92, 34)
+        top = self.panel.top
+        self.help_rect = pygame.Rect(px + theme.PANEL_WIDTH - 44, top + 16, 28, 28)
+        self.submit_rect = pygame.Rect(inner, top + 92, 180, 34)
+        self.abandon_rect = pygame.Rect(inner + 190, top + 92, 92, 34)
         # Ligne sauvegarde : case « progression » + bouton Sauvegarder.
-        self.progress_toggle_rect = pygame.Rect(inner, theme.BOARD_Y + 136, 20, 20)
-        self.save_rect = pygame.Rect(inner + 150, theme.BOARD_Y + 132, 132, 28)
-        bottom = theme.BOARD_Y + self.grid.height * theme.CELL
-        self.input_rect = pygame.Rect(inner, bottom - 92, theme.PANEL_WIDTH - 36, 32)
+        self.progress_toggle_rect = pygame.Rect(inner, top + 136, 20, 20)
+        self.save_rect = pygame.Rect(inner + 150, top + 132, 132, 28)
+        self.input_rect = pygame.Rect(inner, self.panel.bottom - 92, theme.PANEL_WIDTH - 36, 32)
 
         # Zone d'historique : s'étire entre l'en-tête et la zone de saisie,
-        # donc s'adapte à la hauteur de la grille choisie.
-        self.history_header_y = theme.BOARD_Y + 174
+        # donc s'adapte à la hauteur du panneau.
+        self.history_header_y = top + 174
         content_top = self.history_header_y + 24
         content_bottom = self.input_rect.top - 28  # laisse la place au libellé
         self.history_rect = pygame.Rect(
@@ -479,6 +473,8 @@ class GameScreen:
             surface.blit(label, label.get_rect(center=ep.center))
 
     def _draw_palette(self, surface: pygame.Surface) -> None:
+        title = self.font_small.render("Pièces", True, theme.TEXT_DIM)
+        surface.blit(title, (theme.PALETTE.x + 4, theme.PALETTE.y - 22))
         for slot in self.slots:
             used = slot.piece.name in self.used_names
             selected = slot.piece is self.selected
@@ -508,7 +504,7 @@ class GameScreen:
         pygame.draw.rect(surface, theme.PANEL_BG, self.panel, border_radius=8)
         pygame.draw.rect(surface, theme.BOARD_BORDER, self.panel, width=1, border_radius=8)
         x = self.panel_x + 18
-        surface.blit(self.font_big.render("Orapa Mine", True, theme.TEXT), (x, theme.BOARD_Y + 12))
+        surface.blit(self.font_big.render("Orapa Mine", True, theme.TEXT), (x, self.panel.top + 12))
         # Bouton d'aide « ? ».
         pygame.draw.circle(surface, theme.SLOT_BG, self.help_rect.center, 14)
         pygame.draw.circle(surface, theme.BOARD_BORDER, self.help_rect.center, 14, width=1)
@@ -516,7 +512,7 @@ class GameScreen:
         surface.blit(q, q.get_rect(center=self.help_rect.center))
         surface.blit(
             self.font_small.render(self.last_test or "Clique un point d'entrée pour tester.", True, theme.TEXT_DIM),
-            (x, theme.BOARD_Y + 54),
+            (x, self.panel.top + 54),
         )
         # Boutons Proposer / Abandonner.
         pygame.draw.rect(surface, (54, 120, 90), self.submit_rect, border_radius=6)
@@ -561,7 +557,7 @@ class GameScreen:
         hint = "clic=choisir, clic plateau=poser, [R] tourner, clic droit=retirer, [H] aide, [Maj+D] debug"
         surface.blit(
             self.font_small.render(hint, True, theme.TEXT_DIM),
-            (theme.BOARD_X, theme.board_bottom(self.grid.height) + theme.ENTRY_MARGIN + 4),
+            (theme.PALETTE.x, self.size[1] - 24),
         )
 
     # --- Aide paginée ------------------------------------------------------

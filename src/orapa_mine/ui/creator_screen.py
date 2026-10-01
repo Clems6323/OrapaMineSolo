@@ -103,24 +103,16 @@ class CreatorScreen:
     # --- Construction ------------------------------------------------------
 
     def _build_palette(self, pieces: list[Piece]) -> list[Slot]:
-        slots: list[Slot] = []
-        y = theme.palette_top(self.grid.height)
-        slot_w, slot_h, gap = 82, theme.PALETTE_HEIGHT - 8, 10
-        x = theme.BOARD_X
-        for piece in pieces:
-            slots.append(Slot(piece, pygame.Rect(x, y, slot_w, slot_h)))
-            x += slot_w + gap
-        return slots
+        rects = theme.palette_slots(len(pieces))
+        return [Slot(piece, rect) for piece, rect in zip(pieces, rects)]
 
     def _layout_panel(self) -> None:
-        px = theme.BOARD_X + self.grid.width * theme.CELL + theme.PANEL_MARGIN
+        self.panel = theme.PANEL.copy()
+        px = self.panel.x
         self.panel_x = px
-        self.panel = pygame.Rect(
-            px, theme.BOARD_Y, theme.PANEL_WIDTH, self.grid.height * theme.CELL
-        )
         inner = px + 18
         bw = theme.PANEL_WIDTH - 36
-        top = theme.BOARD_Y
+        top = self.panel.top
 
         # Réglages (haut du panneau) : taille de grille + extensions.
         self.size_label_y = top + 46
@@ -304,7 +296,7 @@ class CreatorScreen:
         hint = "clic=choisir, clic plateau=poser, [R] tourner, clic droit=retirer, [Échap] désélectionner"
         surface.blit(
             self.font_small.render(hint, True, theme.TEXT_DIM),
-            (theme.BOARD_X, theme.board_bottom(self.grid.height) + theme.ENTRY_MARGIN + 4),
+            (theme.PALETTE.x, self.size[1] - 24),
         )
 
     def _draw_ghost(self, surface: pygame.Surface) -> None:
@@ -321,6 +313,8 @@ class CreatorScreen:
         surface.blit(overlay, (0, 0))
 
     def _draw_palette(self, surface: pygame.Surface) -> None:
+        title = self.font_small.render("Pièces", True, theme.TEXT_DIM)
+        surface.blit(title, (theme.PALETTE.x + 4, theme.PALETTE.y - 22))
         for slot in self.slots:
             used = slot.piece.name in self.used_names
             selected = slot.piece is self.selected
@@ -351,7 +345,7 @@ class CreatorScreen:
         pygame.draw.rect(surface, theme.PANEL_BG, self.panel, border_radius=8)
         pygame.draw.rect(surface, theme.BOARD_BORDER, self.panel, width=1, border_radius=8)
         x = self.panel_x + 18
-        surface.blit(self.font_big.render("Mode créateur", True, theme.TEXT), (x, theme.BOARD_Y + 14))
+        surface.blit(self.font_big.render("Mode créateur", True, theme.TEXT), (x, self.panel.top + 14))
 
         # Réglages : taille de grille.
         surface.blit(self.font_small.render("Taille de la grille", True, theme.TEXT), (x, self.size_label_y))
