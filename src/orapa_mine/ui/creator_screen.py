@@ -1,0 +1,331 @@
+"""Écran « mode créateur » : composer et sauvegarder une configuration.
+
+L'utilisateur pose librement les gemmes de la palette sur le plateau pour
+dessiner sa propre énigme, puis :
+
+- **Sauvegarde** la configuration (format de partie, sans progression) — le
+  fichier peut être partagé puis chargé depuis le menu de départ ;
+- **Joue** sa configuration (démarre une vraie partie dessus).
+
+Aucune règle de jeu ici : la validation du placement est déléguée à
+`ai/generator.configuration_problems`, le rendu à `ui/board_render` et `theme`.
+"""
+
+from __future__ import annotations
+
+import pygame
+
+from orapa_mine.ai.generator import configuration_problems
+from orapa_mine.model.gems import Piece, PlacedGem, Position
+from orapa_mine.model import serialization
+from orapa_mine.model.grid import Grid
+from orapa_mine.ui import board_render, dialogs, theme
+from orapa_mine.ui.board_render import darken as _darken
+from orapa_mine.ui.board_render import piece_color as _piece_color
+from orapa_mine.ui.game_screen import Slot
+
+
+class CreatorScreen:
+    """Composition d'une grille cachée personnalisée (pose de gemmes)."""
+
+    def __init__(self, width: int, height: int, palette_pieces: list[Piece]) -> None:
+        self.size = theme.window_size(width, height)
+        self.palette_pieces = palette_pieces
+        self.grid = Grid(width=width, height=height)
+
+        # Sélection / pose de pièces (même interaction que l'écran de jeu).
+        self.selected: Piece | None = None
+        self.orientation_index = 0
+        self.used_names: set[str] = set()
+        self.hovered_cell: Position | None = None
+
+        self.message: str | None = None
+        self.message_color = theme.TEXT_DIM
+
+        # Transitions lues par l'app.
+        self.play: Grid | None = None  # « Jouer » : grille à utiliser
+        self.back = False  # « Retour au menu »
+
+        pygame.font.init()
+        self.font = pygame.font.SysFont("arial", 18)
+        self.font_small = pygame.font.SysFont("arial", 15)
+        self.font_big = pygame.font.SysFont("arial", 26, bold=True)
+
+        self.slots = self._build_palette(palette_pieces)
+        self._layout_panel()
+
+    # --- Construction ------------------------------------------------------
+
+    def _build_palette(self, pieces: list[Piece]) -> list[Slot]:
+        slots: list[Slot] = []
+        y = theme.palette_top(self.grid.height)
+        slot_w, slot_h, gap = 82, theme.PALETTE_HEIGHT - 8, 10
+        x = theme.BOARD_X
+        for piece in pieces:
+            slots.append(Slot(piece, pygame.Rect(x, y, slot_w, slot_h)))
+            x += slot_w + gap
+        return slots
+
+    def _layout_panel(self) -> None:
+        px = theme.BOARD_X + self.grid.width * theme.CELL + theme.PANEL_MARGIN
+        self.panel_x = px
+        self.panel = pygame.Rect(
+            px, theme.BOARD_Y, theme.PANEL_WIDTH, self.grid.height * theme.CELL
+        )
+        inner = px + 18
+        bw = theme.PANEL_WIDTH - 36
+        self.save_rect = pygame.Rect(inner, self.panel.bottom - 164, bw, 42)
+        self.play_rect = pygame.Rect(inner, self.panel.bottom - 112, bw, 42)
+        self.back_rect = pygame.Rect(inner, self.panel.bottom - 56, bw, 40)
+
+    # --- Événements --------------------------------------------------------
+
+    def handle_event(self, event: pygame.event.Event) -> None:
+        if event.type == pygame.MOUSEMOTION:
+            self.hovered_cell = self._cell_at(event.pos)
+        elif event.type == pygame.MOUSEBUTTONDOWN:
+            self._on_click(event)
+        elif event.type == pygame.KEYDOWN:
+            self._on_key(event)
+
+    def _on_click(self, event: pygame.event.Event) -> None:
+        pos = event.pos
+        if event.button == 3:  # clic droit : retirer une gemme
+            self._remove_at(self._cell_at(pos))
+            return
+        if event.button != 1:
+            return
+        if self.save_rect.collidepoint(pos):
+            self._save()
+            return
+        if self.play_rect.collidepoint(pos):
+            self._start_play()
+            return
+        if self.back_rect.collidepoint(pos):
+            self.back = True
+            return
+        slot = self._slot_at(pos)
+        if slot is not None:
+            self._select_slot(slot)
+            return
+        cell = self._cell_at(pos)
+        if cell is not None:
+            self._place_or_remove(cell)
+
+    def _on_key(self, event: pygame.event.Event) -> None:
+        if event.key == pygame.K_r and self.selected is not None:
+            count = len(self.selected.orientations())
+            self.orientation_index = (self.orientation_index + 1) % count
+        elif event.key == pygame.K_ESCAPE:
+            self.selected = None
+
+    # --- Actions -----------------------------------------------------------
+
+    def _select_slot(self, index: int) -> None:
+        piece = self.slots[index].piece
+        if piece.name in self.used_names:
+            return
+        self.selected = piece
+        self.orientation_index = 0
+
+    def _place_or_remove(self, cell: Position) -> None:
+        if self.selected is None:
+            self._remove_at(cell)
+            return
+        orientation = self.selected.orientations()[self.orientation_index]
+        gem = PlacedGem(piece=self.selected, anchor=cell, orientation=orientation)
+        if self.grid.can_place(gem):
+            self.grid.place_gem(gem)
+            self.used_names.add(self.selected.name)
+            self.selected = None
+            self.message = None
+
+    def _remove_at(self, cell: Position | None) -> None:
+        if cell is None:
+            return
+        gem = self.grid.gem_at(cell)
+        if gem is not None:
+            self.grid.remove_gem(gem)
+            self.used_names.discard(gem.piece.name)
+            self.message = None
+
+    def _blocking_problem(self) -> str | None:
+        """Raison empêchant de jouer/partager, ou None si tout va bien."""
+        if not self.grid.gems:
+            return "Pose au moins une gemme."
+        problems = configuration_problems(self.grid)
+        if problems:
+            return problems[0]
+        return None
+
+    def _save(self) -> None:
+        if not self.grid.gems:
+            self.message, self.message_color = "Pose au moins une gemme.", theme.LOSE_COLOR
+            return
+        path = dialogs.ask_save_path()
+        if not path:
+            return
+        data = serialization.to_dict(
+            width=self.grid.width,
+            height=self.grid.height,
+            palette_pieces=self.palette_pieces,
+            hidden_grid=self.grid,
+            include_progress=False,
+            game=None,
+            hypothesis_grid=None,
+        )
+        try:
+            dialogs.write_json(path, data)
+        except OSError as exc:
+            self.message, self.message_color = f"Échec de la sauvegarde : {exc}", theme.LOSE_COLOR
+            return
+        warn = self._blocking_problem()
+        if warn:
+            self.message = f"Configuration enregistrée (attention : {warn})."
+            self.message_color = theme.TEXT_DIM
+        else:
+            self.message, self.message_color = "Configuration enregistrée.", theme.WIN_COLOR
+
+    def _start_play(self) -> None:
+        problem = self._blocking_problem()
+        if problem:
+            self.message, self.message_color = problem, theme.LOSE_COLOR
+            return
+        self.play = self.grid
+
+    def update(self, dt: float) -> None:  # noqa: D401 - rien à animer
+        pass
+
+    # --- Détection de zones ------------------------------------------------
+
+    def _slot_at(self, pos: tuple[int, int]) -> int | None:
+        for index, slot in enumerate(self.slots):
+            if slot.rect.collidepoint(pos):
+                return index
+        return None
+
+    def _cell_at(self, pos: tuple[int, int]) -> Position | None:
+        x, y = pos
+        col = (x - theme.BOARD_X) // theme.CELL
+        row = (y - theme.BOARD_Y) // theme.CELL
+        candidate = Position(int(row), int(col))
+        return candidate if self.grid.is_inside(candidate) else None
+
+    # --- Rendu -------------------------------------------------------------
+
+    def render(self, surface: pygame.Surface) -> None:
+        surface.fill(theme.BACKGROUND)
+        caption = self.font.render("Compose ta configuration cachée :", True, theme.TEXT_DIM)
+        surface.blit(caption, (theme.BOARD_X, theme.BOARD_Y - 34))
+        board_render.draw_board(surface, self.grid)
+        board_render.draw_gems(surface, self.grid)
+        self._draw_ghost(surface)
+        self._draw_palette(surface)
+        self._draw_panel(surface)
+        hint = "clic=choisir, clic plateau=poser, [R] tourner, clic droit=retirer, [Échap] désélectionner"
+        surface.blit(
+            self.font_small.render(hint, True, theme.TEXT_DIM),
+            (theme.BOARD_X, theme.board_bottom(self.grid.height) + theme.ENTRY_MARGIN + 4),
+        )
+
+    def _draw_ghost(self, surface: pygame.Surface) -> None:
+        if self.selected is None or self.hovered_cell is None:
+            return
+        orientation = self.selected.orientations()[self.orientation_index]
+        gem = PlacedGem(piece=self.selected, anchor=self.hovered_cell, orientation=orientation)
+        ok = self.grid.can_place(gem)
+        color = theme.GHOST_OK if ok else theme.GHOST_BAD
+        overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
+        for pos, half in gem.absolute_cells().items():
+            if self.grid.is_inside(pos):
+                pygame.draw.polygon(overlay, (*color, 120), theme.half_cell_polygon(pos, half))
+        surface.blit(overlay, (0, 0))
+
+    def _draw_palette(self, surface: pygame.Surface) -> None:
+        for slot in self.slots:
+            used = slot.piece.name in self.used_names
+            selected = slot.piece is self.selected
+            bg = theme.SLOT_USED if used else theme.SLOT_BG
+            pygame.draw.rect(surface, bg, slot.rect, border_radius=6)
+            border = theme.SLOT_SELECTED if selected else theme.BOARD_BORDER
+            pygame.draw.rect(surface, border, slot.rect, width=2 if selected else 1, border_radius=6)
+            self._draw_slot_icon(surface, slot, faded=used)
+
+    def _draw_slot_icon(self, surface: pygame.Surface, slot: Slot, faded: bool) -> None:
+        cells = slot.piece.cells
+        rows = max(p.row for p, _ in cells) + 1
+        cols = max(p.col for p, _ in cells) + 1
+        area = slot.rect.inflate(-16, -22)
+        size = min(area.width / cols, area.height / rows)
+        ox = slot.rect.centerx - cols * size / 2
+        oy = slot.rect.top + 8
+        base = _piece_color(slot.piece)
+        if faded:
+            base = _darken(base, 0.5)
+        for pos, half in cells:
+            pygame.draw.polygon(surface, base, theme.half_cell_polygon_at(pos, half, ox, oy, size))
+        name = slot.piece.color.value if slot.piece.color else slot.piece.name
+        label = self.font_small.render(name, True, theme.TEXT_DIM)
+        surface.blit(label, label.get_rect(centerx=slot.rect.centerx, bottom=slot.rect.bottom - 4))
+
+    def _draw_panel(self, surface: pygame.Surface) -> None:
+        pygame.draw.rect(surface, theme.PANEL_BG, self.panel, border_radius=8)
+        pygame.draw.rect(surface, theme.BOARD_BORDER, self.panel, width=1, border_radius=8)
+        x = self.panel_x + 18
+        surface.blit(self.font_big.render("Mode créateur", True, theme.TEXT), (x, theme.BOARD_Y + 14))
+        intro = [
+            "Place les gemmes où tu le souhaites,",
+            "puis sauvegarde pour partager ton",
+            "énigme, ou joue-la toi-même.",
+        ]
+        for i, text in enumerate(intro):
+            surface.blit(self.font_small.render(text, True, theme.TEXT_DIM), (x, theme.BOARD_Y + 54 + i * 20))
+
+        # État de validité en direct.
+        placed = len(self.grid.gems)
+        problem = self._blocking_problem()
+        if problem is None:
+            status, color = f"Configuration valide ({placed} gemme(s)).", theme.WIN_COLOR
+        else:
+            status, color = f"Attention : {problem}", theme.LOSE_COLOR
+        for i, text in enumerate(_wrap(status, self.font_small, theme.PANEL_WIDTH - 40)):
+            surface.blit(self.font_small.render(text, True, color), (x, theme.BOARD_Y + 134 + i * 20))
+
+        self._button(surface, self.save_rect, (54, 96, 120), "Sauvegarder la configuration")
+        can_play = problem is None
+        self._button(
+            surface,
+            self.play_rect,
+            (54, 120, 90) if can_play else theme.SLOT_USED,
+            "Jouer cette configuration",
+            dim=not can_play,
+        )
+        self._button(surface, self.back_rect, theme.SLOT_BG, "Retour au menu")
+
+        if self.message:
+            for i, text in enumerate(_wrap(self.message, self.font_small, theme.PANEL_WIDTH - 40)):
+                surface.blit(self.font_small.render(text, True, self.message_color), (x, self.save_rect.top - 46 + i * 18))
+
+    def _button(self, surface: pygame.Surface, rect: pygame.Rect, bg, text: str, dim: bool = False) -> None:
+        pygame.draw.rect(surface, bg, rect, border_radius=8)
+        pygame.draw.rect(surface, theme.BOARD_BORDER, rect, width=1, border_radius=8)
+        color = theme.TEXT_DIM if dim else theme.TEXT
+        label = self.font_small.render(text, True, color)
+        surface.blit(label, label.get_rect(center=rect.center))
+
+
+def _wrap(text: str, font: pygame.font.Font, max_width: int) -> list[str]:
+    """Découpe `text` en lignes tenant dans `max_width` pixels."""
+    words = text.split()
+    lines: list[str] = []
+    current = ""
+    for word in words:
+        candidate = f"{current} {word}".strip()
+        if font.size(candidate)[0] <= max_width or not current:
+            current = candidate
+        else:
+            lines.append(current)
+            current = word
+    if current:
+        lines.append(current)
+    return lines

@@ -8,9 +8,12 @@ from orapa_mine.ai.generator import (
     Difficulty,
     _gem_visible,
     _touches_orthogonally,
+    configuration_is_valid,
+    configuration_problems,
     generate_hidden_grid,
 )
 from orapa_mine.model.gems import Direction, HalfCell, Position
+from orapa_mine.model.grid import Grid
 from orapa_mine.model import gems_catalog as cat
 
 
@@ -66,11 +69,47 @@ def test_many_seeds_all_produce_valid_boards():
 
 def test_hidden_gem_is_detected():
     # Une gemme volontairement cachée derrière une autre doit être invisible.
-    from orapa_mine.model.grid import Grid
-
     grid = Grid(width=10, height=8)
     # Blanc-petit (losange 2×2) placé au centre, entouré... on teste juste
     # qu'une gemme au bord est visible et qu'on sait détecter l'inverse.
     edge_gem = cat.YELLOW.at(Position(0, 0))
     grid.place_gem(edge_gem)
     assert _gem_visible(grid, edge_gem)
+
+
+# --- Validation d'une configuration (mode créateur) --------------------------
+
+
+def test_generated_grid_is_a_valid_configuration():
+    grid = generate_hidden_grid(rng=random.Random(11))
+    assert configuration_is_valid(grid)
+    assert configuration_problems(grid) == []
+
+
+def test_empty_configuration_is_valid():
+    assert configuration_is_valid(Grid(width=10, height=8))
+
+
+def test_adjacent_gems_are_reported():
+    grid = Grid(width=10, height=8)
+    # Deux rectangles pleins 1×2 côte à côte : (0,1) et (0,2) sont adjacents.
+    grid.place_gem(cat.BLACK_BODY.at(Position(0, 0)))
+    grid.place_gem(cat.BLACK_BODY.at(Position(0, 2)))
+    problems = configuration_problems(grid)
+    assert problems and any("touche" in p for p in problems)
+
+
+def test_fully_hidden_gem_is_reported():
+    grid = Grid(width=10, height=8)
+    center = cat.WHITE_SMALL.at(Position(3, 4))
+    grid.place_gem(center)
+    own = set(center.absolute_cells())
+    # Entoure complètement la gemme : toute case libre devient un bloqueur, donc
+    # aucune ligne de vue vers un bord -> la gemme est entièrement cachée.
+    for row in range(grid.height):
+        for col in range(grid.width):
+            pos = Position(row, col)
+            if pos not in own:
+                grid.surface[pos] = HalfCell.FULL
+    problems = configuration_problems(grid)
+    assert any("cachée" in p for p in problems)

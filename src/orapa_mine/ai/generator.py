@@ -124,6 +124,38 @@ def _all_gems_visible(grid: Grid) -> bool:
     return all(_gem_visible(grid, gem) for gem in grid.gems)
 
 
+# --- Validation d'une configuration existante (mode créateur) ----------------
+
+
+def _gem_label(gem: PlacedGem) -> str:
+    """Nom lisible d'une gemme posée (pour les messages de validation)."""
+    return gem.color.value if gem.color is not None else gem.piece.name
+
+
+def configuration_problems(grid: Grid) -> list[str]:
+    """Liste les violations des règles de placement dans `grid`.
+
+    Mêmes règles que la génération (adjacence orthogonale interdite, aucune
+    gemme entièrement cachée). Retourne une liste vide si la configuration est
+    valide. Logique pure et testable, réutilisée par le mode créateur.
+    """
+    problems: list[str] = []
+    occupied = set(grid.surface)
+    for gem in grid.gems:
+        others = occupied - set(gem.absolute_cells())
+        if _touches_orthogonally(gem, others):
+            problems.append(f"La gemme {_gem_label(gem)} touche une autre gemme.")
+    for gem in grid.gems:
+        if not _gem_visible(grid, gem):
+            problems.append(f"La gemme {_gem_label(gem)} est entièrement cachée.")
+    return problems
+
+
+def configuration_is_valid(grid: Grid) -> bool:
+    """Vrai si `grid` respecte toutes les règles de placement."""
+    return not configuration_problems(grid)
+
+
 def _gem_visible(grid: Grid, gem: PlacedGem) -> bool:
     """Vrai si `gem` a au moins une ligne de vue droite vers un bord."""
     own_cells = set(gem.absolute_cells())

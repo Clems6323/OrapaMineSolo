@@ -28,6 +28,7 @@ class ConfigScreen:
         self.size_index = 1
         self.result: Difficulty | None = None
         self.loaded: LoadedGame | None = None
+        self.creator: Difficulty | None = None  # lancer le mode créateur
         self.error: str | None = None
 
         pygame.font.init()
@@ -44,8 +45,12 @@ class ConfigScreen:
         self.size_rects = [
             pygame.Rect(start_x + i * (bw + gap), 372, bw, 60) for i in range(3)
         ]
-        self.start_rect = pygame.Rect(cx - 270, 552, 250, 58)
-        self.load_rect = pygame.Rect(cx + 20, 552, 250, 58)
+        bw2, gap2 = 224, 16
+        total2 = 3 * bw2 + 2 * gap2
+        bx = (self.size[0] - total2) // 2
+        self.start_rect = pygame.Rect(bx, 556, bw2, 58)
+        self.creator_rect = pygame.Rect(bx + bw2 + gap2, 556, bw2, 58)
+        self.load_rect = pygame.Rect(bx + 2 * (bw2 + gap2), 556, bw2, 58)
 
     # --- Événements --------------------------------------------------------
 
@@ -59,6 +64,8 @@ class ConfigScreen:
             self.corps_noir = not self.corps_noir
         elif self.start_rect.collidepoint(p):
             self._begin()
+        elif self.creator_rect.collidepoint(p):
+            self.creator = self._difficulty()
         elif self.load_rect.collidepoint(p):
             self._load()
         else:
@@ -75,16 +82,18 @@ class ConfigScreen:
         except (OSError, ValueError, KeyError) as exc:
             self.error = f"Chargement impossible : {exc}"
 
-    def _begin(self) -> None:
+    def _difficulty(self) -> Difficulty:
+        """Construit la difficulté à partir des cases/boutons sélectionnés."""
         pieces = [cat.RED, cat.YELLOW, cat.BLUE, cat.WHITE_BIG, cat.WHITE_SMALL]
         if self.diamant:
             pieces.append(cat.DIAMOND)
         if self.corps_noir:
             pieces.append(cat.BLACK_BODY)
         name, width, height = self.sizes[self.size_index]
-        self.result = Difficulty(
-            pieces=pieces, width=width, height=height, name=name.lower()
-        )
+        return Difficulty(pieces=pieces, width=width, height=height, name=name.lower())
+
+    def _begin(self) -> None:
+        self.result = self._difficulty()
 
     def update(self, dt: float) -> None:  # noqa: D401 - rien à animer
         pass
@@ -125,19 +134,19 @@ class ConfigScreen:
         count = self.font_small.render(f"Total : {total} gemmes à trouver", True, theme.TEXT_DIM)
         surface.blit(count, count.get_rect(centerx=cx, y=470))
 
-        pygame.draw.rect(surface, (54, 120, 90), self.start_rect, border_radius=10)
-        pygame.draw.rect(surface, theme.BOARD_BORDER, self.start_rect, width=1, border_radius=10)
-        label = self.font.render("Commencer", True, theme.TEXT)
-        surface.blit(label, label.get_rect(center=self.start_rect.center))
-
-        pygame.draw.rect(surface, theme.SLOT_BG, self.load_rect, border_radius=10)
-        pygame.draw.rect(surface, theme.BOARD_BORDER, self.load_rect, width=1, border_radius=10)
-        load_label = self.font.render("Charger une partie…", True, theme.TEXT)
-        surface.blit(load_label, load_label.get_rect(center=self.load_rect.center))
+        self._button(surface, self.start_rect, (54, 120, 90), "Commencer")
+        self._button(surface, self.creator_rect, (54, 96, 120), "Mode créateur")
+        self._button(surface, self.load_rect, theme.SLOT_BG, "Charger…")
 
         if self.error:
             err = self.font_small.render(self.error, True, theme.LOSE_COLOR)
             surface.blit(err, err.get_rect(centerx=cx, y=624))
+
+    def _button(self, surface: pygame.Surface, rect: pygame.Rect, bg, text: str) -> None:
+        pygame.draw.rect(surface, bg, rect, border_radius=10)
+        pygame.draw.rect(surface, theme.BOARD_BORDER, rect, width=1, border_radius=10)
+        label = self.font.render(text, True, theme.TEXT)
+        surface.blit(label, label.get_rect(center=rect.center))
 
     def _checkbox(self, surface: pygame.Surface, rect: pygame.Rect, on: bool, text: str) -> None:
         pygame.draw.rect(surface, theme.INPUT_BG, rect, border_radius=4)
