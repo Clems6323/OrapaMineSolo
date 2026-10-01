@@ -92,11 +92,38 @@ def test_empty_configuration_is_valid():
 
 def test_adjacent_gems_are_reported():
     grid = Grid(width=10, height=8)
-    # Deux rectangles pleins 1×2 côte à côte : (0,1) et (0,2) sont adjacents.
+    # Deux rectangles pleins 1×2 côte à côte : faces plates partagées.
     grid.place_gem(cat.BLACK_BODY.at(Position(0, 0)))
     grid.place_gem(cat.BLACK_BODY.at(Position(0, 2)))
     problems = configuration_problems(grid)
     assert problems and any("touche" in p for p in problems)
+
+
+def test_diagonal_contact_is_allowed():
+    # Régression (bug_placement) : deux triangles qui ne se rejoignent que par
+    # leur hypoténuse (contact en diagonale) ne doivent PAS être signalés, même
+    # si leurs cases occupent des positions orthogonalement adjacentes.
+    grid = Grid(width=14, height=12)
+    grid.place_gem(cat.BLUE.at(Position(3, 3), 0))
+    grid.place_gem(cat.WHITE_BIG.at(Position(1, 2), 0))
+    occ_blue = set(grid.gems[0].absolute_cells())
+    occ_white = set(grid.gems[1].absolute_cells())
+    from orapa_mine.model.gems import Direction
+    assert any(
+        (c + d) in occ_white
+        for c in occ_blue
+        for d in (Direction.UP, Direction.DOWN, Direction.LEFT, Direction.RIGHT)
+    ), "cas de test invalide : les pièces ne sont pas orthogonalement adjacentes"
+    assert configuration_is_valid(grid), configuration_problems(grid)
+
+
+def test_point_contact_is_allowed():
+    # Deux losanges blancs dans des boîtes voisines ne se touchent qu'en un
+    # point (leurs arêtes externes sont des hypoténuses) : contact autorisé.
+    grid = Grid(width=10, height=8)
+    grid.place_gem(cat.WHITE_SMALL.at(Position(0, 0)))
+    grid.place_gem(cat.WHITE_SMALL.at(Position(0, 2)))
+    assert not any("touche" in p for p in configuration_problems(grid))
 
 
 def test_fully_hidden_gem_is_reported():

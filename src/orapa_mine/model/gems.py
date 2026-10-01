@@ -120,6 +120,17 @@ class HalfCell(Enum):
             return _DEFLECT_SLASH[incoming]
         return _DEFLECT_BACKSLASH[incoming]
 
+    def flat_faces(self) -> frozenset[Direction]:
+        """Côtés de la case entièrement pleins (faces plates à 180°).
+
+        Une face est « pleine » quand toute l'arête de la case est de la
+        matière (face d'une case pleine, ou cathète d'un triangle rectangle).
+        Les côtés absents correspondent à l'hypoténuse (contact en diagonale) ou
+        à un simple coin. Utilisé pour détecter un vrai contact « côte à côte »
+        entre gemmes, par opposition à un contact ponctuel autorisé.
+        """
+        return _FLAT_FACES[self]
+
     def rotated_cw(self) -> HalfCell:
         """La même demi-case après rotation de 90° dans le sens horaire."""
         return _ROTATE_CW[self]
@@ -140,6 +151,15 @@ _BOUNCE_DIRS: dict[HalfCell, frozenset[Direction]] = {
     HalfCell.RA_NE: frozenset({Direction.DOWN, Direction.LEFT}),
     HalfCell.RA_SW: frozenset({Direction.UP, Direction.RIGHT}),
     HalfCell.RA_SE: frozenset({Direction.UP, Direction.LEFT}),
+}
+
+# Côtés pleins de chaque demi-case (une arête complète de matière). Un rayon qui
+# frappe cette face rebondit à 180° ; c'est le côté par lequel deux gemmes se
+# touchent vraiment « côte à côte ». Déduit de `_BOUNCE_DIRS` : la face frappée
+# est à l'opposé du sens de trajet du rayon.
+_FLAT_FACES: dict[HalfCell, frozenset[Direction]] = {
+    half: frozenset(travel.reverse() for travel in bounces)
+    for half, bounces in _BOUNCE_DIRS.items()
 }
 
 # Rotation horaire des coins : NW -> NE -> SE -> SW -> NW.

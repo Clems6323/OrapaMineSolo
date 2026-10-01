@@ -132,18 +132,40 @@ def _gem_label(gem: PlacedGem) -> str:
     return gem.color.value if gem.color is not None else gem.piece.name
 
 
+def _shares_flat_face(grid: Grid, gem: PlacedGem) -> bool:
+    """Vrai si `gem` touche une autre gemme par une **face plate** partagée.
+
+    Contrairement à `_touches_orthogonally` (adjacence de cases, volontairement
+    conservatrice pour la génération), on tient compte de la géométrie des
+    demi-cases : deux triangles qui ne se rejoignent que par leur hypoténuse ou
+    par un coin ne sont **pas** considérés côte à côte (contact autorisé).
+    """
+    own = gem.absolute_cells()
+    for cell, half in own.items():
+        for direction in _DIRECTIONS:
+            neighbor = cell + direction
+            if neighbor in own:
+                continue
+            other_half = grid.surface.get(neighbor)
+            if other_half is None:
+                continue
+            # Face partagée pleine des deux côtés -> vrai contact « côte à côte ».
+            if direction in half.flat_faces() and direction.reverse() in other_half.flat_faces():
+                return True
+    return False
+
+
 def configuration_problems(grid: Grid) -> list[str]:
     """Liste les violations des règles de placement dans `grid`.
 
-    Mêmes règles que la génération (adjacence orthogonale interdite, aucune
-    gemme entièrement cachée). Retourne une liste vide si la configuration est
-    valide. Logique pure et testable, réutilisée par le mode créateur.
+    Mêmes règles que le jeu : deux gemmes ne peuvent pas être côte à côte (face
+    plate partagée ; le contact en diagonale ou par un coin reste autorisé) et
+    aucune gemme n'est entièrement cachée. Retourne une liste vide si la
+    configuration est valide. Logique pure et testable, pour le mode créateur.
     """
     problems: list[str] = []
-    occupied = set(grid.surface)
     for gem in grid.gems:
-        others = occupied - set(gem.absolute_cells())
-        if _touches_orthogonally(gem, others):
+        if _shares_flat_face(grid, gem):
             problems.append(f"La gemme {_gem_label(gem)} touche une autre gemme.")
     for gem in grid.gems:
         if not _gem_visible(grid, gem):
