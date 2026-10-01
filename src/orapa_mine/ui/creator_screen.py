@@ -149,18 +149,26 @@ class CreatorScreen:
             self.used_names.discard(gem.piece.name)
             self.message = None
 
+    def _missing_pieces(self) -> list[Piece]:
+        """Pièces de la palette pas encore posées sur le plateau."""
+        placed = {gem.piece.name for gem in self.grid.gems}
+        return [piece for piece in self.palette_pieces if piece.name not in placed]
+
     def _blocking_problem(self) -> str | None:
         """Raison empêchant de jouer/partager, ou None si tout va bien."""
-        if not self.grid.gems:
-            return "Pose au moins une gemme."
+        missing = self._missing_pieces()
+        if missing:
+            names = ", ".join(piece.name for piece in missing)
+            return f"Place toutes les gemmes (manque : {names})."
         problems = configuration_problems(self.grid)
         if problems:
             return problems[0]
         return None
 
     def _save(self) -> None:
-        if not self.grid.gems:
-            self.message, self.message_color = "Pose au moins une gemme.", theme.LOSE_COLOR
+        problem = self._blocking_problem()
+        if problem:
+            self.message, self.message_color = problem, theme.LOSE_COLOR
             return
         path = dialogs.ask_save_path()
         if not path:
@@ -179,12 +187,7 @@ class CreatorScreen:
         except OSError as exc:
             self.message, self.message_color = f"Échec de la sauvegarde : {exc}", theme.LOSE_COLOR
             return
-        warn = self._blocking_problem()
-        if warn:
-            self.message = f"Configuration enregistrée (attention : {warn})."
-            self.message_color = theme.TEXT_DIM
-        else:
-            self.message, self.message_color = "Configuration enregistrée.", theme.WIN_COLOR
+        self.message, self.message_color = "Configuration enregistrée.", theme.WIN_COLOR
 
     def _start_play(self) -> None:
         problem = self._blocking_problem()
