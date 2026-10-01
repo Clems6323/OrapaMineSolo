@@ -20,7 +20,7 @@ from orapa_mine.model.gems import Direction, GemColor, GemKind, HalfCell, Positi
 # La palette des pièces est une bande **verticale à gauche** du plateau.
 
 CELL = 72          # taille d'une case (px) — dynamique
-CELL_MAX = 128     # cases jamais plus grandes (évite des tuiles absurdes)
+CELL_MAX = 64      # cases jamais plus grandes (évite des tuiles absurdes)
 CELL_MIN = 30      # cases jamais plus petites (grandes grilles / petits écrans)
 BOARD_X = 180      # coin haut-gauche du plateau (dynamique)
 BOARD_Y = 96
