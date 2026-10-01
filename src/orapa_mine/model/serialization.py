@@ -60,10 +60,16 @@ def to_dict(
     palette_pieces: list[Piece],
     hidden_grid: Grid,
     include_progress: bool,
-    game: GameState,
-    hypothesis_grid: Grid,
+    game: GameState | None = None,
+    hypothesis_grid: Grid | None = None,
 ) -> dict:
-    """Sérialise une partie en dict. `include_progress` ajoute historique + board."""
+    """Sérialise une partie en dict. `include_progress` ajoute historique + board.
+
+    `game` et `hypothesis_grid` ne sont requis que si `include_progress` est vrai
+    (le mode créateur sauvegarde la configuration seule).
+    """
+    if include_progress and (game is None or hypothesis_grid is None):
+        raise ValueError("game et hypothesis_grid sont requis quand include_progress=True")
     data: dict = {
         "version": SAVE_VERSION,
         "width": width,

@@ -124,6 +124,60 @@ def _all_gems_visible(grid: Grid) -> bool:
     return all(_gem_visible(grid, gem) for gem in grid.gems)
 
 
+# --- Validation d'une configuration existante (mode créateur) ----------------
+
+
+def _gem_label(gem: PlacedGem) -> str:
+    """Nom lisible d'une gemme posée (pour les messages de validation)."""
+    return gem.color.value if gem.color is not None else gem.piece.name
+
+
+def _shares_flat_face(grid: Grid, gem: PlacedGem) -> bool:
+    """Vrai si `gem` touche une autre gemme par une **face plate** partagée.
+
+    Contrairement à `_touches_orthogonally` (adjacence de cases, volontairement
+    conservatrice pour la génération), on tient compte de la géométrie des
+    demi-cases : deux triangles qui ne se rejoignent que par leur hypoténuse ou
+    par un coin ne sont **pas** considérés côte à côte (contact autorisé).
+    """
+    own = gem.absolute_cells()
+    for cell, half in own.items():
+        for direction in _DIRECTIONS:
+            neighbor = cell + direction
+            if neighbor in own:
+                continue
+            other_half = grid.surface.get(neighbor)
+            if other_half is None:
+                continue
+            # Face partagée pleine des deux côtés -> vrai contact « côte à côte ».
+            if direction in half.flat_faces() and direction.reverse() in other_half.flat_faces():
+                return True
+    return False
+
+
+def configuration_problems(grid: Grid) -> list[str]:
+    """Liste les violations des règles de placement dans `grid`.
+
+    Mêmes règles que le jeu : deux gemmes ne peuvent pas être côte à côte (face
+    plate partagée ; le contact en diagonale ou par un coin reste autorisé) et
+    aucune gemme n'est entièrement cachée. Retourne une liste vide si la
+    configuration est valide. Logique pure et testable, pour le mode créateur.
+    """
+    problems: list[str] = []
+    for gem in grid.gems:
+        if _shares_flat_face(grid, gem):
+            problems.append(f"La gemme {_gem_label(gem)} touche une autre gemme.")
+    for gem in grid.gems:
+        if not _gem_visible(grid, gem):
+            problems.append(f"La gemme {_gem_label(gem)} est entièrement cachée.")
+    return problems
+
+
+def configuration_is_valid(grid: Grid) -> bool:
+    """Vrai si `grid` respecte toutes les règles de placement."""
+    return not configuration_problems(grid)
+
+
 def _gem_visible(grid: Grid, gem: PlacedGem) -> bool:
     """Vrai si `gem` a au moins une ligne de vue droite vers un bord."""
     own_cells = set(gem.absolute_cells())

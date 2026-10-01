@@ -13,9 +13,11 @@ import random
 import pygame
 
 from orapa_mine.ai.generator import Difficulty, generate_hidden_grid
+from orapa_mine.model import gems_catalog as cat
 from orapa_mine.model.game import GameState
 from orapa_mine.ui import theme
 from orapa_mine.ui.config_screen import ConfigScreen
+from orapa_mine.ui.creator_screen import CreatorScreen
 from orapa_mine.ui.end_screen import EndScreen
 from orapa_mine.ui.game_screen import GameScreen
 
@@ -55,10 +57,20 @@ class OrapaMineApp:
 
     def _handle_transitions(self) -> None:
         screen = self.current
+        if isinstance(screen, CreatorScreen) and screen.pending_resize:
+            self._resize(screen.size)
+            screen.pending_resize = False
         if isinstance(screen, ConfigScreen) and screen.loaded is not None:
             self._start_loaded(screen.loaded)
+        elif isinstance(screen, ConfigScreen) and screen.creator is not None:
+            self._start_creator(screen.creator)
         elif isinstance(screen, ConfigScreen) and screen.result is not None:
             self._start_game(screen.result)
+        elif isinstance(screen, CreatorScreen) and screen.play is not None:
+            self._start_from_grid(screen.play, screen.palette_pieces)
+        elif isinstance(screen, CreatorScreen) and screen.back:
+            self.current = ConfigScreen()
+            self._resize(self.current.size)
         elif isinstance(screen, GameScreen) and screen.finished is not None:
             outcome, score = screen.finished
             self._show_end(outcome == "win", score, screen.game.hidden_grid)
@@ -74,6 +86,26 @@ class OrapaMineApp:
         grid = generate_hidden_grid(difficulty=difficulty, rng=rng)
         game = GameState(hidden_grid=grid)
         self.current = GameScreen(game, palette_pieces=difficulty.pieces)
+        self._resize(theme.window_size(grid.width, grid.height))
+
+    def _start_creator(self, difficulty: Difficulty) -> None:
+        # Reprend la sélection du menu comme valeurs de départ ; l'utilisateur
+        # peut ensuite les changer directement dans le mode créateur.
+        sizes = [(w, h) for _, w, h in CreatorScreen._SIZES]
+        try:
+            size_index = sizes.index((difficulty.width, difficulty.height))
+        except ValueError:
+            size_index = 1
+        self.current = CreatorScreen(
+            size_index=size_index,
+            diamant=cat.DIAMOND in difficulty.pieces,
+            corps_noir=cat.BLACK_BODY in difficulty.pieces,
+        )
+        self._resize(self.current.size)
+
+    def _start_from_grid(self, grid, palette_pieces) -> None:
+        game = GameState(hidden_grid=grid)
+        self.current = GameScreen(game, palette_pieces=palette_pieces)
         self._resize(theme.window_size(grid.width, grid.height))
 
     def _start_loaded(self, loaded) -> None:

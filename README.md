@@ -49,7 +49,16 @@ uv run pytest                 # lance les tests
 **Sauvegarder / charger** : le bouton **Sauvegarder** enregistre la partie dans
 un fichier `.json` ; coche **Progression** pour y inclure aussi l'historique et
 tes pièces posées (sinon seule la configuration à deviner est enregistrée).
-Recharge une partie depuis le menu de départ avec **Charger une partie…**.
+Recharge une partie depuis le menu de départ avec **Charger…**.
+
+**Mode créateur** : depuis le menu de départ, **Mode créateur** ouvre un plateau
+où tu places toi-même les gemmes. La **taille de la grille** et les
+**extensions** se règlent directement dans l'écran (changer la taille repart
+d'un plateau vide). La configuration n'est valide que lorsque **toutes** les
+gemmes de la palette sont posées, sans gemmes collées ni entièrement cachées —
+la validité est vérifiée en direct. Tu peux alors **sauvegarder** ta
+configuration pour la **partager** (n'importe qui peut la rejouer via
+**Charger…**) ou la **jouer** directement.
 
 Raccourcis en jeu : **[H]** aide, **[S]** sauvegarder, **[D]** révéler les
 gemmes (debug), **[R]** tourner une pièce, clic droit retirer, **Échap**
@@ -67,8 +76,8 @@ src/orapa_mine/model/            # Logique de jeu pure (aucune dépendance UI)
   ├── grid.py                    #   grille, placement
   ├── beam.py                    #   trajectoire + mélange des couleurs
   └── game.py                    #   actions, historique, score, victoire
-src/orapa_mine/ai/generator.py   # Génération d'une grille cachée valide
-src/orapa_mine/ui/               # Interface Pygame (config → jeu → fin)
+src/orapa_mine/ai/generator.py   # Génération + validation d'une grille cachée
+src/orapa_mine/ui/               # Interface Pygame (config → jeu/créateur → fin)
 tests/                           # Tests unitaires (modèle 100 % testable)
 ```
 
