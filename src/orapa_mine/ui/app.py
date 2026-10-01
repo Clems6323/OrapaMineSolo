@@ -13,6 +13,7 @@ import random
 import pygame
 
 from orapa_mine.ai.generator import Difficulty, generate_hidden_grid
+from orapa_mine.model import gems_catalog as cat
 from orapa_mine.model.game import GameState
 from orapa_mine.ui import theme
 from orapa_mine.ui.config_screen import ConfigScreen
@@ -56,6 +57,9 @@ class OrapaMineApp:
 
     def _handle_transitions(self) -> None:
         screen = self.current
+        if isinstance(screen, CreatorScreen) and screen.pending_resize:
+            self._resize(screen.size)
+            screen.pending_resize = False
         if isinstance(screen, ConfigScreen) and screen.loaded is not None:
             self._start_loaded(screen.loaded)
         elif isinstance(screen, ConfigScreen) and screen.creator is not None:
@@ -85,10 +89,17 @@ class OrapaMineApp:
         self._resize(theme.window_size(grid.width, grid.height))
 
     def _start_creator(self, difficulty: Difficulty) -> None:
+        # Reprend la sélection du menu comme valeurs de départ ; l'utilisateur
+        # peut ensuite les changer directement dans le mode créateur.
+        sizes = [(w, h) for _, w, h in CreatorScreen._SIZES]
+        try:
+            size_index = sizes.index((difficulty.width, difficulty.height))
+        except ValueError:
+            size_index = 1
         self.current = CreatorScreen(
-            width=difficulty.width,
-            height=difficulty.height,
-            palette_pieces=difficulty.pieces,
+            size_index=size_index,
+            diamant=cat.DIAMOND in difficulty.pieces,
+            corps_noir=cat.BLACK_BODY in difficulty.pieces,
         )
         self._resize(self.current.size)
 

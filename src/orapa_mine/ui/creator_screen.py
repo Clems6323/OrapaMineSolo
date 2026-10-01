@@ -17,6 +17,7 @@ import pygame
 
 from orapa_mine.ai.generator import configuration_problems
 from orapa_mine.model.gems import Piece, PlacedGem, Position
+from orapa_mine.model import gems_catalog as cat
 from orapa_mine.model import serialization
 from orapa_mine.model.grid import Grid
 from orapa_mine.ui import board_render, dialogs, theme
@@ -24,14 +25,23 @@ from orapa_mine.ui.board_render import darken as _darken
 from orapa_mine.ui.board_render import piece_color as _piece_color
 from orapa_mine.ui.game_screen import Slot
 
+_BASE_PIECES = [cat.RED, cat.YELLOW, cat.BLUE, cat.WHITE_BIG, cat.WHITE_SMALL]
+
 
 class CreatorScreen:
-    """Composition d'une grille cachée personnalisée (pose de gemmes)."""
+    """Composition d'une grille cachée personnalisée (pose de gemmes).
 
-    def __init__(self, width: int, height: int, palette_pieces: list[Piece]) -> None:
-        self.size = theme.window_size(width, height)
-        self.palette_pieces = palette_pieces
-        self.grid = Grid(width=width, height=height)
+    La taille de grille et les extensions se règlent directement ici : changer
+    l'un ou l'autre reconstruit le plateau et la palette (et redimensionne la
+    fenêtre via `pending_resize`, lu par l'app).
+    """
+
+    _SIZES = [("Petit", 8, 6), ("Standard", 10, 8), ("Grand", 12, 10)]
+
+    def __init__(self, size_index: int = 1, diamant: bool = False, corps_noir: bool = False) -> None:
+        self.size_index = size_index
+        self.diamant = diamant
+        self.corps_noir = corps_noir
 
         # Sélection / pose de pièces (même interaction que l'écran de jeu).
         self.selected: Piece | None = None
@@ -45,14 +55,50 @@ class CreatorScreen:
         # Transitions lues par l'app.
         self.play: Grid | None = None  # « Jouer » : grille à utiliser
         self.back = False  # « Retour au menu »
+        self.pending_resize = False  # demande de redimensionnement de la fenêtre
 
         pygame.font.init()
         self.font = pygame.font.SysFont("arial", 18)
         self.font_small = pygame.font.SysFont("arial", 15)
         self.font_big = pygame.font.SysFont("arial", 26, bold=True)
 
-        self.slots = self._build_palette(palette_pieces)
+        self.grid = Grid(width=10, height=8)  # remplacé par _rebuild
+        self._rebuild(clear_gems=True)
+        self.pending_resize = False  # la taille initiale est posée par l'app
+
+    # --- Construction ------------------------------------------------------
+
+    def _palette_pieces(self) -> list[Piece]:
+        pieces = list(_BASE_PIECES)
+        if self.diamant:
+            pieces.append(cat.DIAMOND)
+        if self.corps_noir:
+            pieces.append(cat.BLACK_BODY)
+        return pieces
+
+    def _rebuild(self, clear_gems: bool) -> None:
+        """Reconstruit plateau, palette et mise en page après un changement.
+
+        `clear_gems=True` repart d'un plateau vide (changement de taille) ; sinon
+        on conserve les gemmes compatibles (toujours dans la grille et dont la
+        pièce reste dans la palette — utile lors d'un (dé)cochage d'extension).
+        """
+        _, width, height = self._SIZES[self.size_index]
+        kept = [] if clear_gems else list(self.grid.gems)
+        self.palette_pieces = self._palette_pieces()
+        palette_names = {p.name for p in self.palette_pieces}
+
+        self.grid = Grid(width=width, height=height)
+        for gem in kept:
+            if gem.piece.name in palette_names and self.grid.can_place(gem):
+                self.grid.place_gem(gem)
+
+        self.used_names = {gem.piece.name for gem in self.grid.gems}
+        self.selected = None
+        self.size = theme.window_size(width, height)
+        self.slots = self._build_palette(self.palette_pieces)
         self._layout_panel()
+        self.pending_resize = True
 
     # --- Construction ------------------------------------------------------
 
@@ -74,9 +120,24 @@ class CreatorScreen:
         )
         inner = px + 18
         bw = theme.PANEL_WIDTH - 36
-        self.save_rect = pygame.Rect(inner, self.panel.bottom - 164, bw, 42)
-        self.play_rect = pygame.Rect(inner, self.panel.bottom - 112, bw, 42)
-        self.back_rect = pygame.Rect(inner, self.panel.bottom - 56, bw, 40)
+        top = theme.BOARD_Y
+
+        # Réglages (haut du panneau) : taille de grille + extensions.
+        self.size_label_y = top + 46
+        sgap = 8
+        sbw = (bw - 2 * sgap) // 3
+        self.size_rects = [
+            pygame.Rect(inner + i * (sbw + sgap), top + 66, sbw, 32) for i in range(3)
+        ]
+        self.ext_label_y = top + 104
+        self.diamant_rect = pygame.Rect(inner, top + 126, 20, 20)
+        self.corps_rect = pygame.Rect(inner, top + 150, 20, 20)
+        self.status_y = top + 178
+
+        # Actions (bas du panneau).
+        self.save_rect = pygame.Rect(inner, self.panel.bottom - 152, bw, 40)
+        self.play_rect = pygame.Rect(inner, self.panel.bottom - 106, bw, 40)
+        self.back_rect = pygame.Rect(inner, self.panel.bottom - 54, bw, 40)
 
     # --- Événements --------------------------------------------------------
 
@@ -104,6 +165,21 @@ class CreatorScreen:
         if self.back_rect.collidepoint(pos):
             self.back = True
             return
+        if self.diamant_rect.collidepoint(pos):
+            self.diamant = not self.diamant
+            self._rebuild(clear_gems=False)
+            return
+        if self.corps_rect.collidepoint(pos):
+            self.corps_noir = not self.corps_noir
+            self._rebuild(clear_gems=False)
+            return
+        for i, rect in enumerate(self.size_rects):
+            if rect.collidepoint(pos):
+                if i != self.size_index:
+                    self.size_index = i
+                    self._rebuild(clear_gems=True)
+                    self.message = None
+                return
         slot = self._slot_at(pos)
         if slot is not None:
             self._select_slot(slot)
@@ -276,13 +352,23 @@ class CreatorScreen:
         pygame.draw.rect(surface, theme.BOARD_BORDER, self.panel, width=1, border_radius=8)
         x = self.panel_x + 18
         surface.blit(self.font_big.render("Mode créateur", True, theme.TEXT), (x, theme.BOARD_Y + 14))
-        intro = [
-            "Place les gemmes où tu le souhaites,",
-            "puis sauvegarde pour partager ton",
-            "énigme, ou joue-la toi-même.",
-        ]
-        for i, text in enumerate(intro):
-            surface.blit(self.font_small.render(text, True, theme.TEXT_DIM), (x, theme.BOARD_Y + 54 + i * 20))
+
+        # Réglages : taille de grille.
+        surface.blit(self.font_small.render("Taille de la grille", True, theme.TEXT), (x, self.size_label_y))
+        for i, rect in enumerate(self.size_rects):
+            selected = i == self.size_index
+            bg = theme.SLOT_SELECTED if selected else theme.SLOT_BG
+            pygame.draw.rect(surface, bg, rect, border_radius=6)
+            pygame.draw.rect(surface, theme.BOARD_BORDER, rect, width=1, border_radius=6)
+            name, w, h = self._SIZES[i]
+            fg = theme.BACKGROUND if selected else theme.TEXT
+            label = self.font_small.render(f"{name} {w}×{h}", True, fg)
+            surface.blit(label, label.get_rect(center=rect.center))
+
+        # Réglages : extensions.
+        surface.blit(self.font_small.render("Extensions", True, theme.TEXT), (x, self.ext_label_y))
+        self._checkbox(surface, self.diamant_rect, self.diamant, "Diamant")
+        self._checkbox(surface, self.corps_rect, self.corps_noir, "Corps noir")
 
         # État de validité en direct.
         placed = len(self.grid.gems)
@@ -292,7 +378,7 @@ class CreatorScreen:
         else:
             status, color = f"Attention : {problem}", theme.LOSE_COLOR
         for i, text in enumerate(_wrap(status, self.font_small, theme.PANEL_WIDTH - 40)):
-            surface.blit(self.font_small.render(text, True, color), (x, theme.BOARD_Y + 134 + i * 20))
+            surface.blit(self.font_small.render(text, True, color), (x, self.status_y + i * 18))
 
         self._button(surface, self.save_rect, (54, 96, 120), "Sauvegarder la configuration")
         can_play = problem is None
@@ -315,6 +401,14 @@ class CreatorScreen:
         color = theme.TEXT_DIM if dim else theme.TEXT
         label = self.font_small.render(text, True, color)
         surface.blit(label, label.get_rect(center=rect.center))
+
+    def _checkbox(self, surface: pygame.Surface, rect: pygame.Rect, on: bool, text: str) -> None:
+        pygame.draw.rect(surface, theme.INPUT_BG, rect, border_radius=4)
+        pygame.draw.rect(surface, theme.BOARD_BORDER, rect, width=1, border_radius=4)
+        if on:
+            pygame.draw.rect(surface, theme.SLOT_SELECTED, rect.inflate(-8, -8), border_radius=2)
+        label = self.font_small.render(text, True, theme.TEXT)
+        surface.blit(label, (rect.right + 10, rect.y + 2))
 
 
 def _wrap(text: str, font: pygame.font.Font, max_width: int) -> list[str]:

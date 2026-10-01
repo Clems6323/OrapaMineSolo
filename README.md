@@ -52,11 +52,13 @@ tes pièces posées (sinon seule la configuration à deviner est enregistrée).
 Recharge une partie depuis le menu de départ avec **Charger…**.
 
 **Mode créateur** : depuis le menu de départ, **Mode créateur** ouvre un plateau
-vide (taille et extensions choisies dans la configuration) où tu places
-toi-même les gemmes. La validité du placement est vérifiée en direct (pas de
-gemmes collées ni entièrement cachées). Tu peux **sauvegarder** ta configuration
-pour la **partager** — n'importe qui peut la rejouer via **Charger…** — ou la
-**jouer** directement.
+où tu places toi-même les gemmes. La **taille de la grille** et les
+**extensions** se règlent directement dans l'écran (changer la taille repart
+d'un plateau vide). La configuration n'est valide que lorsque **toutes** les
+gemmes de la palette sont posées, sans gemmes collées ni entièrement cachées —
+la validité est vérifiée en direct. Tu peux alors **sauvegarder** ta
+configuration pour la **partager** (n'importe qui peut la rejouer via
+**Charger…**) ou la **jouer** directement.
 
 Raccourcis en jeu : **[H]** aide, **[S]** sauvegarder, **[D]** révéler les
 gemmes (debug), **[R]** tourner une pièce, clic droit retirer, **Échap**
