@@ -30,7 +30,6 @@ from orapa_mine.ui.board_render import darken as _darken
 from orapa_mine.ui.board_render import piece_color as _piece_color
 
 _HISTORY_ROW_H = 22  # hauteur d'une ligne d'historique (px)
-_PAGE_BREAK = -1000  # sentinelle : force un saut de page dans l'aide
 
 
 @dataclass
@@ -443,27 +442,32 @@ class GameScreen:
         """Construit la liste des lignes de l'aide (hauteur, fonction de dessin)."""
         rows: list[tuple[int, object]] = []
 
-        def heading(text: str) -> None:
-            rows.append((28, lambda s, x, y, t=text: s.blit(self.font.render(t, True, theme.SLOT_SELECTED), (x, y))))
+        def heading_draw(text: str):
+            return lambda s, x, y, t=text: s.blit(self.font.render(t, True, theme.SLOT_SELECTED), (x, y))
 
-        def line(text: str) -> None:
-            rows.append((22, lambda s, x, y, t=text: s.blit(self.font_small.render(t, True, theme.TEXT), (x, y))))
+        def line_draw(text: str):
+            return lambda s, x, y, t=text: s.blit(self.font_small.render(t, True, theme.TEXT), (x, y))
 
         for head, body in _HELP:
             if head == "Couleurs":
-                rows.append((_PAGE_BREAK, None))  # la légende couleurs reste groupée
-            heading(head)
-            if head == "Couleurs":
-                line("Le rayon se teinte au contact ; mélange peinture, le blanc éclaircit.")
-                line("Aucune gemme touchée → rayon transparent.")
+                # La légende des couleurs forme un bloc insécable : une seule
+                # « ligne » composite qui ne se coupe jamais entre deux pages
+                # (mais partage une page avec ce qui précède si ça tient).
+                block: list[tuple[int, object]] = [
+                    (28, heading_draw(head)),
+                    (22, line_draw("Le rayon se teinte au contact ; mélange peinture, le blanc éclaircit.")),
+                    (22, line_draw("Aucune gemme touchée → rayon transparent.")),
+                ]
                 col_w = content_width // 2  # deux colonnes de combinaisons
                 for i in range(0, len(_COLOR_COMBOS), 2):
                     left = _COLOR_COMBOS[i]
                     right = _COLOR_COMBOS[i + 1] if i + 1 < len(_COLOR_COMBOS) else None
-                    rows.append((26, self._combo_pair_drawer(left, right, col_w)))
+                    block.append((26, self._combo_pair_drawer(left, right, col_w)))
+                rows.append((sum(h for h, _ in block), _group_drawer(block)))
             else:
+                rows.append((28, heading_draw(head)))
                 for wrapped in _wrap(body, self.font_small, content_width):
-                    line(wrapped)
+                    rows.append((22, line_draw(wrapped)))
             rows.append((12, _spacer))  # espace entre sections
         return rows
 
@@ -687,22 +691,30 @@ def _spacer(surface: "pygame.Surface", x: int, y: int) -> None:
     """Ligne vide : sert uniquement d'espacement vertical entre sections."""
 
 
+def _group_drawer(block: list[tuple[int, object]]):
+    """Dessine un bloc insécable de lignes empilées à partir de (x, y)."""
+
+    def draw(surface: "pygame.Surface", x: int, y: int) -> None:
+        yy = y
+        for height, sub_draw in block:
+            sub_draw(surface, x, yy)
+            yy += height
+
+    return draw
+
+
 def _paginate(rows: list, max_height: int) -> list[list]:
     """Répartit les lignes (hauteur, dessin) en pages qui tiennent dans `max_height`.
 
-    Une ligne de hauteur `_PAGE_BREAK` force le début d'une nouvelle page. Les
-    lignes d'espacement (`_spacer`) ne commencent jamais une page et ne sont pas
-    reportées sur la page suivante — ce qui évite de créer une page quasi vide.
+    Les lignes d'espacement (`_spacer`) ne commencent jamais une page et ne sont
+    pas reportées sur la page suivante — ce qui évite de créer une page quasi
+    vide. Un bloc trop grand pour une page entière est placé tel quel (il peut
+    déborder plutôt que disparaître).
     """
     pages: list[list] = []
     current: list = []
     used = 0
     for row_h, draw in rows:
-        if row_h == _PAGE_BREAK:
-            if current:
-                pages.append(current)
-                current, used = [], 0
-            continue
         is_spacer = draw is _spacer
         if is_spacer and not current:
             continue  # ne pas commencer une page par un espace
