@@ -78,20 +78,23 @@ def available_screen() -> tuple[int, int]:
     return max(760, w - _SCREEN_MARGIN_W), max(560, h - _SCREEN_MARGIN_H)
 
 
-def configure(cols: int, rows: int) -> tuple[int, int]:
+def configure(cols: int, rows: int, panel_width: int | None = None) -> tuple[int, int]:
     """Recalcule la mise en page pour une grille `cols`×`rows` tenant à l'écran.
 
     Choisit la plus grande taille de case (≤ CELL_MAX) telle que plateau +
     palette (gauche) + panneau (droite) tiennent dans l'écran disponible, puis
-    positionne le plateau, la palette et le panneau. Renvoie la taille fenêtre.
+    positionne le plateau, la palette et le panneau. `panel_width` permet à un
+    écran (p. ex. le mode créateur) d'élargir son panneau ; la fenêtre s'ajuste.
+    Renvoie la taille fenêtre.
     """
     global CELL, BOARD_X, BOARD_Y, PANEL, PALETTE, WINDOW
+    pw = PANEL_WIDTH if panel_width is None else panel_width
     avail_w, avail_h = available_screen()
     pad = ENTRY_MARGIN  # place pour les points d'entrée de chaque côté
 
     fixed_w = (
         _LEFT_GUTTER + PALETTE_WIDTH + _PALETTE_GAP + pad
-        + pad + PANEL_MARGIN + PANEL_WIDTH + _RIGHT_GUTTER
+        + pad + PANEL_MARGIN + pw + _RIGHT_GUTTER
     )
     fixed_h = _TOP_SPACE + _BELOW_SPACE
     cell_w = (avail_w - fixed_w) / cols if cols else CELL_MAX
@@ -104,15 +107,15 @@ def configure(cols: int, rows: int) -> tuple[int, int]:
     panel_h = max(board_h, _PANEL_MIN_H)
     panel_x = BOARD_X + board_w + pad + PANEL_MARGIN
 
-    PANEL = pygame.Rect(panel_x, BOARD_Y, PANEL_WIDTH, panel_h)
+    PANEL = pygame.Rect(panel_x, BOARD_Y, pw, panel_h)
     PALETTE = pygame.Rect(_LEFT_GUTTER, BOARD_Y, PALETTE_WIDTH, panel_h)
-    WINDOW = (panel_x + PANEL_WIDTH + _RIGHT_GUTTER, BOARD_Y + panel_h + _BELOW_SPACE)
+    WINDOW = (panel_x + pw + _RIGHT_GUTTER, BOARD_Y + panel_h + _BELOW_SPACE)
     return WINDOW
 
 
-def window_size(cols: int, rows: int) -> tuple[int, int]:
+def window_size(cols: int, rows: int, panel_width: int | None = None) -> tuple[int, int]:
     """Configure la mise en page pour `cols`×`rows` et renvoie la taille fenêtre."""
-    return configure(cols, rows)
+    return configure(cols, rows, panel_width)
 
 
 def palette_slots(count: int) -> list[pygame.Rect]:

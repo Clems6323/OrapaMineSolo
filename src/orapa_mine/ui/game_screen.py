@@ -15,34 +15,22 @@ Aucune règle de jeu ici : on appelle `fire_beam` / `GameState` et on affiche.
 
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass
 
 import pygame
 
-from orapa_mine.model.beam import BeamResult, fire_beam, mix_colors
+from orapa_mine.model.beam import mix_colors
 from orapa_mine.model.game import GameState, RayShot
-from orapa_mine.model.gems import Direction, GemColor, Piece, PlacedGem, Position
+from orapa_mine.model.gems import GemColor, Piece, PlacedGem, Position
 from orapa_mine.model import serialization
 from orapa_mine.model.grid import Grid
 from orapa_mine.ui import board_render, dialogs, theme
+from orapa_mine.ui.beam_test import RayTester
 from orapa_mine.ui.board_render import darken as _darken
-from orapa_mine.ui.board_render import lighten as _lighten
 from orapa_mine.ui.board_render import piece_color as _piece_color
 
-_RAY_SPEED = 620.0  # pixels par seconde pour l'animation du rayon
 _HISTORY_ROW_H = 22  # hauteur d'une ligne d'historique (px)
 _PAGE_BREAK = -1000  # sentinelle : force un saut de page dans l'aide
-
-
-@dataclass
-class EntryPoint:
-    """Un point d'entrée cliquable sur la bordure du plateau."""
-
-    entry: Position
-    direction: Direction
-    center: tuple[int, int]
-    label: str
 
 
 @dataclass
@@ -68,16 +56,7 @@ class GameScreen:
         self.selected: Piece | None = None
         self.orientation_index = 0
         self.used_names: set[str] = set()
-        self.hovered_entry: int | None = None
         self.hovered_cell: Position | None = None
-
-        # Animation du rayon de test.
-        self._ray_points: list[tuple[float, float]] = []
-        self._ray_seg_colors: list[tuple[int, int, int]] = []
-        self._ray_absorbed = False
-        self._ray_total_len = 0.0
-        self._ray_progress = 0.0
-        self.last_test: str | None = None
 
         # Zone de proposition (texte) et résultat de soumission.
         self.input_text = ""
@@ -103,33 +82,11 @@ class GameScreen:
 
         # Mise en page adaptative (taille de case + positions selon l'écran).
         self.size = theme.window_size(self.grid.width, self.grid.height)
-        self.entries = self._build_entries()
-        self.entry_by_label = {ep.label: ep for ep in self.entries}
+        self.ray = RayTester(self.grid.width, self.grid.height, self.font_small)
         self.slots = self._build_palette(palette_pieces)
         self._layout_panel()
 
     # --- Construction ------------------------------------------------------
-
-    def _build_entries(self) -> list[EntryPoint]:
-        entries: list[EntryPoint] = []
-        w, h = self.grid.width, self.grid.height
-        off = theme.ENTRY_MARGIN * 0.55
-
-        def make(pos: Position, direction: Direction, center: tuple[int, int]) -> None:
-            label = theme.entry_label(pos, direction, w, h)
-            entries.append(EntryPoint(pos, direction, center, label))
-
-        for col in range(w):
-            cx, _ = theme.cell_center(Position(0, col))
-            make(Position(0, col), Direction.DOWN, (int(cx), int(theme.BOARD_Y - off)))
-            bottom = theme.board_bottom(h) + off
-            make(Position(h - 1, col), Direction.UP, (int(cx), int(bottom)))
-        for row in range(h):
-            _, cy = theme.cell_center(Position(row, 0))
-            make(Position(row, 0), Direction.RIGHT, (int(theme.BOARD_X - off), int(cy)))
-            right = theme.BOARD_X + w * theme.CELL + off
-            make(Position(row, w - 1), Direction.LEFT, (int(right), int(cy)))
-        return entries
 
     def _build_palette(self, pieces: list[Piece]) -> list[Slot]:
         rects = theme.palette_slots(len(pieces))
@@ -162,7 +119,7 @@ class GameScreen:
 
     def handle_event(self, event: pygame.event.Event) -> None:
         if event.type == pygame.MOUSEMOTION:
-            self.hovered_entry = self._entry_at(event.pos)
+            self.ray.hover(event.pos)
             self.hovered_cell = self._cell_at(event.pos)
         elif event.type == pygame.MOUSEBUTTONDOWN:
             self._on_click(event)
@@ -219,9 +176,9 @@ class GameScreen:
         if self.save_rect.collidepoint(pos):
             self._save()
             return
-        entry = self._entry_at(pos)
+        entry = self.ray.entry_at(pos)
         if entry is not None:
-            self._fire_test(self.entries[entry])
+            self.ray.fire(self.hypothesis, self.ray.entries[entry])
             return
         slot = self._slot_at(pos)
         if slot is not None:
@@ -297,19 +254,10 @@ class GameScreen:
             self.hypothesis.remove_gem(gem)
             self.used_names.discard(gem.piece.name)
 
-    def _fire_test(self, ep: EntryPoint) -> None:
-        result = fire_beam(self.hypothesis, ep.entry, ep.direction)
-        self._ray_points = [theme.point_px(r, c) for r, c in result.vertices]
-        self._ray_seg_colors = [theme.ray_rgb(name) for name in result.segment_colors]
-        self._ray_absorbed = result.absorbed
-        self._ray_total_len = _polyline_length(self._ray_points)
-        self._ray_progress = 0.0
-        self.last_test = f"Test {ep.label} → {self._result_label(result)}"
-
     def _ask_true(self) -> None:
         label = self.input_text.strip().upper()
         self.input_text = ""
-        ep = self.entry_by_label.get(label)
+        ep = self.ray.entry_by_label.get(label)
         if ep is None:
             self.message = f"Point « {label} » inconnu."
             self.message_color = theme.LOSE_COLOR
@@ -346,23 +294,7 @@ class GameScreen:
             self.message = "Proposition incorrecte, réessaie."
             self.message_color = theme.LOSE_COLOR
 
-    def _result_label(self, result: BeamResult) -> str:
-        if result.absorbed:
-            return "absorbé"
-        if result.exit_point is None or result.exit_direction is None:
-            return "?"
-        label = theme.exit_label(
-            result.exit_point, result.exit_direction, self.grid.width, self.grid.height
-        )
-        return f"{label} ({result.color or 'transparent'})"
-
     # --- Détection de zones ------------------------------------------------
-
-    def _entry_at(self, pos: tuple[int, int]) -> int | None:
-        for index, ep in enumerate(self.entries):
-            if math.dist(pos, ep.center) <= 16:
-                return index
-        return None
 
     def _slot_at(self, pos: tuple[int, int]) -> int | None:
         for index, slot in enumerate(self.slots):
@@ -377,13 +309,10 @@ class GameScreen:
         candidate = Position(int(row), int(col))
         return candidate if self.grid.is_inside(candidate) else None
 
-    # --- Rayon (géométrie d'animation) -------------------------------------
+    # --- Rendu -------------------------------------------------------------
 
     def update(self, dt: float) -> None:
-        if self._ray_progress < self._ray_total_len:
-            self._ray_progress = min(self._ray_total_len, self._ray_progress + _RAY_SPEED * dt)
-
-    # --- Rendu -------------------------------------------------------------
+        self.ray.update(dt)
 
     def render(self, surface: pygame.Surface) -> None:
         surface.fill(theme.BACKGROUND)
@@ -392,8 +321,7 @@ class GameScreen:
         if self.reveal:
             self._draw_hidden_outline(surface)
         self._draw_ghost(surface)
-        self._draw_ray(surface)
-        self._draw_entries(surface)
+        self.ray.draw(surface)
         self._draw_palette(surface)
         self._draw_panel(surface)
         if self.show_help:
@@ -416,61 +344,6 @@ class GameScreen:
             if self.grid.is_inside(pos):
                 pygame.draw.polygon(overlay, (*color, 120), theme.half_cell_polygon(pos, half))
         surface.blit(overlay, (0, 0))
-
-    def _draw_ray(self, surface: pygame.Surface) -> None:
-        pts = self._ray_points
-        if len(pts) < 2:
-            return
-        overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
-        remaining = self._ray_progress
-        head = pts[0]
-        head_rgb = self._ray_seg_colors[0] if self._ray_seg_colors else theme.RAY_TRANSPARENT
-        drawn = False
-        for i in range(len(pts) - 1):
-            if remaining <= 0:
-                break
-            a, b = pts[i], pts[i + 1]
-            seg = math.dist(a, b)
-            if seg == 0:
-                continue
-            rgb = self._ray_seg_colors[i]
-            end = b if remaining >= seg else (
-                a[0] + (b[0] - a[0]) * remaining / seg,
-                a[1] + (b[1] - a[1]) * remaining / seg,
-            )
-            self._glow_segment(overlay, a, end, rgb)
-            head, head_rgb, drawn = end, rgb, True
-            remaining -= seg
-        if not drawn:
-            return
-        r, g, b = head_rgb
-        for radius, alpha in ((14, 60), (8, 120), (4, 220)):
-            pygame.draw.circle(overlay, (r, g, b, alpha), (int(head[0]), int(head[1])), radius)
-        surface.blit(overlay, (0, 0))
-        if self._ray_absorbed and self._ray_progress >= self._ray_total_len:
-            pygame.draw.circle(surface, (30, 30, 40), (int(head[0]), int(head[1])), 12)
-            pygame.draw.circle(surface, (90, 90, 110), (int(head[0]), int(head[1])), 12, width=2)
-
-    def _glow_segment(
-        self,
-        overlay: pygame.Surface,
-        a: tuple[float, float],
-        b: tuple[float, float],
-        rgb: tuple[int, int, int],
-    ) -> None:
-        r, g, bl = rgb
-        for width, alpha in ((16, 34), (9, 70), (4, 150)):
-            pygame.draw.line(overlay, (r, g, bl, alpha), a, b, width)
-        pygame.draw.line(overlay, (*_lighten(rgb, 0.5), 235), a, b, 2)
-
-    def _draw_entries(self, surface: pygame.Surface) -> None:
-        for index, ep in enumerate(self.entries):
-            hot = index == self.hovered_entry
-            color = theme.ENTRY_HOVER if hot else theme.ENTRY_IDLE
-            pygame.draw.circle(surface, color, ep.center, 15 if hot else 12)
-            pygame.draw.circle(surface, theme.BACKGROUND, ep.center, 15 if hot else 12, width=2)
-            label = self.font_small.render(ep.label, True, theme.BACKGROUND if hot else theme.TEXT_DIM)
-            surface.blit(label, label.get_rect(center=ep.center))
 
     def _draw_palette(self, surface: pygame.Surface) -> None:
         title = self.font_small.render("Pièces", True, theme.TEXT_DIM)
@@ -511,7 +384,7 @@ class GameScreen:
         q = self.font.render("?", True, theme.TEXT)
         surface.blit(q, q.get_rect(center=self.help_rect.center))
         surface.blit(
-            self.font_small.render(self.last_test or "Clique un point d'entrée pour tester.", True, theme.TEXT_DIM),
+            self.font_small.render(self.ray.last_test or "Clique un point d'entrée pour tester.", True, theme.TEXT_DIM),
             (x, self.panel.top + 54),
         )
         # Boutons Proposer / Abandonner.
@@ -706,7 +579,7 @@ class GameScreen:
         if shot.result.absorbed:
             text, dot = f"{entry} → absorbé", theme.RAY_ABSORBED
         else:
-            text = f"{entry} → {self._result_label(shot.result)}"
+            text = f"{entry} → {self.ray.result_label(shot.result)}"
             dot = theme.ray_rgb(shot.result.color)
         pygame.draw.circle(surface, dot, (x + 6, y + 8), 6)
         surface.blit(self.font_small.render(text, True, theme.TEXT), (x + 20, y))
@@ -817,10 +690,3 @@ def _paginate(rows: list, max_height: int) -> list[list]:
     if current:
         pages.append(current)
     return pages or [[]]
-
-
-# --- Helpers géométrie du rayon ---------------------------------------------
-
-
-def _polyline_length(points: list[tuple[float, float]]) -> float:
-    return sum(math.dist(a, b) for a, b in zip(points, points[1:]))

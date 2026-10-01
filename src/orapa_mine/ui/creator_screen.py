@@ -21,11 +21,15 @@ from orapa_mine.model import gems_catalog as cat
 from orapa_mine.model import serialization
 from orapa_mine.model.grid import Grid
 from orapa_mine.ui import board_render, dialogs, theme
+from orapa_mine.ui.beam_test import RayTester
 from orapa_mine.ui.board_render import darken as _darken
 from orapa_mine.ui.board_render import piece_color as _piece_color
 from orapa_mine.ui.game_screen import Slot
 
 _BASE_PIECES = [cat.RED, cat.YELLOW, cat.BLUE, cat.WHITE_BIG, cat.WHITE_SMALL]
+# Panneau un peu plus large qu'en jeu : les boutons de taille de grille
+# (« Standard 10×8 ») y tiennent confortablement.
+_PANEL_WIDTH = theme.PANEL_WIDTH + 44
 
 
 class CreatorScreen:
@@ -95,7 +99,8 @@ class CreatorScreen:
 
         self.used_names = {gem.piece.name for gem in self.grid.gems}
         self.selected = None
-        self.size = theme.window_size(width, height)
+        self.size = theme.window_size(width, height, panel_width=_PANEL_WIDTH)
+        self.ray = RayTester(width, height, self.font_small)
         self.slots = self._build_palette(self.palette_pieces)
         self._layout_panel()
         self.pending_resize = True
@@ -111,7 +116,7 @@ class CreatorScreen:
         px = self.panel.x
         self.panel_x = px
         inner = px + 18
-        bw = theme.PANEL_WIDTH - 36
+        bw = self.panel.width - 36
         top = self.panel.top
 
         # Réglages (haut du panneau) : taille de grille + extensions.
@@ -136,6 +141,7 @@ class CreatorScreen:
     def handle_event(self, event: pygame.event.Event) -> None:
         if event.type == pygame.MOUSEMOTION:
             self.hovered_cell = self._cell_at(event.pos)
+            self.ray.hover(event.pos)
         elif event.type == pygame.MOUSEBUTTONDOWN:
             self._on_click(event)
         elif event.type == pygame.KEYDOWN:
@@ -172,6 +178,10 @@ class CreatorScreen:
                     self._rebuild(clear_gems=True)
                     self.message = None
                 return
+        entry = self.ray.entry_at(pos)
+        if entry is not None:  # tester un rayon sur la configuration en cours
+            self.ray.fire(self.grid, self.ray.entries[entry])
+            return
         slot = self._slot_at(pos)
         if slot is not None:
             self._select_slot(slot)
@@ -264,8 +274,8 @@ class CreatorScreen:
             return
         self.play = self.grid
 
-    def update(self, dt: float) -> None:  # noqa: D401 - rien à animer
-        pass
+    def update(self, dt: float) -> None:
+        self.ray.update(dt)
 
     # --- Détection de zones ------------------------------------------------
 
@@ -286,14 +296,13 @@ class CreatorScreen:
 
     def render(self, surface: pygame.Surface) -> None:
         surface.fill(theme.BACKGROUND)
-        caption = self.font.render("Compose ta configuration cachée :", True, theme.TEXT_DIM)
-        surface.blit(caption, (theme.BOARD_X, theme.BOARD_Y - 34))
         board_render.draw_board(surface, self.grid)
         board_render.draw_gems(surface, self.grid)
         self._draw_ghost(surface)
+        self.ray.draw(surface)
         self._draw_palette(surface)
         self._draw_panel(surface)
-        hint = "clic=choisir, clic plateau=poser, [R] tourner, clic droit=retirer, [Échap] désélectionner"
+        hint = "clic=choisir, clic plateau=poser, [R] tourner, clic droit=retirer, point d'entrée=tester le rayon, [Échap] désélectionner"
         surface.blit(
             self.font_small.render(hint, True, theme.TEXT_DIM),
             (theme.PALETTE.x, self.size[1] - 24),
@@ -371,8 +380,13 @@ class CreatorScreen:
             status, color = f"Configuration valide ({placed} gemme(s)).", theme.WIN_COLOR
         else:
             status, color = f"Attention : {problem}", theme.LOSE_COLOR
-        for i, text in enumerate(_wrap(status, self.font_small, theme.PANEL_WIDTH - 40)):
+        for i, text in enumerate(_wrap(status, self.font_small, self.panel.width - 40)):
             surface.blit(self.font_small.render(text, True, color), (x, self.status_y + i * 18))
+
+        # Résultat du dernier rayon de test (clic sur un point d'entrée).
+        ray_line = self.ray.last_test or "Clique un point d'entrée pour tester le rayon."
+        for i, text in enumerate(_wrap(ray_line, self.font_small, self.panel.width - 40)):
+            surface.blit(self.font_small.render(text, True, theme.TEXT_DIM), (x, self.status_y + 66 + i * 18))
 
         self._button(surface, self.save_rect, (54, 96, 120), "Sauvegarder la configuration")
         can_play = problem is None
@@ -386,7 +400,7 @@ class CreatorScreen:
         self._button(surface, self.back_rect, theme.SLOT_BG, "Retour au menu")
 
         if self.message:
-            for i, text in enumerate(_wrap(self.message, self.font_small, theme.PANEL_WIDTH - 40)):
+            for i, text in enumerate(_wrap(self.message, self.font_small, self.panel.width - 40)):
                 surface.blit(self.font_small.render(text, True, self.message_color), (x, self.save_rect.top - 46 + i * 18))
 
     def _button(self, surface: pygame.Surface, rect: pygame.Rect, bg, text: str, dim: bool = False) -> None:
