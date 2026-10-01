@@ -31,9 +31,8 @@ class EndScreen:
         self.font = pygame.font.SysFont("arial", 20)
         self.font_small = pygame.font.SysFont("arial", 16)
 
-        px = theme.BOARD_X + hidden_grid.width * theme.CELL + theme.PANEL_MARGIN
-        self.panel = pygame.Rect(px, theme.BOARD_Y, theme.PANEL_WIDTH, hidden_grid.height * theme.CELL)
-        inner = px + 18
+        self.panel = theme.PANEL.copy()
+        inner = self.panel.x + 18
         self.replay_rect = pygame.Rect(inner, self.panel.bottom - 108, theme.PANEL_WIDTH - 36, 44)
         self.quit_rect = pygame.Rect(inner, self.panel.bottom - 56, theme.PANEL_WIDTH - 36, 40)
 
@@ -71,8 +70,8 @@ class EndScreen:
             banner, color = "Partie abandonnée", theme.LOSE_COLOR
             detail = f"{self.score} tir(s)/question(s) joués."
         title = self.font_big.render(banner, True, color)
-        surface.blit(title, (x, theme.BOARD_Y + 20))
-        surface.blit(self.font.render(detail, True, theme.TEXT), (x, theme.BOARD_Y + 64))
+        surface.blit(title, (x, self.panel.top + 20))
+        surface.blit(self.font.render(detail, True, theme.TEXT), (x, self.panel.top + 64))
 
         pygame.draw.rect(surface, (54, 120, 90), self.replay_rect, border_radius=8)
         pygame.draw.rect(surface, theme.BOARD_BORDER, self.replay_rect, width=1, border_radius=8)

@@ -17,6 +17,10 @@ la peinture (rouge + jaune = orange, jaune + bleu = vert…), le blanc
 éclaircissant la teinte. Deux extensions : le **diamant** (dévie sans teinter)
 et le **corps noir** (absorbe le rayon).
 
+La fenêtre s'adapte à l'écran : la taille des cases est choisie automatiquement
+pour que le plateau tienne sur ton moniteur, et la palette des pièces est une
+bande verticale à gauche du plateau (panneau d'infos à droite).
+
 Les règles complètes et confirmées sont dans [`docs/RULES.md`](docs/RULES.md).
 
 ## Démarrage rapide

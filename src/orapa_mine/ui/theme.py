@@ -7,32 +7,112 @@ retoucher le rendu en un seul endroit.
 
 from __future__ import annotations
 
+import pygame
+
 from orapa_mine.model.gems import Direction, GemColor, GemKind, HalfCell, Position
 
-# --- Dimensions --------------------------------------------------------------
+# --- Dimensions (mise en page adaptative) -----------------------------------
+#
+# La taille des cases et la position du plateau sont recalculées par
+# `configure()` en fonction de la grille ET de la taille de l'écran, pour que la
+# fenêtre tienne toujours sur le moniteur. Les valeurs ci-dessous sont des
+# défauts (remplacés dès le premier appel à `configure()` / `window_size()`).
+# La palette des pièces est une bande **verticale à gauche** du plateau.
 
-CELL = 64
-ENTRY_MARGIN = 46  # marge autour du plateau pour les points d'entrée
-BOARD_X = 60
+CELL = 64          # taille d'une case (px) — dynamique
+CELL_MAX = 64      # cases jamais plus grandes (petites grilles)
+CELL_MIN = 30      # cases jamais plus petites (grandes grilles / petits écrans)
+BOARD_X = 184      # coin haut-gauche du plateau (dynamique)
 BOARD_Y = 96
-PANEL_MARGIN = 56  # espace entre le plateau et le panneau de droite
-PANEL_WIDTH = 320
-PALETTE_HEIGHT = 104  # bande de sélection des pièces sous le plateau
+
+ENTRY_MARGIN = 46  # marge autour du plateau pour les points d'entrée
+PANEL_WIDTH = 320  # panneau d'informations à droite
+PANEL_MARGIN = 48  # espace entre le plateau et le panneau
+PALETTE_WIDTH = 96  # largeur de la bande de palette (à gauche)
+
+_PALETTE_GAP = 20   # espace entre la palette et le plateau
+_LEFT_GUTTER = 22
+_RIGHT_GUTTER = 24
+_TOP_SPACE = 96     # au-dessus du plateau (= BOARD_Y : titre + entrées du haut)
+_BELOW_SPACE = 80   # sous le plateau (entrées du bas + ligne d'indices)
+_PANEL_MIN_H = 430  # hauteur minimale du panneau (sinon son contenu déborde)
+_SCREEN_MARGIN_W = 48   # marge écran (bords de fenêtre)
+_SCREEN_MARGIN_H = 120  # marge écran (barre des tâches + barre de titre)
+_FALLBACK_SCREEN = (1366, 768)
+
+# Géométrie calculée par `configure()`.
+PANEL = pygame.Rect(0, 0, PANEL_WIDTH, _PANEL_MIN_H)
+PALETTE = pygame.Rect(0, 0, PALETTE_WIDTH, _PANEL_MIN_H)
+WINDOW = (0, 0)
 
 
 def board_bottom(rows: int) -> int:
     return BOARD_Y + rows * CELL
 
 
-def palette_top(rows: int) -> int:
-    return board_bottom(rows) + ENTRY_MARGIN + 26
+def available_screen() -> tuple[int, int]:
+    """Taille d'écran utilisable (résolution du bureau moins les marges)."""
+    try:
+        info = pygame.display.Info()
+        w, h = int(info.current_w), int(info.current_h)
+        if w <= 0 or h <= 0:
+            raise ValueError
+    except (pygame.error, ValueError):
+        w, h = _FALLBACK_SCREEN
+    return max(760, w - _SCREEN_MARGIN_W), max(560, h - _SCREEN_MARGIN_H)
+
+
+def configure(cols: int, rows: int) -> tuple[int, int]:
+    """Recalcule la mise en page pour une grille `cols`×`rows` tenant à l'écran.
+
+    Choisit la plus grande taille de case (≤ CELL_MAX) telle que plateau +
+    palette (gauche) + panneau (droite) tiennent dans l'écran disponible, puis
+    positionne le plateau, la palette et le panneau. Renvoie la taille fenêtre.
+    """
+    global CELL, BOARD_X, BOARD_Y, PANEL, PALETTE, WINDOW
+    avail_w, avail_h = available_screen()
+    pad = ENTRY_MARGIN  # place pour les points d'entrée de chaque côté
+
+    fixed_w = (
+        _LEFT_GUTTER + PALETTE_WIDTH + _PALETTE_GAP + pad
+        + pad + PANEL_MARGIN + PANEL_WIDTH + _RIGHT_GUTTER
+    )
+    fixed_h = _TOP_SPACE + _BELOW_SPACE
+    cell_w = (avail_w - fixed_w) / cols if cols else CELL_MAX
+    cell_h = (avail_h - fixed_h) / rows if rows else CELL_MAX
+    CELL = int(max(CELL_MIN, min(CELL_MAX, cell_w, cell_h)))
+
+    BOARD_Y = _TOP_SPACE
+    BOARD_X = _LEFT_GUTTER + PALETTE_WIDTH + _PALETTE_GAP + pad
+    board_w, board_h = cols * CELL, rows * CELL
+    panel_h = max(board_h, _PANEL_MIN_H)
+    panel_x = BOARD_X + board_w + pad + PANEL_MARGIN
+
+    PANEL = pygame.Rect(panel_x, BOARD_Y, PANEL_WIDTH, panel_h)
+    PALETTE = pygame.Rect(_LEFT_GUTTER, BOARD_Y, PALETTE_WIDTH, panel_h)
+    WINDOW = (panel_x + PANEL_WIDTH + _RIGHT_GUTTER, BOARD_Y + panel_h + _BELOW_SPACE)
+    return WINDOW
 
 
 def window_size(cols: int, rows: int) -> tuple[int, int]:
-    """Taille de fenêtre pour une grille de `cols`×`rows`."""
-    width = BOARD_X + cols * CELL + PANEL_MARGIN + PANEL_WIDTH + 40
-    height = palette_top(rows) + PALETTE_HEIGHT + 20
-    return width, height
+    """Configure la mise en page pour `cols`×`rows` et renvoie la taille fenêtre."""
+    return configure(cols, rows)
+
+
+def palette_slots(count: int) -> list[pygame.Rect]:
+    """Rectangles des `count` cases de la palette, empilés verticalement à gauche."""
+    if count <= 0:
+        return []
+    pad, gap = 8, 8
+    inner_h = PALETTE.height - 2 * pad
+    slot_h = min(float(PALETTE_WIDTH), (inner_h - (count - 1) * gap) / count)
+    slot_w = PALETTE_WIDTH - 6
+    rects: list[pygame.Rect] = []
+    y = PALETTE.y + pad
+    for _ in range(count):
+        rects.append(pygame.Rect(PALETTE.x + 3, int(y), slot_w, int(slot_h)))
+        y += slot_h + gap
+    return rects
 
 
 # --- Couleurs ----------------------------------------------------------------
