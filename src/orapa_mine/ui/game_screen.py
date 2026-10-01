@@ -464,7 +464,7 @@ class GameScreen:
             else:
                 for wrapped in _wrap(body, self.font_small, content_width):
                     line(wrapped)
-            rows.append((12, lambda s, x, y: None))  # espace
+            rows.append((12, _spacer))  # espace entre sections
         return rows
 
     def _combo_pair_drawer(self, left: frozenset, right: frozenset | None, col_w: int):
@@ -683,10 +683,16 @@ def _swatch(surface: pygame.Surface, x: int, y: int, rgb: tuple[int, int, int], 
     pygame.draw.rect(surface, theme.BOARD_BORDER, rect, width=1, border_radius=3)
 
 
+def _spacer(surface: "pygame.Surface", x: int, y: int) -> None:
+    """Ligne vide : sert uniquement d'espacement vertical entre sections."""
+
+
 def _paginate(rows: list, max_height: int) -> list[list]:
     """Répartit les lignes (hauteur, dessin) en pages qui tiennent dans `max_height`.
 
-    Une ligne de hauteur `_PAGE_BREAK` force le début d'une nouvelle page.
+    Une ligne de hauteur `_PAGE_BREAK` force le début d'une nouvelle page. Les
+    lignes d'espacement (`_spacer`) ne commencent jamais une page et ne sont pas
+    reportées sur la page suivante — ce qui évite de créer une page quasi vide.
     """
     pages: list[list] = []
     current: list = []
@@ -697,7 +703,12 @@ def _paginate(rows: list, max_height: int) -> list[list]:
                 pages.append(current)
                 current, used = [], 0
             continue
+        is_spacer = draw is _spacer
+        if is_spacer and not current:
+            continue  # ne pas commencer une page par un espace
         if current and used + row_h > max_height:
+            if is_spacer:
+                continue  # espace de fin de page : on le laisse tomber
             pages.append(current)
             current, used = [], 0
         current.append((row_h, draw))
