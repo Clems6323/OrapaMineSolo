@@ -19,25 +19,27 @@ from orapa_mine.model.gems import Direction, GemColor, GemKind, HalfCell, Positi
 # défauts (remplacés dès le premier appel à `configure()` / `window_size()`).
 # La palette des pièces est une bande **verticale à gauche** du plateau.
 
-CELL = 64          # taille d'une case (px) — dynamique
-CELL_MAX = 64      # cases jamais plus grandes (petites grilles)
+CELL = 72          # taille d'une case (px) — dynamique
+CELL_MAX = 128     # cases jamais plus grandes (évite des tuiles absurdes)
 CELL_MIN = 30      # cases jamais plus petites (grandes grilles / petits écrans)
-BOARD_X = 184      # coin haut-gauche du plateau (dynamique)
+BOARD_X = 180      # coin haut-gauche du plateau (dynamique)
 BOARD_Y = 96
 
 ENTRY_MARGIN = 46  # marge autour du plateau pour les points d'entrée
 PANEL_WIDTH = 320  # panneau d'informations à droite
 PANEL_MARGIN = 48  # espace entre le plateau et le panneau
-PALETTE_WIDTH = 96  # largeur de la bande de palette (à gauche)
+PALETTE_WIDTH = 88  # largeur de la bande de palette (à gauche)
 
 _PALETTE_GAP = 20   # espace entre la palette et le plateau
+_SLOT_H = 74        # hauteur d'une case de palette (fixe, pour garder des icônes mesurées)
+_SLOT_GAP = 8
 _LEFT_GUTTER = 22
 _RIGHT_GUTTER = 24
 _TOP_SPACE = 96     # au-dessus du plateau (= BOARD_Y : titre + entrées du haut)
-_BELOW_SPACE = 80   # sous le plateau (entrées du bas + ligne d'indices)
+_BELOW_SPACE = 84   # sous le plateau (entrées du bas + ligne d'indices)
 _PANEL_MIN_H = 430  # hauteur minimale du panneau (sinon son contenu déborde)
-_SCREEN_MARGIN_W = 48   # marge écran (bords de fenêtre)
-_SCREEN_MARGIN_H = 120  # marge écran (barre des tâches + barre de titre)
+_SCREEN_MARGIN_W = 40   # marge écran (bords de fenêtre)
+_SCREEN_MARGIN_H = 96   # marge écran (barre des tâches + barre de titre)
 _FALLBACK_SCREEN = (1366, 768)
 
 # Géométrie calculée par `configure()`.
@@ -100,18 +102,22 @@ def window_size(cols: int, rows: int) -> tuple[int, int]:
 
 
 def palette_slots(count: int) -> list[pygame.Rect]:
-    """Rectangles des `count` cases de la palette, empilés verticalement à gauche."""
+    """Rectangles des `count` cases de la palette, empilés verticalement à gauche.
+
+    Les cases ont une hauteur fixe (`_SLOT_H`) pour rester mesurées quelle que
+    soit la taille du plateau ; elles ne rétrécissent que si l'espace manque.
+    """
     if count <= 0:
         return []
-    pad, gap = 8, 8
+    pad = 6
     inner_h = PALETTE.height - 2 * pad
-    slot_h = min(float(PALETTE_WIDTH), (inner_h - (count - 1) * gap) / count)
+    slot_h = min(float(_SLOT_H), (inner_h - (count - 1) * _SLOT_GAP) / count)
     slot_w = PALETTE_WIDTH - 6
     rects: list[pygame.Rect] = []
     y = PALETTE.y + pad
     for _ in range(count):
         rects.append(pygame.Rect(PALETTE.x + 3, int(y), slot_w, int(slot_h)))
-        y += slot_h + gap
+        y += slot_h + _SLOT_GAP
     return rects
 
 

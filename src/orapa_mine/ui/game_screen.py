@@ -557,7 +557,7 @@ class GameScreen:
         hint = "clic=choisir, clic plateau=poser, [R] tourner, clic droit=retirer, [H] aide, [Maj+D] debug"
         surface.blit(
             self.font_small.render(hint, True, theme.TEXT_DIM),
-            (theme.BOARD_X, theme.board_bottom(self.grid.height) + theme.ENTRY_MARGIN + 4),
+            (theme.PALETTE.x, self.size[1] - 24),
         )
 
     # --- Aide paginée ------------------------------------------------------
