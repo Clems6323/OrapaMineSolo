@@ -456,13 +456,28 @@ class GameScreen:
             if head == "Couleurs":
                 line("Le rayon se teinte au contact ; mélange peinture, le blanc éclaircit.")
                 line("Aucune gemme touchée → rayon transparent.")
-                for combo in _COLOR_COMBOS:
-                    rows.append((26, self._combo_drawer(combo)))
+                col_w = content_width // 2  # deux colonnes de combinaisons
+                for i in range(0, len(_COLOR_COMBOS), 2):
+                    left = _COLOR_COMBOS[i]
+                    right = _COLOR_COMBOS[i + 1] if i + 1 < len(_COLOR_COMBOS) else None
+                    rows.append((26, self._combo_pair_drawer(left, right, col_w)))
             else:
                 for wrapped in _wrap(body, self.font_small, content_width):
                     line(wrapped)
             rows.append((12, lambda s, x, y: None))  # espace
         return rows
+
+    def _combo_pair_drawer(self, left: frozenset, right: frozenset | None, col_w: int):
+        """Dessine deux combinaisons de couleurs côte à côte (deux colonnes)."""
+        draw_left = self._combo_drawer(left)
+        draw_right = self._combo_drawer(right) if right is not None else None
+
+        def draw(surface: pygame.Surface, x: int, y: int) -> None:
+            draw_left(surface, x, y)
+            if draw_right is not None:
+                draw_right(surface, x + col_w, y)
+
+        return draw
 
     def _combo_drawer(self, combo: frozenset):
         """Retourne une fonction dessinant une ligne « couleurs = résultat »."""
