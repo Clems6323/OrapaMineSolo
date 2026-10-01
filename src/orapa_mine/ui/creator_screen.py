@@ -296,8 +296,6 @@ class CreatorScreen:
 
     def render(self, surface: pygame.Surface) -> None:
         surface.fill(theme.BACKGROUND)
-        # caption = self.font.render("Compose ta configuration cachée :", True, theme.TEXT_DIM)
-        # surface.blit(caption, (theme.BOARD_X, theme.BOARD_Y - 34))
         board_render.draw_board(surface, self.grid)
         board_render.draw_gems(surface, self.grid)
         self._draw_ghost(surface)
