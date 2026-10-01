@@ -60,7 +60,7 @@ la validité est vérifiée en direct. Tu peux alors **sauvegarder** ta
 configuration pour la **partager** (n'importe qui peut la rejouer via
 **Charger…**) ou la **jouer** directement.
 
-Raccourcis en jeu : **[H]** aide, **[S]** sauvegarder, **[D]** révéler les
+Raccourcis en jeu : **[H]** aide, **[S]** sauvegarder, **[Maj+D]** révéler les
 gemmes (debug), **[R]** tourner une pièce, clic droit retirer, **Échap**
 désélectionner.
 

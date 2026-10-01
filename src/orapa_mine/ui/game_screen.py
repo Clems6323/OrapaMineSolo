@@ -255,7 +255,9 @@ class GameScreen:
             self.help_page = 0
         elif event.key == pygame.K_s:
             self._save()
-        elif event.key == pygame.K_d:
+        elif event.key == pygame.K_d and event.mod & pygame.KMOD_SHIFT:
+            # Maj+D (et non D seul) : la touche D jouxte R et provoquait des
+            # révélations accidentelles de la solution.
             self.reveal = not self.reveal
         elif event.key == pygame.K_r and self.selected is not None:
             count = len(self.selected.orientations())
@@ -556,7 +558,7 @@ class GameScreen:
             msg = self.font_small.render(self.message, True, self.message_color)
             surface.blit(msg, (x, self.input_rect.bottom + 10))
 
-        hint = "clic=choisir, clic plateau=poser, [R] tourner, clic droit=retirer, [H] aide, [D] debug"
+        hint = "clic=choisir, clic plateau=poser, [R] tourner, clic droit=retirer, [H] aide, [Maj+D] debug"
         surface.blit(
             self.font_small.render(hint, True, theme.TEXT_DIM),
             (theme.BOARD_X, theme.board_bottom(self.grid.height) + theme.ENTRY_MARGIN + 4),
@@ -768,7 +770,7 @@ _HELP: list[tuple[str, str]] = [
     ),
     (
         "Raccourcis",
-        "[H] aide, [S] sauvegarder, [D] debug. R] tourne/retourne la pièce, le clic droit la retire."
+        "[H] aide, [S] sauvegarder, [Maj+D] debug. [R] tourne/retourne la pièce, le clic droit la retire."
     ),
 ]
 
