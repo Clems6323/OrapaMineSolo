@@ -20,7 +20,7 @@ from orapa_mine.model.gems import Direction, GemColor, GemKind, HalfCell, Positi
 # La palette des pièces est une bande **verticale à gauche** du plateau.
 
 CELL = 72          # taille d'une case (px) — dynamique
-CELL_MAX = 128     # cases jamais plus grandes (évite des tuiles absurdes)
+CELL_MAX = 192     # cases jamais plus grandes (évite des tuiles absurdes)
 CELL_MIN = 30      # cases jamais plus petites (grandes grilles / petits écrans)
 BOARD_X = 180      # coin haut-gauche du plateau (dynamique)
 BOARD_Y = 96
@@ -53,13 +53,27 @@ def board_bottom(rows: int) -> int:
 
 
 def available_screen() -> tuple[int, int]:
-    """Taille d'écran utilisable (résolution du bureau moins les marges)."""
+    """Taille d'écran utilisable (résolution du **bureau** moins les marges).
+
+    On utilise `get_desktop_sizes()` et non `Info().current_w/h` : ce dernier
+    renvoie le *mode vidéo courant* (donc la taille de la fenêtre déjà ouverte,
+    p. ex. 760×660 pour le menu), ce qui rapetissait le plateau. Le bureau, lui,
+    reste la vraie résolution du moniteur.
+    """
+    w = h = 0
     try:
-        info = pygame.display.Info()
-        w, h = int(info.current_w), int(info.current_h)
-        if w <= 0 or h <= 0:
-            raise ValueError
-    except (pygame.error, ValueError):
+        sizes = pygame.display.get_desktop_sizes()
+        if sizes:
+            w, h = sizes[0]
+    except (pygame.error, AttributeError):
+        pass
+    if w <= 0 or h <= 0:  # repli : mode courant, puis valeur par défaut
+        try:
+            info = pygame.display.Info()
+            w, h = int(info.current_w), int(info.current_h)
+        except pygame.error:
+            pass
+    if w <= 0 or h <= 0:
         w, h = _FALLBACK_SCREEN
     return max(760, w - _SCREEN_MARGIN_W), max(560, h - _SCREEN_MARGIN_H)
 
