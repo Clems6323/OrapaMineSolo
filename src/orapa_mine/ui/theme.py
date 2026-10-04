@@ -7,6 +7,8 @@ retoucher le rendu en un seul endroit.
 
 from __future__ import annotations
 
+import re
+
 import pygame
 
 from orapa_mine.model.gems import Direction, GemColor, GemKind, HalfCell, Position
@@ -288,3 +290,43 @@ def entry_label(pos: Position, direction: Direction, width: int, height: int) ->
 def exit_label(pos: Position, direction: Direction, width: int, height: int) -> str:
     """Étiquette du point de sortie (bord dans le sens de trajet)."""
     return _edge_label(_EXIT_EDGE[direction], pos.row, pos.col, width, height)
+
+
+# --- Étiquetage des cases (« Qu'y a-t-il en A1 ? ») --------------------------
+#
+# Une case est désignée par « ligne-lettre + colonne-numéro » (A1 = coin
+# haut-gauche) : la lettre est la LIGNE (comme les bords gauche A–H), le chiffre
+# la COLONNE (comme les bords haut 1–10). Ce format (lettre SUIVIE d'un chiffre)
+# est volontairement distinct des libellés de bord — chiffre seul (1–18) ou
+# lettre seule (A–R) — pour que les deux espaces de noms ne se recouvrent jamais.
+
+_CELL_LABEL_RE = re.compile(r"([A-Z])([0-9]+)")
+
+
+def cell_label(pos: Position) -> str:
+    """Étiquette « ligne-lettre + colonne-numéro » d'une case (A1 = haut-gauche)."""
+    return f"{chr(ord('A') + pos.row)}{pos.col + 1}"
+
+
+def looks_like_cell_label(text: str) -> bool:
+    """Vrai si `text` a la *forme* d'une étiquette de case (lettre + chiffres).
+
+    Ne vérifie pas que la case est dans la grille (voir `parse_cell_label`) :
+    sert à router la saisie vers une question de case plutôt qu'un tir de bord.
+    """
+    return _CELL_LABEL_RE.fullmatch(text.strip().upper()) is not None
+
+
+def parse_cell_label(text: str, width: int, height: int) -> Position | None:
+    """Convertit « A1 » (ligne-lettre + colonne-numéro) en `Position`.
+
+    Renvoie None si le format ne correspond pas ou si la case est hors grille.
+    """
+    match = _CELL_LABEL_RE.fullmatch(text.strip().upper())
+    if match is None:
+        return None
+    row = ord(match.group(1)) - ord("A")
+    col = int(match.group(2)) - 1
+    if 0 <= row < height and 0 <= col < width:
+        return Position(row, col)
+    return None

@@ -6,9 +6,12 @@ Deux façons de tirer, volontairement distinctes :
   les pièces d'**hypothèse posées par le joueur** (aide à la déduction, non
   enregistré). Le trajet est animé.
 - **Saisir une étiquette** dans la zone de texte (sous « Historique ») envoie
-  la *vraie* question sur la grille cachée : seuls l'étiquette d'entrée, le
-  point de sortie et la couleur sont enregistrés dans l'historique — le trajet
-  réel n'est jamais dessiné (il révélerait les positions cachées).
+  la *vraie* question sur la grille cachée. Deux formats :
+  - un point de bord (chiffre 1–18 ou lettre A–R) → tir réel : seuls l'entrée,
+    le point de sortie et la couleur sont enregistrés (le trajet n'est jamais
+    dessiné, il révélerait les positions cachées) ;
+  - une case « colonne-lettre + ligne-numéro » (ex. A1) → question de case :
+    la réponse (vide, couleur, ou nom d'extension) est enregistrée.
 
 Aucune règle de jeu ici : on appelle `fire_beam` / `GameState` et on affiche.
 """
@@ -20,14 +23,22 @@ from dataclasses import dataclass
 import pygame
 
 from orapa_mine.model.beam import mix_colors
-from orapa_mine.model.game import GameState, RayShot
-from orapa_mine.model.gems import GemColor, Piece, PlacedGem, Position
+from orapa_mine.model.game import CellContent, CellQuery, GameState, RayShot
+from orapa_mine.model.gems import GemColor, GemKind, Piece, PlacedGem, Position
 from orapa_mine.model import serialization
 from orapa_mine.model.grid import Grid
 from orapa_mine.ui import board_render, dialogs, i18n, theme
 from orapa_mine.ui.beam_test import RayTester
 
 _HISTORY_ROW_H = 22  # hauteur d'une ligne d'historique (px)
+
+# Extensions : on annonce le NOM de la pièce (et non une couleur) en réponse à
+# une question de case. Clés = libellés français, traduits par `i18n.piece`.
+_KIND_PIECE_NAME: dict[GemKind, str] = {
+    GemKind.DIAMOND: "diamant",
+    GemKind.BLACK_BODY: "corps-noir",
+    GemKind.WORMHOLE: "trou-de-ver",
+}
 
 
 @dataclass
@@ -127,7 +138,7 @@ class GameScreen:
             self._on_key(event)
 
     def _scroll_history(self, dy: int) -> None:
-        content_h = len(self.game.shots) * _HISTORY_ROW_H + 8
+        content_h = len(self.game.history) * _HISTORY_ROW_H + 8
         max_scroll = max(0.0, content_h - self.history_rect.height)
         if max_scroll <= 0:
             return
@@ -215,7 +226,7 @@ class GameScreen:
 
     def _input_key(self, event: pygame.event.Event) -> None:
         if event.key == pygame.K_RETURN:
-            self._ask_true()
+            self._ask()
         elif event.key == pygame.K_BACKSPACE:
             self.input_text = self.input_text[:-1]
         elif event.key == pygame.K_ESCAPE:
@@ -255,9 +266,15 @@ class GameScreen:
             name = gem.piece.name
             self.placed_counts[name] = max(0, self.placed_counts.get(name, 0) - 1)
 
-    def _ask_true(self) -> None:
+    def _ask(self) -> None:
+        """Pose une vraie question : case (ex. A1) ou point de bord (tir)."""
         label = self.input_text.strip().upper()
         self.input_text = ""
+        if not label:
+            return
+        if theme.looks_like_cell_label(label):
+            self._ask_cell(label)
+            return
         ep = self.ray.entry_by_label.get(label)
         if ep is None:
             self.message = i18n.t(f"Point « {label} » inconnu.", f"Unknown point « {label} ».")
@@ -265,6 +282,27 @@ class GameScreen:
             return
         self.game.play_shot(ep.entry, ep.direction)
         self.message = None
+
+    def _ask_cell(self, label: str) -> None:
+        """Pose la question « Qu'y a-t-il en <label> ? » sur la grille cachée."""
+        cell = theme.parse_cell_label(label, self.grid.width, self.grid.height)
+        if cell is None:
+            self.message = i18n.t(f"Case « {label} » hors plateau.", f"Cell « {label} » off board.")
+            self.message_color = theme.LOSE_COLOR
+            return
+        answer = self.game.query_cell(cell)
+        self.message = i18n.t(f"Case {label} : ", f"Cell {label}: ") + _cell_answer_text(answer.content)
+        self.message_color = theme.TEXT
+
+    def _query_marker_rgb(self, content: CellContent) -> tuple[int, int, int]:
+        """Couleur du marqueur d'une question de case dans l'historique."""
+        if not content.occupied:
+            return theme.SLOT_BG
+        if content.color is not None:
+            return theme.GEM_FILL[content.color]
+        if content.kind in theme.GEM_FILL:
+            return theme.GEM_FILL[content.kind]
+        return theme.TEXT_DIM
 
     def _save(self) -> None:
         path = dialogs.ask_save_path()
@@ -325,6 +363,7 @@ class GameScreen:
         if self.reveal:
             self._draw_hidden_outline(surface)
         self._draw_ghost(surface)
+        self._draw_hovered_coord(surface)
         self.ray.draw(surface)
         self._draw_palette(surface)
         self._draw_panel(surface)
@@ -348,6 +387,17 @@ class GameScreen:
             if self.grid.is_inside(pos):
                 pygame.draw.polygon(overlay, (*color, 120), theme.half_cell_polygon(pos, half))
         surface.blit(overlay, (0, 0))
+
+    def _draw_hovered_coord(self, surface: pygame.Surface) -> None:
+        """Badge « A1 » sur la case survolée (pour savoir quelle case interroger)."""
+        if self.hovered_cell is None:
+            return
+        label = theme.cell_label(self.hovered_cell)
+        img = self.font_small.render(label, True, theme.BACKGROUND)
+        x, y, _, _ = theme.cell_rect(self.hovered_cell)
+        box = img.get_rect(topleft=(x + 3, y + 3)).inflate(6, 4)
+        pygame.draw.rect(surface, theme.SLOT_SELECTED, box, border_radius=3)
+        surface.blit(img, img.get_rect(center=box.center))
 
     def _draw_palette(self, surface: pygame.Surface) -> None:
         title = self.font_small.render(i18n.t("Pièces", "Pieces"), True, theme.TEXT_DIM)
@@ -404,7 +454,7 @@ class GameScreen:
 
         # Zone de proposition (saisie d'un point d'entrée à interroger).
         label = self.font_small.render(
-            i18n.t("Proposer un point (ex. 5 ou C) :", "Enter a point (e.g. 5 or C):"), True, theme.TEXT_DIM)
+            i18n.t("Point de bord (5/C) ou case (A1) :", "Edge point (5/C) or cell (A1):"), True, theme.TEXT_DIM)
         surface.blit(label, (x, self.input_rect.top - 20))
         pygame.draw.rect(surface, theme.INPUT_BG, self.input_rect, border_radius=5)
         edge = theme.INPUT_ACTIVE if self.input_active else theme.BOARD_BORDER
@@ -565,13 +615,13 @@ class GameScreen:
         pygame.draw.rect(surface, theme.INPUT_BG, rect, border_radius=6)
         pygame.draw.rect(surface, theme.BOARD_BORDER, rect, width=1, border_radius=6)
 
-        shots = self.game.shots
-        if not shots:
+        actions = self.game.history
+        if not actions:
             empty = self.font_small.render(i18n.t("Aucune question posée.", "No question asked yet."), True, theme.TEXT_DIM)
             surface.blit(empty, (rect.x + 12, rect.y + 10))
             return
 
-        content_h = len(shots) * _HISTORY_ROW_H + 8
+        content_h = len(actions) * _HISTORY_ROW_H + 8
         max_scroll = max(0.0, content_h - rect.height)
         if self.history_stick_bottom:
             self.history_scroll = max_scroll
@@ -581,10 +631,10 @@ class GameScreen:
         previous_clip = surface.get_clip()
         surface.set_clip(rect.inflate(-3, -3))
         y0 = rect.y + 6 - self.history_scroll
-        for i, shot in enumerate(shots):
+        for i, action in enumerate(actions):
             ry = y0 + i * _HISTORY_ROW_H
             if ry + _HISTORY_ROW_H >= rect.y and ry <= rect.bottom:
-                self._draw_history_row(surface, rect.x + 8, int(ry), shot)
+                self._draw_history_row(surface, rect.x + 8, int(ry), action)
         surface.set_clip(previous_clip)
 
         # Barre de défilement (si le contenu déborde).
@@ -594,7 +644,15 @@ class GameScreen:
             thumb = pygame.Rect(rect.right - 7, int(thumb_y), 4, int(thumb_h))
             pygame.draw.rect(surface, theme.BOARD_BORDER, thumb, border_radius=2)
 
-    def _draw_history_row(self, surface: pygame.Surface, x: int, y: int, shot: RayShot) -> None:
+    def _draw_history_row(
+        self, surface: pygame.Surface, x: int, y: int, action: RayShot | CellQuery
+    ) -> None:
+        if isinstance(action, CellQuery):
+            self._draw_query_row(surface, x, y, action)
+        else:
+            self._draw_shot_row(surface, x, y, action)
+
+    def _draw_shot_row(self, surface: pygame.Surface, x: int, y: int, shot: RayShot) -> None:
         entry = theme.entry_label(shot.entry, shot.direction, self.grid.width, self.grid.height)
         if shot.result.absorbed:
             text, dot = f"{entry} → {i18n.color('absorbé')}", theme.RAY_ABSORBED
@@ -602,6 +660,15 @@ class GameScreen:
             text = f"{entry} → {self.ray.result_label(shot.result)}"
             dot = theme.ray_rgb(shot.result.color)
         pygame.draw.circle(surface, dot, (x + 6, y + 8), 6)
+        surface.blit(self.font_small.render(text, True, theme.TEXT), (x + 20, y))
+
+    def _draw_query_row(self, surface: pygame.Surface, x: int, y: int, query: CellQuery) -> None:
+        # Marqueur carré (vs cercle des tirs) pour distinguer d'un coup d'œil
+        # une question de case d'un tir de rayon.
+        text = f"{theme.cell_label(query.position)} → {_cell_answer_text(query.content)}"
+        marker = pygame.Rect(x, y + 2, 12, 12)
+        pygame.draw.rect(surface, self._query_marker_rgb(query.content), marker, border_radius=2)
+        pygame.draw.rect(surface, theme.BOARD_BORDER, marker, width=1, border_radius=2)
         surface.blit(self.font_small.render(text, True, theme.TEXT), (x + 20, y))
 
 
@@ -641,10 +708,17 @@ _HELP: list[tuple[str, str, str, str]] = [
     ),
     (
         "Interroger la mine", "Query the mine",
-        "Saisis un point (chiffre 1–18 ou lettre A–R) dans « Proposer un point » "
+        "Saisis un point de bord (chiffre 1–18 ou lettre A–R) dans la zone de saisie "
         "puis Entrée : la vraie sortie et la couleur s'ajoutent à l'Historique.",
-        "Enter a point (number 1–18 or letter A–R) in “Enter a point” then press "
+        "Enter an edge point (number 1–18 or letter A–R) in the input box then press "
         "Enter: the real exit and color are added to the History.",
+    ),
+    (
+        "Interroger une case", "Query a cell",
+        "Saisis une case « ligne-lettre + colonne-numéro » (ex. A1, C4) puis Entrée : "
+        "la réponse (vide, couleur, ou nom d'une extension) s'ajoute à l'Historique.",
+        "Enter a cell “row-letter + column-number” (e.g. A1, C4) then Enter: the "
+        "answer (empty, a color, or an extension name) is added to the History.",
     ),
     (
         "Déduire", "Deduce",
@@ -681,6 +755,17 @@ _HELP: list[tuple[str, str, str, str]] = [
         "[H] help, [S] save, [Shift+D] debug. [R] rotates/flips the piece, right-click removes it.",
     ),
 ]
+
+
+def _cell_answer_text(content: CellContent) -> str:
+    """Réponse affichée à une question de case (vide / couleur / nom d'extension)."""
+    if not content.occupied:
+        return i18n.t("vide", "empty")
+    if content.kind in _KIND_PIECE_NAME:  # extension : on annonce son nom
+        return i18n.piece(_KIND_PIECE_NAME[content.kind])
+    if content.color is not None:
+        return i18n.color(content.color.value)
+    return i18n.t("occupée", "occupied")
 
 
 def _wrap(text: str, font: "pygame.font.Font", max_width: int) -> list[str]:

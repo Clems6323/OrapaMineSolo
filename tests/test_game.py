@@ -63,6 +63,33 @@ def test_query_diamond_has_no_color():
     assert answer.content.color is None
 
 
+def test_query_wormhole_reports_its_kind():
+    # Extension trou de ver : interrogée, la case révèle sa nature (pas de couleur).
+    grid = Grid(width=10, height=8)
+    grid.place_gem(cat.WORMHOLE.at(Position(1, 1)))
+    game = GameState(hidden_grid=grid)
+    answer = game.query_cell(Position(1, 1))
+    assert answer.content.occupied is True
+    assert answer.content.kind is GemKind.WORMHOLE
+    assert answer.content.color is None
+
+
+def test_query_half_filled_cell_reports_the_color():
+    # Une case seulement à moitié occupée (triangle) répond quand même la couleur.
+    from orapa_mine.model.gems import HalfCell
+
+    grid = Grid(width=10, height=8)
+    gem = cat.RED.at(Position(3, 3))  # parallélogramme : contient des triangles
+    grid.place_gem(gem)
+    half_cell = next(
+        pos for pos, hc in gem.absolute_cells().items() if hc is not HalfCell.FULL
+    )
+    game = GameState(hidden_grid=grid)
+    answer = game.query_cell(half_cell)
+    assert answer.content.occupied is True
+    assert answer.content.color is GemColor.RED
+
+
 def test_submit_correct_guess_wins():
     grid, gems = _grid_with_pieces()
     game = GameState(hidden_grid=grid)
