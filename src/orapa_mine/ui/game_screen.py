@@ -26,7 +26,6 @@ from orapa_mine.model import serialization
 from orapa_mine.model.grid import Grid
 from orapa_mine.ui import board_render, dialogs, theme
 from orapa_mine.ui.beam_test import RayTester
-from orapa_mine.ui.board_render import darken as _darken
 from orapa_mine.ui.board_render import piece_color as _piece_color
 
 _HISTORY_ROW_H = 22  # hauteur d'une ligne d'historique (px)
@@ -364,9 +363,7 @@ class GameScreen:
         size = min(area.width / cols, area.height / rows)
         ox = slot.rect.centerx - cols * size / 2
         oy = slot.rect.top + 8
-        base = _piece_color(slot.piece)
-        if faded:
-            base = _darken(base, 0.5)
+        base = board_render.faded_piece_color(slot.piece) if faded else _piece_color(slot.piece)
         for pos, half in cells:
             pygame.draw.polygon(surface, base, theme.half_cell_polygon_at(pos, half, ox, oy, size))
         name = self.font_small.render(slot.piece.color.value if slot.piece.color else slot.piece.name, True, theme.TEXT_DIM)

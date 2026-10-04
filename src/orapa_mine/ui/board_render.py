@@ -18,6 +18,17 @@ def piece_color(piece: Piece) -> tuple[int, int, int]:
     return theme.GEM_FILL[key]
 
 
+def faded_piece_color(piece: Piece) -> tuple[int, int, int]:
+    """Couleur « posée/utilisée » d'une pièce dans la palette.
+
+    Les pièces colorées sont assombries ; le corps noir (déjà quasi noir) est au
+    contraire éclairci en gris foncé, sinon son état « posé » serait invisible.
+    """
+    if piece.kind is GemKind.BLACK_BODY:
+        return (72, 72, 82)
+    return darken(piece_color(piece), 0.5)
+
+
 def lighten(color: tuple[int, int, int], amount: float) -> tuple[int, int, int]:
     return tuple(min(255, int(c + (255 - c) * amount)) for c in color)  # type: ignore[return-value]
 
