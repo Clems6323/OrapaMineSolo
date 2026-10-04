@@ -153,6 +153,19 @@ def _shares_flat_face(grid: Grid, gem: PlacedGem) -> bool:
     return False
 
 
+def placement_is_legal(grid: Grid, gem: PlacedGem) -> bool:
+    """Vrai si `gem` peut être posée sur `grid` au moment de la pose.
+
+    Applique les contraintes *locales* de placement : la gemme tient dans la
+    grille, ne chevauche aucune autre, et ne **touche pas** une autre gemme par
+    une face plate partagée (le contact en diagonale ou par un coin reste
+    autorisé). La règle « gemme entièrement cachée » n'est pas vérifiée ici :
+    c'est une propriété *globale* de la configuration (voir
+    `configuration_problems`), pas un blocage à la pose d'une pièce.
+    """
+    return grid.can_place(gem) and not _shares_flat_face(grid, gem)
+
+
 def configuration_problems(grid: Grid) -> list[tuple[str, PlacedGem]]:
     """Liste les violations des règles de placement dans `grid`.
 
