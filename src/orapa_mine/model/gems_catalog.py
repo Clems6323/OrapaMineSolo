@@ -117,6 +117,15 @@ DIAMOND = _piece("diamant", None, GemKind.DIAMOND, [(0, 1), (2, 1), (1, 0)])
 BLACK_BODY = _piece(
     "corps-noir", None, GemKind.BLACK_BODY, [(0, 0), (2, 0), (2, 1), (0, 1)]
 )
+# Trou de ver (extension) : une case pleine 1×1, posée par paire (quantity=2).
+# Un rayon entrant dans un trou ressort de l'autre dans la même direction.
+WORMHOLE = Piece(
+    name="trou-de-ver",
+    color=None,
+    kind=GemKind.WORMHOLE,
+    cells=_rasterize([(0, 0), (1, 0), (1, 1), (0, 1)]),
+    quantity=2,
+)
 
 
 def base_set() -> list[Piece]:
@@ -131,5 +140,5 @@ def full_set() -> list[Piece]:
 
 ALL_PIECES: dict[str, Piece] = {
     p.name: p
-    for p in (RED, BLUE, WHITE_BIG, YELLOW, WHITE_SMALL, DIAMOND, BLACK_BODY)
+    for p in (RED, BLUE, WHITE_BIG, YELLOW, WHITE_SMALL, DIAMOND, BLACK_BODY, WORMHOLE)
 }

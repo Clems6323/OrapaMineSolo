@@ -26,7 +26,6 @@ from orapa_mine.model import serialization
 from orapa_mine.model.grid import Grid
 from orapa_mine.ui import board_render, dialogs, theme
 from orapa_mine.ui.beam_test import RayTester
-from orapa_mine.ui.board_render import piece_color as _piece_color
 
 _HISTORY_ROW_H = 22  # hauteur d'une ligne d'historique (px)
 
@@ -53,7 +52,7 @@ class GameScreen:
         # Sélection / pose de pièces.
         self.selected: Piece | None = None
         self.orientation_index = 0
-        self.used_names: set[str] = set()
+        self.placed_counts: dict[str, int] = {}  # nom de pièce -> nb d'exemplaires posés
         self.hovered_cell: Position | None = None
 
         # Zone de proposition (texte) et résultat de soumission.
@@ -228,7 +227,7 @@ class GameScreen:
 
     def _select_slot(self, index: int) -> None:
         piece = self.slots[index].piece
-        if piece.name in self.used_names:
+        if self.placed_counts.get(piece.name, 0) >= piece.quantity:
             return
         self.selected = piece
         self.orientation_index = 0
@@ -241,8 +240,11 @@ class GameScreen:
         gem = PlacedGem(piece=self.selected, anchor=cell, orientation=orientation)
         if self.hypothesis.can_place(gem):
             self.hypothesis.place_gem(gem)
-            self.used_names.add(self.selected.name)
-            self.selected = None
+            name = self.selected.name
+            self.placed_counts[name] = self.placed_counts.get(name, 0) + 1
+            # On garde la pièce sélectionnée tant qu'il en reste à poser (trou de ver).
+            if self.placed_counts[name] >= self.selected.quantity:
+                self.selected = None
 
     def _remove_at(self, cell: Position | None) -> None:
         if cell is None:
@@ -250,7 +252,8 @@ class GameScreen:
         gem = self.hypothesis.gem_at(cell)
         if gem is not None:
             self.hypothesis.remove_gem(gem)
-            self.used_names.discard(gem.piece.name)
+            name = gem.piece.name
+            self.placed_counts[name] = max(0, self.placed_counts.get(name, 0) - 1)
 
     def _ask_true(self) -> None:
         label = self.input_text.strip().upper()
@@ -347,27 +350,12 @@ class GameScreen:
         title = self.font_small.render("Pièces", True, theme.TEXT_DIM)
         surface.blit(title, (theme.PALETTE.x + 4, theme.PALETTE.y - 22))
         for slot in self.slots:
-            used = slot.piece.name in self.used_names
-            selected = slot.piece is self.selected
-            bg = theme.SLOT_USED if used else theme.SLOT_BG
-            pygame.draw.rect(surface, bg, slot.rect, border_radius=6)
-            border = theme.SLOT_SELECTED if selected else theme.BOARD_BORDER
-            pygame.draw.rect(surface, border, slot.rect, width=2 if selected else 1, border_radius=6)
-            self._draw_slot_icon(surface, slot, faded=used)
-
-    def _draw_slot_icon(self, surface: pygame.Surface, slot: Slot, faded: bool) -> None:
-        cells = slot.piece.cells
-        rows = max(p.row for p, _ in cells) + 1
-        cols = max(p.col for p, _ in cells) + 1
-        area = slot.rect.inflate(-16, -22)
-        size = min(area.width / cols, area.height / rows)
-        ox = slot.rect.centerx - cols * size / 2
-        oy = slot.rect.top + 8
-        base = board_render.faded_piece_color(slot.piece) if faded else _piece_color(slot.piece)
-        for pos, half in cells:
-            pygame.draw.polygon(surface, base, theme.half_cell_polygon_at(pos, half, ox, oy, size))
-        name = self.font_small.render(slot.piece.color.value if slot.piece.color else slot.piece.name, True, theme.TEXT_DIM)
-        surface.blit(name, name.get_rect(centerx=slot.rect.centerx, bottom=slot.rect.bottom - 4))
+            board_render.draw_palette_slot(
+                surface, slot.rect, slot.piece,
+                selected=slot.piece is self.selected,
+                placed=self.placed_counts.get(slot.piece.name, 0),
+                font=self.font_small,
+            )
 
     def _draw_panel(self, surface: pygame.Surface) -> None:
         pygame.draw.rect(surface, theme.PANEL_BG, self.panel, border_radius=8)

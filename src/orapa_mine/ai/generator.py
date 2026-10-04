@@ -80,8 +80,11 @@ def generate_hidden_grid(
 
 
 def _try_fill(grid: Grid, pieces: list[Piece], rng: random.Random) -> bool:
-    """Tente de poser toutes les `pieces` (ordre aléatoire). True si réussi."""
-    order = list(pieces)
+    """Tente de poser toutes les `pieces` (ordre aléatoire). True si réussi.
+
+    Chaque pièce est posée `piece.quantity` fois (le trou de ver en pose deux).
+    """
+    order = [piece for piece in pieces for _ in range(piece.quantity)]
     rng.shuffle(order)
     for piece in order:
         placement = _random_valid_placement(grid, piece, rng)

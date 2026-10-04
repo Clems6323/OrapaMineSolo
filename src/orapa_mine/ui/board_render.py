@@ -51,9 +51,77 @@ def draw_board(surface: pygame.Surface, grid: Grid) -> None:
     pygame.draw.rect(surface, theme.BOARD_BORDER, rect, width=2, border_radius=6)
 
 
+def draw_wormhole(
+    surface: pygame.Surface,
+    center: tuple[float, float],
+    size: float,
+    ring_color: tuple[int, int, int] = theme.WORMHOLE_RING,
+) -> None:
+    """Dessine un trou de ver : cercle sombre cerné d'un liseré (le « O »)."""
+    cx, cy = int(center[0]), int(center[1])
+    radius = max(4, int(size * 0.34))
+    ring = max(2, int(size * 0.08))
+    pygame.draw.circle(surface, theme.GEM_FILL[GemKind.WORMHOLE], (cx, cy), radius)
+    pygame.draw.circle(surface, ring_color, (cx, cy), radius, width=ring)
+
+
+def draw_palette_slot(
+    surface: pygame.Surface,
+    rect: pygame.Rect,
+    piece: Piece,
+    *,
+    selected: bool,
+    placed: int,
+    font: pygame.font.Font,
+) -> None:
+    """Dessine une case de palette (fond, bordure, icône, badge de quantité).
+
+    `placed` = nombre d'exemplaires déjà posés ; la case est grisée quand tous
+    le sont, et un badge « ×N » affiche le reste à poser (pièces en plusieurs
+    exemplaires, p. ex. le trou de ver).
+    """
+    used = placed >= piece.quantity
+    bg = theme.SLOT_USED if used else theme.SLOT_BG
+    pygame.draw.rect(surface, bg, rect, border_radius=6)
+    border = theme.SLOT_SELECTED if selected else theme.BOARD_BORDER
+    pygame.draw.rect(surface, border, rect, width=2 if selected else 1, border_radius=6)
+    _draw_slot_icon(surface, rect, piece, faded=used, font=font)
+    if piece.quantity > 1 and not used:
+        badge = font.render(f"x{piece.quantity - placed}", True, theme.TEXT)
+        surface.blit(badge, (rect.left + 6, rect.bottom - 38))  # au-dessus du nom
+
+
+def _draw_slot_icon(
+    surface: pygame.Surface, rect: pygame.Rect, piece: Piece, faded: bool, font: pygame.font.Font
+) -> None:
+    if piece.kind is GemKind.WORMHOLE:
+        size = min(rect.width, rect.height) - 22
+        center = (rect.centerx, rect.top + 8 + size / 2)
+        ring = theme.TEXT_DIM if faded else theme.WORMHOLE_RING
+        draw_wormhole(surface, center, size, ring_color=ring)
+    else:
+        cells = piece.cells
+        rows = max(p.row for p, _ in cells) + 1
+        cols = max(p.col for p, _ in cells) + 1
+        area = rect.inflate(-16, -22)
+        cell_size = min(area.width / cols, area.height / rows)
+        ox = rect.centerx - cols * cell_size / 2
+        oy = rect.top + 8
+        base = faded_piece_color(piece) if faded else piece_color(piece)
+        for pos, half in cells:
+            pygame.draw.polygon(surface, base, theme.half_cell_polygon_at(pos, half, ox, oy, cell_size))
+    label = piece.color.value if piece.color else piece.name
+    name = font.render(label, True, theme.TEXT_DIM)
+    surface.blit(name, name.get_rect(centerx=rect.centerx, bottom=rect.bottom - 4))
+
+
 def draw_gems(surface: pygame.Surface, grid: Grid) -> None:
     """Dessine les gemmes pleines de `grid` (couleur + arêtes visibles)."""
     for gem in grid.gems:
+        if gem.kind is GemKind.WORMHOLE:
+            for pos in gem.absolute_cells():
+                draw_wormhole(surface, theme.cell_center(pos), theme.CELL)
+            continue
         base = piece_color(gem.piece)
         for pos, half in gem.absolute_cells().items():
             poly = theme.half_cell_polygon(pos, half)

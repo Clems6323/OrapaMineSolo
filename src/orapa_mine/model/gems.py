@@ -33,11 +33,14 @@ class GemKind(Enum):
     - NORMAL : gemme colorée classique (teinte le rayon).
     - DIAMOND : extension. Dévie comme une gemme normale mais ne teinte jamais.
     - BLACK_BODY : extension. Absorbe le rayon (aucune sortie).
+    - WORMHOLE : extension. Va par paires : un rayon qui entre dans un trou
+      ressort de l'autre dans la **même direction** (téléportation, sans teinter).
     """
 
     NORMAL = "normal"
     DIAMOND = "diamond"
     BLACK_BODY = "black_body"
+    WORMHOLE = "wormhole"
 
 
 @dataclass(frozen=True)
@@ -193,6 +196,7 @@ class Piece:
     color: GemColor | None
     kind: GemKind
     cells: frozenset[tuple[Position, HalfCell]]
+    quantity: int = 1  # nombre d'exemplaires à placer (2 pour le trou de ver)
 
     def orientations(self) -> list[frozenset[tuple[Position, HalfCell]]]:
         """Empreintes distinctes obtenues par rotations **et retournements**.

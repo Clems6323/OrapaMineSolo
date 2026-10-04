@@ -22,7 +22,6 @@ from orapa_mine.model import serialization
 from orapa_mine.model.grid import Grid
 from orapa_mine.ui import board_render, dialogs, theme
 from orapa_mine.ui.beam_test import RayTester
-from orapa_mine.ui.board_render import piece_color as _piece_color
 from orapa_mine.ui.game_screen import Slot
 
 _BASE_PIECES = [cat.RED, cat.YELLOW, cat.BLUE, cat.WHITE_BIG, cat.WHITE_SMALL]
@@ -41,15 +40,22 @@ class CreatorScreen:
 
     _SIZES = [("Petit", 8, 6), ("Standard", 10, 8), ("Grand", 12, 10)]
 
-    def __init__(self, size_index: int = 1, diamant: bool = False, corps_noir: bool = False) -> None:
+    def __init__(
+        self,
+        size_index: int = 1,
+        diamant: bool = False,
+        corps_noir: bool = False,
+        wormhole: bool = False,
+    ) -> None:
         self.size_index = size_index
         self.diamant = diamant
         self.corps_noir = corps_noir
+        self.wormhole = wormhole
 
         # Sélection / pose de pièces (même interaction que l'écran de jeu).
         self.selected: Piece | None = None
         self.orientation_index = 0
-        self.used_names: set[str] = set()
+        self.placed_counts: dict[str, int] = {}
         self.hovered_cell: Position | None = None
 
         self.message: str | None = None
@@ -77,6 +83,8 @@ class CreatorScreen:
             pieces.append(cat.DIAMOND)
         if self.corps_noir:
             pieces.append(cat.BLACK_BODY)
+        if self.wormhole:
+            pieces.append(cat.WORMHOLE)
         return pieces
 
     def _rebuild(self, clear_gems: bool) -> None:
@@ -96,7 +104,9 @@ class CreatorScreen:
             if gem.piece.name in palette_names and self.grid.can_place(gem):
                 self.grid.place_gem(gem)
 
-        self.used_names = {gem.piece.name for gem in self.grid.gems}
+        self.placed_counts = {}
+        for gem in self.grid.gems:
+            self.placed_counts[gem.piece.name] = self.placed_counts.get(gem.piece.name, 0) + 1
         self.selected = None
         self.size = theme.window_size(width, height, panel_width=_PANEL_WIDTH)
         self.ray = RayTester(width, height, self.font_small)
@@ -128,7 +138,8 @@ class CreatorScreen:
         self.ext_label_y = top + 104
         self.diamant_rect = pygame.Rect(inner, top + 126, 20, 20)
         self.corps_rect = pygame.Rect(inner, top + 150, 20, 20)
-        self.status_y = top + 178
+        self.wormhole_rect = pygame.Rect(inner, top + 174, 20, 20)
+        self.status_y = top + 202
 
         # Actions (bas du panneau).
         self.save_rect = pygame.Rect(inner, self.panel.bottom - 152, bw, 40)
@@ -170,6 +181,10 @@ class CreatorScreen:
             self.corps_noir = not self.corps_noir
             self._rebuild(clear_gems=False)
             return
+        if self.wormhole_rect.collidepoint(pos):
+            self.wormhole = not self.wormhole
+            self._rebuild(clear_gems=False)
+            return
         for i, rect in enumerate(self.size_rects):
             if rect.collidepoint(pos):
                 if i != self.size_index:
@@ -200,7 +215,7 @@ class CreatorScreen:
 
     def _select_slot(self, index: int) -> None:
         piece = self.slots[index].piece
-        if piece.name in self.used_names:
+        if self.placed_counts.get(piece.name, 0) >= piece.quantity:
             return
         self.selected = piece
         self.orientation_index = 0
@@ -213,8 +228,10 @@ class CreatorScreen:
         gem = PlacedGem(piece=self.selected, anchor=cell, orientation=orientation)
         if self.grid.can_place(gem):
             self.grid.place_gem(gem)
-            self.used_names.add(self.selected.name)
-            self.selected = None
+            name = self.selected.name
+            self.placed_counts[name] = self.placed_counts.get(name, 0) + 1
+            if self.placed_counts[name] >= self.selected.quantity:
+                self.selected = None
             self.message = None
 
     def _remove_at(self, cell: Position | None) -> None:
@@ -223,19 +240,27 @@ class CreatorScreen:
         gem = self.grid.gem_at(cell)
         if gem is not None:
             self.grid.remove_gem(gem)
-            self.used_names.discard(gem.piece.name)
+            name = gem.piece.name
+            self.placed_counts[name] = max(0, self.placed_counts.get(name, 0) - 1)
             self.message = None
 
-    def _missing_pieces(self) -> list[Piece]:
-        """Pièces de la palette pas encore posées sur le plateau."""
-        placed = {gem.piece.name for gem in self.grid.gems}
-        return [piece for piece in self.palette_pieces if piece.name not in placed]
+    def _missing_pieces(self) -> list[str]:
+        """Pièces de la palette dont il manque des exemplaires sur le plateau."""
+        counts: dict[str, int] = {}
+        for gem in self.grid.gems:
+            counts[gem.piece.name] = counts.get(gem.piece.name, 0) + 1
+        missing: list[str] = []
+        for piece in self.palette_pieces:
+            remaining = piece.quantity - counts.get(piece.name, 0)
+            if remaining > 0:
+                missing.append(piece.name + (f" (×{remaining})" if piece.quantity > 1 else ""))
+        return missing
 
     def _blocking_problem(self) -> str | None:
         """Raison empêchant de jouer/partager, ou None si tout va bien."""
         missing = self._missing_pieces()
         if missing:
-            names = ", ".join(piece.name for piece in missing)
+            names = ", ".join(missing)
             return f"Place toutes les gemmes (manque : {names})."
         problems = configuration_problems(self.grid)
         if problems:
@@ -324,28 +349,12 @@ class CreatorScreen:
         title = self.font_small.render("Pièces", True, theme.TEXT_DIM)
         surface.blit(title, (theme.PALETTE.x + 4, theme.PALETTE.y - 22))
         for slot in self.slots:
-            used = slot.piece.name in self.used_names
-            selected = slot.piece is self.selected
-            bg = theme.SLOT_USED if used else theme.SLOT_BG
-            pygame.draw.rect(surface, bg, slot.rect, border_radius=6)
-            border = theme.SLOT_SELECTED if selected else theme.BOARD_BORDER
-            pygame.draw.rect(surface, border, slot.rect, width=2 if selected else 1, border_radius=6)
-            self._draw_slot_icon(surface, slot, faded=used)
-
-    def _draw_slot_icon(self, surface: pygame.Surface, slot: Slot, faded: bool) -> None:
-        cells = slot.piece.cells
-        rows = max(p.row for p, _ in cells) + 1
-        cols = max(p.col for p, _ in cells) + 1
-        area = slot.rect.inflate(-16, -22)
-        size = min(area.width / cols, area.height / rows)
-        ox = slot.rect.centerx - cols * size / 2
-        oy = slot.rect.top + 8
-        base = board_render.faded_piece_color(slot.piece) if faded else _piece_color(slot.piece)
-        for pos, half in cells:
-            pygame.draw.polygon(surface, base, theme.half_cell_polygon_at(pos, half, ox, oy, size))
-        name = slot.piece.color.value if slot.piece.color else slot.piece.name
-        label = self.font_small.render(name, True, theme.TEXT_DIM)
-        surface.blit(label, label.get_rect(centerx=slot.rect.centerx, bottom=slot.rect.bottom - 4))
+            board_render.draw_palette_slot(
+                surface, slot.rect, slot.piece,
+                selected=slot.piece is self.selected,
+                placed=self.placed_counts.get(slot.piece.name, 0),
+                font=self.font_small,
+            )
 
     def _draw_panel(self, surface: pygame.Surface) -> None:
         pygame.draw.rect(surface, theme.PANEL_BG, self.panel, border_radius=8)
@@ -369,6 +378,7 @@ class CreatorScreen:
         surface.blit(self.font_small.render("Extensions", True, theme.TEXT), (x, self.ext_label_y))
         self._checkbox(surface, self.diamant_rect, self.diamant, "Diamant")
         self._checkbox(surface, self.corps_rect, self.corps_noir, "Corps noir")
+        self._checkbox(surface, self.wormhole_rect, self.wormhole, "Trou de ver (×2)")
 
         # État de validité en direct.
         placed = len(self.grid.gems)
@@ -377,13 +387,15 @@ class CreatorScreen:
             status, color = f"Configuration valide ({placed} gemme(s)).", theme.WIN_COLOR
         else:
             status, color = f"Attention : {problem}", theme.LOSE_COLOR
-        for i, text in enumerate(_wrap(status, self.font_small, self.panel.width - 40)):
+        status_lines = _wrap(status, self.font_small, self.panel.width - 40)
+        for i, text in enumerate(status_lines):
             surface.blit(self.font_small.render(text, True, color), (x, self.status_y + i * 18))
 
-        # Résultat du dernier rayon de test (clic sur un point d'entrée).
+        # Résultat du dernier rayon de test (sous l'état, position dynamique).
+        ray_y = self.status_y + len(status_lines) * 18 + 10
         ray_line = self.ray.last_test or "Clique un point d'entrée pour tester le rayon."
         for i, text in enumerate(_wrap(ray_line, self.font_small, self.panel.width - 40)):
-            surface.blit(self.font_small.render(text, True, theme.TEXT_DIM), (x, self.status_y + 66 + i * 18))
+            surface.blit(self.font_small.render(text, True, theme.TEXT_DIM), (x, ray_y + i * 18))
 
         self._button(surface, self.save_rect, (54, 96, 120), "Sauvegarder la configuration")
         can_play = problem is None

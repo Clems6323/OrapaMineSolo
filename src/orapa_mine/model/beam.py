@@ -15,7 +15,11 @@ from orapa_mine.model.grid import Grid
 
 # Direction est ré-exporté ici par commodité (l'API historique et l'UI
 # l'importent depuis beam).
-__all__ = ["Direction", "BeamResult", "fire_beam", "COLOR_MIX_TABLE"]
+__all__ = ["Direction", "BeamResult", "fire_beam", "COLOR_MIX_TABLE", "TELEPORT_SEGMENT"]
+
+# Marqueur de segment « saut de trou de ver » dans `segment_colors` : ce segment
+# relie les deux trous et ne doit pas être dessiné (le rayon se téléporte).
+TELEPORT_SEGMENT = "__teleport__"
 
 
 # Couleur finale du rayon en fonction de l'ensemble des couleurs distinctes
@@ -89,6 +93,14 @@ class BeamResult:
     segment_colors: list[str | None] = field(default_factory=list)
 
 
+def _wormhole_partner(grid: Grid, gem) -> Position | None:
+    """Position de l'autre trou de ver (chaque trou est une case 1×1)."""
+    for position, owner in grid.owner.items():
+        if owner.kind is GemKind.WORMHOLE and owner is not gem:
+            return position
+    return None
+
+
 def fire_beam(grid: Grid, entry: Position, direction: Direction) -> BeamResult:
     """Simule un rayon entrant par la case de bordure `entry`, vers `direction`.
 
@@ -151,6 +163,29 @@ def fire_beam(grid: Grid, entry: Position, direction: Direction) -> BeamResult:
             continue
 
         gem = grid.owner[nxt]
+        if gem.kind is GemKind.WORMHOLE:
+            current = mix_colors(frozenset(colors))
+            partner = _wormhole_partner(grid, gem)
+            if partner is None:
+                # Trou de ver orphelin (sans partenaire) : traversée simple.
+                pos = nxt
+                last_inside = nxt
+                path.append(nxt)
+                color_steps.append(current)
+                add_vertex(nxt.row, nxt.col, current)
+                continue
+            # Entrée dans le trou `nxt`, sortie de l'autre trou `partner` dans la
+            # même direction ; le segment de liaison n'est pas dessiné.
+            add_vertex(nxt.row, nxt.col, current)
+            add_vertex(partner.row, partner.col, TELEPORT_SEGMENT)
+            path.append(nxt)
+            path.append(partner)
+            color_steps.append(current)
+            color_steps.append(current)
+            pos = partner
+            last_inside = partner
+            continue
+
         if gem.kind is GemKind.BLACK_BODY:
             add_vertex(pos.row + dr * 0.5, pos.col + dc * 0.5, mix_colors(frozenset(colors)))
             return result(None, absorbed=True)
