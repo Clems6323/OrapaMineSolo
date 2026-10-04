@@ -10,7 +10,7 @@ import pygame
 
 from orapa_mine.model.gems import GemKind, Piece
 from orapa_mine.model.grid import Grid
-from orapa_mine.ui import theme
+from orapa_mine.ui import i18n, theme
 
 
 def piece_color(piece: Piece) -> tuple[int, int, int]:
@@ -110,7 +110,7 @@ def _draw_slot_icon(
         base = faded_piece_color(piece) if faded else piece_color(piece)
         for pos, half in cells:
             pygame.draw.polygon(surface, base, theme.half_cell_polygon_at(pos, half, ox, oy, cell_size))
-    label = piece.color.value if piece.color else piece.name
+    label = i18n.piece(piece.color.value if piece.color else piece.name)
     name = font.render(label, True, theme.TEXT_DIM)
     surface.blit(name, name.get_rect(centerx=rect.centerx, bottom=rect.bottom - 4))
 

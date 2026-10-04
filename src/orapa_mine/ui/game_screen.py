@@ -24,7 +24,7 @@ from orapa_mine.model.game import GameState, RayShot
 from orapa_mine.model.gems import GemColor, Piece, PlacedGem, Position
 from orapa_mine.model import serialization
 from orapa_mine.model.grid import Grid
-from orapa_mine.ui import board_render, dialogs, theme
+from orapa_mine.ui import board_render, dialogs, i18n, theme
 from orapa_mine.ui.beam_test import RayTester
 
 _HISTORY_ROW_H = 22  # hauteur d'une ligne d'historique (px)
@@ -260,7 +260,7 @@ class GameScreen:
         self.input_text = ""
         ep = self.ray.entry_by_label.get(label)
         if ep is None:
-            self.message = f"Point « {label} » inconnu."
+            self.message = i18n.t(f"Point « {label} » inconnu.", f"Unknown point « {label} ».")
             self.message_color = theme.LOSE_COLOR
             return
         self.game.play_shot(ep.entry, ep.direction)
@@ -282,17 +282,20 @@ class GameScreen:
         try:
             dialogs.write_json(path, data)
         except OSError as exc:
-            self.message, self.message_color = f"Échec de la sauvegarde : {exc}", theme.LOSE_COLOR
+            self.message = i18n.t("Échec de la sauvegarde : ", "Save failed: ") + str(exc)
+            self.message_color = theme.LOSE_COLOR
             return
-        kind = "avec progression" if self.save_progress else "configuration seule"
-        self.message, self.message_color = f"Partie sauvegardée ({kind}).", theme.WIN_COLOR
+        kind = i18n.t("avec progression", "with progress") if self.save_progress \
+            else i18n.t("configuration seule", "configuration only")
+        self.message = i18n.t(f"Partie sauvegardée ({kind}).", f"Game saved ({kind}).")
+        self.message_color = theme.WIN_COLOR
 
     def _submit(self) -> None:
         won = self.game.submit_guess(list(self.hypothesis.gems))
         if won:
             self.finished = ("win", self.game.score)
         else:
-            self.message = "Proposition incorrecte, réessaie."
+            self.message = i18n.t("Proposition incorrecte, réessaie.", "Incorrect guess, try again.")
             self.message_color = theme.LOSE_COLOR
 
     # --- Détection de zones ------------------------------------------------
@@ -347,7 +350,7 @@ class GameScreen:
         surface.blit(overlay, (0, 0))
 
     def _draw_palette(self, surface: pygame.Surface) -> None:
-        title = self.font_small.render("Pièces", True, theme.TEXT_DIM)
+        title = self.font_small.render(i18n.t("Pièces", "Pieces"), True, theme.TEXT_DIM)
         surface.blit(title, (theme.PALETTE.x + 4, theme.PALETTE.y - 22))
         for slot in self.slots:
             board_render.draw_palette_slot(
@@ -367,18 +370,19 @@ class GameScreen:
         pygame.draw.circle(surface, theme.BOARD_BORDER, self.help_rect.center, 14, width=1)
         q = self.font.render("?", True, theme.TEXT)
         surface.blit(q, q.get_rect(center=self.help_rect.center))
+        test_hint = self.ray.last_test or i18n.t("Clique un point d'entrée pour tester.", "Click an entry point to test.")
         surface.blit(
-            self.font_small.render(self.ray.last_test or "Clique un point d'entrée pour tester.", True, theme.TEXT_DIM),
+            self.font_small.render(test_hint, True, theme.TEXT_DIM),
             (x, self.panel.top + 54),
         )
         # Boutons Proposer / Abandonner.
         pygame.draw.rect(surface, (54, 120, 90), self.submit_rect, border_radius=6)
         pygame.draw.rect(surface, theme.BOARD_BORDER, self.submit_rect, width=1, border_radius=6)
-        btn = self.font_small.render("Proposer la solution", True, theme.TEXT)
+        btn = self.font_small.render(i18n.t("Proposer la solution", "Submit solution"), True, theme.TEXT)
         surface.blit(btn, btn.get_rect(center=self.submit_rect.center))
         pygame.draw.rect(surface, (96, 54, 60), self.abandon_rect, border_radius=6)
         pygame.draw.rect(surface, theme.BOARD_BORDER, self.abandon_rect, width=1, border_radius=6)
-        ab = self.font_small.render("Abandonner", True, theme.TEXT)
+        ab = self.font_small.render(i18n.t("Abandonner", "Give up"), True, theme.TEXT)
         surface.blit(ab, ab.get_rect(center=self.abandon_rect.center))
 
         # Ligne sauvegarde : case « progression » + bouton Sauvegarder.
@@ -387,19 +391,20 @@ class GameScreen:
         if self.save_progress:
             pygame.draw.rect(surface, theme.SLOT_SELECTED, self.progress_toggle_rect.inflate(-8, -8), border_radius=2)
         surface.blit(
-            self.font_small.render("Progression", True, theme.TEXT),
+            self.font_small.render(i18n.t("Progression", "Progress"), True, theme.TEXT),
             (self.progress_toggle_rect.right + 8, self.progress_toggle_rect.y + 2),
         )
         pygame.draw.rect(surface, theme.SLOT_BG, self.save_rect, border_radius=6)
         pygame.draw.rect(surface, theme.BOARD_BORDER, self.save_rect, width=1, border_radius=6)
-        sv = self.font_small.render("Sauvegarder", True, theme.TEXT)
+        sv = self.font_small.render(i18n.t("Sauvegarder", "Save"), True, theme.TEXT)
         surface.blit(sv, sv.get_rect(center=self.save_rect.center))
 
-        surface.blit(self.font.render("Historique", True, theme.TEXT), (x, self.history_header_y))
+        surface.blit(self.font.render(i18n.t("Historique", "History"), True, theme.TEXT), (x, self.history_header_y))
         self._draw_history(surface)
 
         # Zone de proposition (saisie d'un point d'entrée à interroger).
-        label = self.font_small.render("Proposer un point (ex. 5 ou C) :", True, theme.TEXT_DIM)
+        label = self.font_small.render(
+            i18n.t("Proposer un point (ex. 5 ou C) :", "Enter a point (e.g. 5 or C):"), True, theme.TEXT_DIM)
         surface.blit(label, (x, self.input_rect.top - 20))
         pygame.draw.rect(surface, theme.INPUT_BG, self.input_rect, border_radius=5)
         edge = theme.INPUT_ACTIVE if self.input_active else theme.BOARD_BORDER
@@ -411,7 +416,10 @@ class GameScreen:
             msg = self.font_small.render(self.message, True, self.message_color)
             surface.blit(msg, (x, self.input_rect.bottom + 10))
 
-        hint = "clic=choisir, clic plateau=poser, [R] tourner, clic droit=retirer, [H] aide, [Maj+D] debug"
+        hint = i18n.t(
+            "clic=choisir, clic plateau=poser, [R] tourner, clic droit=retirer, [H] aide, [Maj+D] debug",
+            "click=select, click board=place, [R] rotate, right-click=remove, [H] help, [Shift+D] debug",
+        )
         surface.blit(
             self.font_small.render(hint, True, theme.TEXT_DIM),
             (theme.PALETTE.x, self.size[1] - 24),
@@ -433,15 +441,20 @@ class GameScreen:
         def line_draw(text: str):
             return lambda s, x, y, t=text: s.blit(self.font_small.render(t, True, theme.TEXT), (x, y))
 
-        for head, body in _HELP:
-            if head == "Couleurs":
+        for head_fr, head_en, body_fr, body_en in _HELP:
+            head = i18n.t(head_fr, head_en)
+            if head_fr == "Couleurs":
                 # La légende des couleurs forme un bloc insécable : une seule
                 # « ligne » composite qui ne se coupe jamais entre deux pages
                 # (mais partage une page avec ce qui précède si ça tient).
                 block: list[tuple[int, object]] = [
                     (28, heading_draw(head)),
-                    (22, line_draw("Le rayon se teinte au contact ; mélange peinture, le blanc éclaircit.")),
-                    (22, line_draw("Aucune gemme touchée → rayon transparent.")),
+                    (22, line_draw(i18n.t(
+                        "Le rayon se teinte au contact ; mélange peinture, le blanc éclaircit.",
+                        "The beam is tinted on contact; paint-style mixing, white lightens."))),
+                    (22, line_draw(i18n.t(
+                        "Aucune gemme touchée → rayon transparent.",
+                        "No gem touched → transparent beam."))),
                 ]
                 col_w = content_width // 2  # deux colonnes de combinaisons
                 for i in range(0, len(_COLOR_COMBOS), 2):
@@ -451,7 +464,7 @@ class GameScreen:
                 rows.append((sum(h for h, _ in block), _group_drawer(block)))
             else:
                 rows.append((28, heading_draw(head)))
-                for wrapped in _wrap(body, self.font_small, content_width):
+                for wrapped in _wrap(i18n.t(body_fr, body_en), self.font_small, content_width):
                     rows.append((22, line_draw(wrapped)))
             rows.append((12, _spacer))  # espace entre sections
         return rows
@@ -482,7 +495,7 @@ class GameScreen:
                 cx += 20
             surface.blit(self.font_small.render("=", True, theme.TEXT_DIM), (cx, y + 1))
             cx += 18
-            name = mix_colors(combo) or "transparent"
+            name = i18n.color(mix_colors(combo))
             _swatch(surface, cx, y, theme.ray_rgb(mix_colors(combo)))
             cx += 24
             surface.blit(self.font_small.render(name, True, theme.TEXT), (cx, y + 1))
@@ -519,7 +532,7 @@ class GameScreen:
         pygame.draw.rect(surface, theme.PANEL_BG, panel, border_radius=12)
         pygame.draw.rect(surface, theme.BOARD_BORDER, panel, width=2, border_radius=12)
 
-        surface.blit(self.font_big.render("Comment jouer", True, theme.TEXT), (panel.x + self._MARGIN, panel.y + 16))
+        surface.blit(self.font_big.render(i18n.t("Comment jouer", "How to play"), True, theme.TEXT), (panel.x + self._MARGIN, panel.y + 16))
 
         y = panel.y + self._TITLE_H
         x = panel.x + self._MARGIN
@@ -532,7 +545,10 @@ class GameScreen:
         multi = len(pages) > 1
         self._nav_button(surface, prev_rect, "<", enabled=self.help_page > 0 and multi)
         self._nav_button(surface, next_rect, ">", enabled=self.help_page < len(pages) - 1)
-        footer = f"Page {self.help_page + 1}/{len(pages)}   ·   ←/→ pages   ·   [H] fermer"
+        footer = i18n.t(
+            f"Page {self.help_page + 1}/{len(pages)}   ·   ←/→ pages   ·   [H] fermer",
+            f"Page {self.help_page + 1}/{len(pages)}   ·   ←/→ pages   ·   [H] close",
+        )
         label = self.font_small.render(footer, True, theme.TEXT_DIM)
         surface.blit(label, label.get_rect(centerx=panel.centerx, centery=prev_rect.centery))
 
@@ -551,7 +567,7 @@ class GameScreen:
 
         shots = self.game.shots
         if not shots:
-            empty = self.font_small.render("Aucune question posée.", True, theme.TEXT_DIM)
+            empty = self.font_small.render(i18n.t("Aucune question posée.", "No question asked yet."), True, theme.TEXT_DIM)
             surface.blit(empty, (rect.x + 12, rect.y + 10))
             return
 
@@ -581,7 +597,7 @@ class GameScreen:
     def _draw_history_row(self, surface: pygame.Surface, x: int, y: int, shot: RayShot) -> None:
         entry = theme.entry_label(shot.entry, shot.direction, self.grid.width, self.grid.height)
         if shot.result.absorbed:
-            text, dot = f"{entry} → absorbé", theme.RAY_ABSORBED
+            text, dot = f"{entry} → {i18n.color('absorbé')}", theme.RAY_ABSORBED
         else:
             text = f"{entry} → {self.ray.result_label(shot.result)}"
             dot = theme.ray_rgb(shot.result.color)
@@ -603,47 +619,66 @@ _COLOR_COMBOS: list[frozenset] = [
     frozenset({_R, _J, _B, _W}),
 ]
 
-_HELP: list[tuple[str, str]] = [
-    ("But", "Localise la position exacte de toutes les gemmes cachées de la mine."),
+# Chaque section : (titre FR, titre EN, corps FR, corps EN). Le titre FR sert
+# aussi de clé interne (p. ex. le bloc insécable « Couleurs »).
+_HELP: list[tuple[str, str, str, str]] = [
     (
-        "Poser des hypothèses",
-        "Choisis une pièce dans la palette, puis clique sur le plateau pour la "
-        "poser.",
+        "But", "Goal",
+        "Localise la position exacte de toutes les gemmes cachées de la mine.",
+        "Find the exact position of every hidden gem in the mine.",
     ),
     (
-        "Tester ton hypothèse",
+        "Poser des hypothèses", "Place hypotheses",
+        "Choisis une pièce dans la palette, puis clique sur le plateau pour la poser.",
+        "Pick a piece from the palette, then click the board to place it.",
+    ),
+    (
+        "Tester ton hypothèse", "Test your hypothesis",
         "Clique un point d'entrée sur le bord : un rayon rebondit sur TES pièces "
         "posées. Il part transparent et se teinte en touchant les gemmes.",
+        "Click an entry point on the edge: a beam bounces off YOUR placed pieces. "
+        "It starts transparent and gets tinted when it touches gems.",
     ),
     (
-        "Interroger la mine",
+        "Interroger la mine", "Query the mine",
         "Saisis un point (chiffre 1–18 ou lettre A–R) dans « Proposer un point » "
         "puis Entrée : la vraie sortie et la couleur s'ajoutent à l'Historique.",
+        "Enter a point (number 1–18 or letter A–R) in “Enter a point” then press "
+        "Enter: the real exit and color are added to the History.",
     ),
     (
-        "Déduire",
+        "Déduire", "Deduce",
         "Rejoue les mêmes points sur tes hypothèses jusqu'à retrouver les vraies "
         "sorties et couleurs listées dans l'Historique.",
+        "Replay the same points on your hypotheses until they match the real "
+        "exits and colors listed in the History.",
     ),
     (
-        "Gagner",
+        "Gagner", "Win",
         "Quand tu es sûr de toi, clique « Proposer la solution ». Le score est le "
         "nombre de questions posées.",
+        "When you're confident, click “Submit solution”. Your score is the number "
+        "of questions asked.",
     ),
     (
-        "Sauvegarder / charger",
+        "Sauvegarder / charger", "Save / load",
         "« Sauvegarder » enregistre la partie ; coche « Progression » pour y "
         "inclure l'historique et tes pièces posées. Recharge-la depuis le menu "
-        "de départ (« Charger une partie… »).",
+        "de départ (« Charger… »).",
+        "“Save” stores the game; tick “Progress” to also include the history and "
+        "your placed pieces. Reload it from the start menu (“Load…”).",
     ),
     (
-        "Couleurs",
+        "Couleurs", "Colors",
         "Le rayon mélange les couleurs comme de la peinture (rouge+jaune=orange, "
         "jaune+bleu=vert, rouge+bleu=violet…) ; le blanc éclaircit la teinte.",
+        "The beam mixes colors like paint (red+yellow=orange, yellow+blue=green, "
+        "red+blue=purple…); white lightens the shade.",
     ),
     (
-        "Raccourcis",
-        "[H] aide, [S] sauvegarder, [Maj+D] debug. [R] tourne/retourne la pièce, le clic droit la retire."
+        "Raccourcis", "Shortcuts",
+        "[H] aide, [S] sauvegarder, [Maj+D] debug. [R] tourne/retourne la pièce, le clic droit la retire.",
+        "[H] help, [S] save, [Shift+D] debug. [R] rotates/flips the piece, right-click removes it.",
     ),
 ]
 

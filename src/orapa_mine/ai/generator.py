@@ -130,11 +130,6 @@ def _all_gems_visible(grid: Grid) -> bool:
 # --- Validation d'une configuration existante (mode créateur) ----------------
 
 
-def _gem_label(gem: PlacedGem) -> str:
-    """Nom lisible d'une gemme posée (pour les messages de validation)."""
-    return gem.color.value if gem.color is not None else gem.piece.name
-
-
 def _shares_flat_face(grid: Grid, gem: PlacedGem) -> bool:
     """Vrai si `gem` touche une autre gemme par une **face plate** partagée.
 
@@ -158,21 +153,23 @@ def _shares_flat_face(grid: Grid, gem: PlacedGem) -> bool:
     return False
 
 
-def configuration_problems(grid: Grid) -> list[str]:
+def configuration_problems(grid: Grid) -> list[tuple[str, PlacedGem]]:
     """Liste les violations des règles de placement dans `grid`.
 
     Mêmes règles que le jeu : deux gemmes ne peuvent pas être côte à côte (face
     plate partagée ; le contact en diagonale ou par un coin reste autorisé) et
     aucune gemme n'est entièrement cachée. Retourne une liste vide si la
-    configuration est valide. Logique pure et testable, pour le mode créateur.
+    configuration est valide. Chaque problème est un couple `(code, gemme)` avec
+    `code` ∈ {"touche", "cachée"} : la présentation (et la traduction) est laissée
+    à l'UI. Logique pure et testable, pour le mode créateur.
     """
-    problems: list[str] = []
+    problems: list[tuple[str, PlacedGem]] = []
     for gem in grid.gems:
         if _shares_flat_face(grid, gem):
-            problems.append(f"La gemme {_gem_label(gem)} touche une autre gemme.")
+            problems.append(("touche", gem))
     for gem in grid.gems:
         if not _gem_visible(grid, gem):
-            problems.append(f"La gemme {_gem_label(gem)} est entièrement cachée.")
+            problems.append(("cachée", gem))
     return problems
 
 

@@ -16,7 +16,7 @@ import pygame
 from orapa_mine.model.beam import BeamResult, TELEPORT_SEGMENT, fire_beam
 from orapa_mine.model.gems import Direction, Position
 from orapa_mine.model.grid import Grid
-from orapa_mine.ui import theme
+from orapa_mine.ui import i18n, theme
 from orapa_mine.ui.board_render import lighten as _lighten
 
 _RAY_SPEED = 620.0  # pixels par seconde pour l'animation du rayon
@@ -103,11 +103,11 @@ class RayTester:
 
     def result_label(self, result: BeamResult) -> str:
         if result.absorbed:
-            return "absorbé"
+            return i18n.color("absorbé")
         if result.exit_point is None or result.exit_direction is None:
             return "?"
         label = theme.exit_label(result.exit_point, result.exit_direction, self.width, self.height)
-        return f"{label} ({result.color or 'transparent'})"
+        return f"{label} ({i18n.color(result.color)})"
 
     def update(self, dt: float) -> None:
         if self._progress < self._total_len:
