@@ -166,7 +166,7 @@ GEM_FILL: dict[object, tuple[int, int, int]] = {
     GemColor.BLUE: (66, 122, 214),
     GemColor.WHITE: (232, 234, 240),
     GemKind.DIAMOND: (150, 205, 220),
-    GemKind.BLACK_BODY: (34, 34, 42),
+    GemKind.BLACK_BODY: (8, 8, 12),  # quasi noir : nettement plus sombre que le plateau
 }
 
 # Couleur finale annoncée du rayon -> RGB, pour dessiner le rayon et l'historique.
