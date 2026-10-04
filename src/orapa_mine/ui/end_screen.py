@@ -12,7 +12,7 @@ from __future__ import annotations
 import pygame
 
 from orapa_mine.model.grid import Grid
-from orapa_mine.ui import board_render, theme
+from orapa_mine.ui import board_render, i18n, theme
 
 
 class EndScreen:
@@ -56,7 +56,7 @@ class EndScreen:
         board_render.draw_board(surface, self.grid)
         board_render.draw_gems(surface, self.grid)  # solution révélée
 
-        caption = self.font.render("Voici la solution :", True, theme.TEXT_DIM)
+        caption = self.font.render(i18n.t("Voici la solution :", "Here is the solution:"), True, theme.TEXT_DIM)
         surface.blit(caption, (theme.BOARD_X, theme.BOARD_Y - 34))
 
         pygame.draw.rect(surface, theme.PANEL_BG, self.panel, border_radius=8)
@@ -64,21 +64,23 @@ class EndScreen:
         x = self.panel.x + 18
 
         if self.won:
-            banner, color = "Gagné !", theme.WIN_COLOR
-            detail = f"Résolu en {self.score} tir(s)/question(s)."
+            banner, color = i18n.t("Gagné !", "You win!"), theme.WIN_COLOR
+            detail = i18n.t(f"Résolu en {self.score} tir(s)/question(s).",
+                            f"Solved in {self.score} shot(s)/question(s).")
         else:
-            banner, color = "Partie abandonnée", theme.LOSE_COLOR
-            detail = f"{self.score} tir(s)/question(s) joués."
+            banner, color = i18n.t("Partie abandonnée", "Game abandoned"), theme.LOSE_COLOR
+            detail = i18n.t(f"{self.score} tir(s)/question(s) joués.",
+                            f"{self.score} shot(s)/question(s) played.")
         title = self.font_big.render(banner, True, color)
         surface.blit(title, (x, self.panel.top + 20))
         surface.blit(self.font.render(detail, True, theme.TEXT), (x, self.panel.top + 64))
 
         pygame.draw.rect(surface, (54, 120, 90), self.replay_rect, border_radius=8)
         pygame.draw.rect(surface, theme.BOARD_BORDER, self.replay_rect, width=1, border_radius=8)
-        r = self.font.render("Rejouer", True, theme.TEXT)
+        r = self.font.render(i18n.t("Rejouer", "Replay"), True, theme.TEXT)
         surface.blit(r, r.get_rect(center=self.replay_rect.center))
 
         pygame.draw.rect(surface, theme.SLOT_BG, self.quit_rect, border_radius=8)
         pygame.draw.rect(surface, theme.BOARD_BORDER, self.quit_rect, width=1, border_radius=8)
-        q = self.font.render("Quitter", True, theme.TEXT)
+        q = self.font.render(i18n.t("Quitter", "Quit"), True, theme.TEXT)
         surface.blit(q, q.get_rect(center=self.quit_rect.center))

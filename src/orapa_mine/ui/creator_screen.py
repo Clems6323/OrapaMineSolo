@@ -20,7 +20,7 @@ from orapa_mine.model.gems import Piece, PlacedGem, Position
 from orapa_mine.model import gems_catalog as cat
 from orapa_mine.model import serialization
 from orapa_mine.model.grid import Grid
-from orapa_mine.ui import board_render, dialogs, theme
+from orapa_mine.ui import board_render, dialogs, i18n, theme
 from orapa_mine.ui.beam_test import RayTester
 from orapa_mine.ui.game_screen import Slot
 
@@ -253,7 +253,8 @@ class CreatorScreen:
         for piece in self.palette_pieces:
             remaining = piece.quantity - counts.get(piece.name, 0)
             if remaining > 0:
-                missing.append(piece.name + (f" (×{remaining})" if piece.quantity > 1 else ""))
+                label = i18n.piece(piece.color.value if piece.color else piece.name)
+                missing.append(label + (f" (×{remaining})" if piece.quantity > 1 else ""))
         return missing
 
     def _blocking_problem(self) -> str | None:
@@ -261,10 +262,17 @@ class CreatorScreen:
         missing = self._missing_pieces()
         if missing:
             names = ", ".join(missing)
-            return f"Place toutes les gemmes (manque : {names})."
+            return i18n.t(f"Place toutes les gemmes (manque : {names}).",
+                          f"Place all gems (missing: {names}).")
         problems = configuration_problems(self.grid)
         if problems:
-            return problems[0]
+            code, gem = problems[0]
+            label = i18n.piece(gem.color.value if gem.color else gem.piece.name)
+            if code == "touche":
+                return i18n.t(f"La gemme {label} touche une autre gemme.",
+                              f"The {label} gem touches another gem.")
+            return i18n.t(f"La gemme {label} est entièrement cachée.",
+                          f"The {label} gem is entirely hidden.")
         return None
 
     def _save(self) -> None:
@@ -287,9 +295,11 @@ class CreatorScreen:
         try:
             dialogs.write_json(path, data)
         except OSError as exc:
-            self.message, self.message_color = f"Échec de la sauvegarde : {exc}", theme.LOSE_COLOR
+            self.message = i18n.t("Échec de la sauvegarde : ", "Save failed: ") + str(exc)
+            self.message_color = theme.LOSE_COLOR
             return
-        self.message, self.message_color = "Configuration enregistrée.", theme.WIN_COLOR
+        self.message = i18n.t("Configuration enregistrée.", "Configuration saved.")
+        self.message_color = theme.WIN_COLOR
 
     def _start_play(self) -> None:
         problem = self._blocking_problem()
@@ -326,7 +336,10 @@ class CreatorScreen:
         self.ray.draw(surface)
         self._draw_palette(surface)
         self._draw_panel(surface)
-        hint = "clic=choisir, clic plateau=poser, [R] tourner, clic droit=retirer, point d'entrée=tester le rayon, [Échap] désélectionner"
+        hint = i18n.t(
+            "clic=choisir, clic plateau=poser, [R] tourner, clic droit=retirer, point d'entrée=tester le rayon, [Échap] désélectionner",
+            "click=select, click board=place, [R] rotate, right-click=remove, entry point=test the beam, [Esc] deselect",
+        )
         surface.blit(
             self.font_small.render(hint, True, theme.TEXT_DIM),
             (theme.PALETTE.x, self.size[1] - 24),
@@ -346,7 +359,7 @@ class CreatorScreen:
         surface.blit(overlay, (0, 0))
 
     def _draw_palette(self, surface: pygame.Surface) -> None:
-        title = self.font_small.render("Pièces", True, theme.TEXT_DIM)
+        title = self.font_small.render(i18n.t("Pièces", "Pieces"), True, theme.TEXT_DIM)
         surface.blit(title, (theme.PALETTE.x + 4, theme.PALETTE.y - 22))
         for slot in self.slots:
             board_render.draw_palette_slot(
@@ -360,10 +373,10 @@ class CreatorScreen:
         pygame.draw.rect(surface, theme.PANEL_BG, self.panel, border_radius=8)
         pygame.draw.rect(surface, theme.BOARD_BORDER, self.panel, width=1, border_radius=8)
         x = self.panel_x + 18
-        surface.blit(self.font_big.render("Mode créateur", True, theme.TEXT), (x, self.panel.top + 14))
+        surface.blit(self.font_big.render(i18n.t("Mode créateur", "Creator mode"), True, theme.TEXT), (x, self.panel.top + 14))
 
         # Réglages : taille de grille.
-        surface.blit(self.font_small.render("Taille de la grille", True, theme.TEXT), (x, self.size_label_y))
+        surface.blit(self.font_small.render(i18n.t("Taille de la grille", "Grid size"), True, theme.TEXT), (x, self.size_label_y))
         for i, rect in enumerate(self.size_rects):
             selected = i == self.size_index
             bg = theme.SLOT_SELECTED if selected else theme.SLOT_BG
@@ -371,42 +384,45 @@ class CreatorScreen:
             pygame.draw.rect(surface, theme.BOARD_BORDER, rect, width=1, border_radius=6)
             name, w, h = self._SIZES[i]
             fg = theme.BACKGROUND if selected else theme.TEXT
-            label = self.font_small.render(f"{name} {w}×{h}", True, fg)
+            label = self.font_small.render(f"{i18n.size_name(name)} {w}×{h}", True, fg)
             surface.blit(label, label.get_rect(center=rect.center))
 
         # Réglages : extensions.
-        surface.blit(self.font_small.render("Extensions", True, theme.TEXT), (x, self.ext_label_y))
-        self._checkbox(surface, self.diamant_rect, self.diamant, "Diamant")
-        self._checkbox(surface, self.corps_rect, self.corps_noir, "Corps noir")
-        self._checkbox(surface, self.wormhole_rect, self.wormhole, "Trou de ver (×2)")
+        surface.blit(self.font_small.render(i18n.t("Extensions", "Extensions"), True, theme.TEXT), (x, self.ext_label_y))
+        self._checkbox(surface, self.diamant_rect, self.diamant, i18n.t("Diamant", "Diamond"))
+        self._checkbox(surface, self.corps_rect, self.corps_noir, i18n.t("Corps noir", "Black body"))
+        self._checkbox(surface, self.wormhole_rect, self.wormhole, i18n.t("Trou de ver (×2)", "Wormhole (×2)"))
 
         # État de validité en direct.
         placed = len(self.grid.gems)
         problem = self._blocking_problem()
         if problem is None:
-            status, color = f"Configuration valide ({placed} gemme(s)).", theme.WIN_COLOR
+            status = i18n.t(f"Configuration valide ({placed} gemme(s)).", f"Valid configuration ({placed} gem(s)).")
+            color = theme.WIN_COLOR
         else:
-            status, color = f"Attention : {problem}", theme.LOSE_COLOR
+            status = i18n.t(f"Attention : {problem}", f"Warning: {problem}")
+            color = theme.LOSE_COLOR
         status_lines = _wrap(status, self.font_small, self.panel.width - 40)
         for i, text in enumerate(status_lines):
             surface.blit(self.font_small.render(text, True, color), (x, self.status_y + i * 18))
 
         # Résultat du dernier rayon de test (sous l'état, position dynamique).
         ray_y = self.status_y + len(status_lines) * 18 + 10
-        ray_line = self.ray.last_test or "Clique un point d'entrée pour tester le rayon."
+        ray_line = self.ray.last_test or i18n.t("Clique un point d'entrée pour tester le rayon.",
+                                                "Click an entry point to test the beam.")
         for i, text in enumerate(_wrap(ray_line, self.font_small, self.panel.width - 40)):
             surface.blit(self.font_small.render(text, True, theme.TEXT_DIM), (x, ray_y + i * 18))
 
-        self._button(surface, self.save_rect, (54, 96, 120), "Sauvegarder la configuration")
+        self._button(surface, self.save_rect, (54, 96, 120), i18n.t("Sauvegarder la configuration", "Save configuration"))
         can_play = problem is None
         self._button(
             surface,
             self.play_rect,
             (54, 120, 90) if can_play else theme.SLOT_USED,
-            "Jouer cette configuration",
+            i18n.t("Jouer cette configuration", "Play this configuration"),
             dim=not can_play,
         )
-        self._button(surface, self.back_rect, theme.SLOT_BG, "Retour au menu")
+        self._button(surface, self.back_rect, theme.SLOT_BG, i18n.t("Retour au menu", "Back to menu"))
 
         if self.message:
             for i, text in enumerate(_wrap(self.message, self.font_small, self.panel.width - 40)):

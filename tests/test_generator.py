@@ -105,7 +105,7 @@ def test_adjacent_gems_are_reported():
     grid.place_gem(cat.BLACK_BODY.at(Position(0, 0)))
     grid.place_gem(cat.BLACK_BODY.at(Position(0, 2)))
     problems = configuration_problems(grid)
-    assert problems and any("touche" in p for p in problems)
+    assert problems and any(code == "touche" for code, _ in problems)
 
 
 def test_diagonal_contact_is_allowed():
@@ -132,7 +132,7 @@ def test_point_contact_is_allowed():
     grid = Grid(width=10, height=8)
     grid.place_gem(cat.WHITE_SMALL.at(Position(0, 0)))
     grid.place_gem(cat.WHITE_SMALL.at(Position(0, 2)))
-    assert not any("touche" in p for p in configuration_problems(grid))
+    assert not any(code == "touche" for code, _ in configuration_problems(grid))
 
 
 def test_fully_hidden_gem_is_reported():
@@ -148,4 +148,4 @@ def test_fully_hidden_gem_is_reported():
             if pos not in own:
                 grid.surface[pos] = HalfCell.FULL
     problems = configuration_problems(grid)
-    assert any("cachée" in p for p in problems)
+    assert any(code == "cachée" for code, _ in problems)
