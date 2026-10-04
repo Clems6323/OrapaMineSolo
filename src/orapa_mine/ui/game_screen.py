@@ -454,6 +454,13 @@ class GameScreen:
         surface.blit(sv, sv.get_rect(center=self.save_rect.center))
 
         surface.blit(self.font.render(i18n.t("Historique", "History"), True, theme.TEXT), (x, self.history_header_y))
+        # Score en direct (nombre de questions posées), aligné à droite sur la
+        # même ligne que « Historique ». La valeur finale est reprise à l'écran de fin.
+        score_img = self.font.render(
+            i18n.t(f"Score : {self.game.score}", f"Score: {self.game.score}"),
+            True, theme.SLOT_SELECTED,
+        )
+        surface.blit(score_img, score_img.get_rect(topright=(self.panel.right - 18, self.history_header_y)))
         self._draw_history(surface)
 
         # Zone de proposition (saisie d'un point d'entrée à interroger).
