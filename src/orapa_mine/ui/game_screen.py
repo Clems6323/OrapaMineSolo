@@ -250,7 +250,10 @@ class GameScreen:
             return
         orientation = self.selected.orientations()[self.orientation_index]
         gem = PlacedGem(piece=self.selected, anchor=cell, orientation=orientation)
-        if placement_is_legal(self.hypothesis, gem):
+        # Blocage DUR uniquement sur bornes/chevauchement (pose impossible) ; une
+        # gemme posée côte à côte d'une autre reste autorisée mais signalée en
+        # rouge par l'aperçu (avertissement, voir `_draw_ghost`).
+        if self.hypothesis.can_place(gem):
             self.hypothesis.place_gem(gem)
             name = self.selected.name
             self.placed_counts[name] = self.placed_counts.get(name, 0) + 1

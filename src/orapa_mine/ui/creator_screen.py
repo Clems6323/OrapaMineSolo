@@ -226,7 +226,9 @@ class CreatorScreen:
             return
         orientation = self.selected.orientations()[self.orientation_index]
         gem = PlacedGem(piece=self.selected, anchor=cell, orientation=orientation)
-        if placement_is_legal(self.grid, gem):
+        # Blocage DUR uniquement sur bornes/chevauchement ; une gemme côte à côte
+        # reste posable mais signalée en rouge (aperçu) et bloque Sauver/Jouer.
+        if self.grid.can_place(gem):
             self.grid.place_gem(gem)
             name = self.selected.name
             self.placed_counts[name] = self.placed_counts.get(name, 0) + 1
