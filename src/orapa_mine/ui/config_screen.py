@@ -53,7 +53,10 @@ class ConfigScreen:
         self.start_rect = pygame.Rect(bx, 556, bw2, 58)
         self.creator_rect = pygame.Rect(bx + bw2 + gap2, 556, bw2, 58)
         self.load_rect = pygame.Rect(bx + 2 * (bw2 + gap2), 556, bw2, 58)
-        self.lang_rect = pygame.Rect(self.size[0] - 112, 24, 88, 32)
+        fw, fh, fgap = 44, 28, 10
+        fx = self.size[0] - 2 * fw - fgap - 24
+        self.fr_flag_rect = pygame.Rect(fx, 24, fw, fh)
+        self.uk_flag_rect = pygame.Rect(fx + fw + fgap, 24, fw, fh)
 
     # --- Événements --------------------------------------------------------
 
@@ -61,8 +64,10 @@ class ConfigScreen:
         if event.type != pygame.MOUSEBUTTONDOWN or event.button != 1:
             return
         p = event.pos
-        if self.lang_rect.collidepoint(p):
-            i18n.toggle()
+        if self.fr_flag_rect.collidepoint(p):
+            i18n.set_language("fr")
+        elif self.uk_flag_rect.collidepoint(p):
+            i18n.set_language("en")
         elif self.diamant_rect.collidepoint(p):
             self.diamant = not self.diamant
         elif self.corps_rect.collidepoint(p):
@@ -117,8 +122,9 @@ class ConfigScreen:
         sub = self.font.render(i18n.t("Configuration de la partie", "Game setup"), True, theme.TEXT_DIM)
         surface.blit(sub, sub.get_rect(centerx=cx, y=108))
 
-        # Bouton de langue (bascule vers l'autre langue).
-        self._button(surface, self.lang_rect, theme.SLOT_BG, i18n.t("English", "Français"))
+        # Sélecteur de langue : drapeaux France / Royaume-Uni.
+        self._draw_flag(surface, self.fr_flag_rect, "fr", active=i18n.LANG == "fr")
+        self._draw_flag(surface, self.uk_flag_rect, "uk", active=i18n.LANG == "en")
 
         base = self.font_small.render(
             i18n.t("Base : 1 rouge, 1 jaune, 1 bleu, 2 blanches (5 gemmes)",
@@ -165,6 +171,52 @@ class ConfigScreen:
         pygame.draw.rect(surface, theme.BOARD_BORDER, rect, width=1, border_radius=10)
         label = self.font.render(text, True, theme.TEXT)
         surface.blit(label, label.get_rect(center=rect.center))
+
+    def _draw_flag(self, surface: pygame.Surface, rect: pygame.Rect, which: str, active: bool) -> None:
+        """Dessine un drapeau (France ou Royaume-Uni) cliquable.
+
+        Le drapeau de la langue active est mis en avant (liseré jaune) ;
+        l'inactif est assombri.
+        """
+        if which == "fr":
+            self._draw_france(surface, rect)
+        else:
+            self._draw_uk(surface, rect)
+        if not active:
+            shade = pygame.Surface(rect.size, pygame.SRCALPHA)
+            shade.fill((10, 12, 18, 150))
+            surface.blit(shade, rect.topleft)
+            pygame.draw.rect(surface, theme.BOARD_BORDER, rect, width=1)
+        else:
+            pygame.draw.rect(surface, theme.SLOT_SELECTED, rect.inflate(6, 6), width=3, border_radius=3)
+
+    @staticmethod
+    def _draw_france(surface: pygame.Surface, rect: pygame.Rect) -> None:
+        third = rect.width / 3
+        pygame.draw.rect(surface, (0, 85, 164), (rect.x, rect.y, third + 1, rect.height))
+        pygame.draw.rect(surface, (240, 240, 245), (rect.x + third, rect.y, third + 1, rect.height))
+        pygame.draw.rect(surface, (239, 65, 53), (rect.x + 2 * third, rect.y, third + 1, rect.height))
+
+    @staticmethod
+    def _draw_uk(surface: pygame.Surface, rect: pygame.Rect) -> None:
+        blue, white, red = (1, 33, 105), (240, 240, 245), (200, 16, 46)
+        x, y, w, h = rect
+        cx, cy = rect.centerx, rect.centery
+        tl, tr, bl, br = rect.topleft, rect.topright, rect.bottomleft, rect.bottomright
+        pygame.draw.rect(surface, blue, rect)
+        clip = surface.get_clip()
+        surface.set_clip(rect)
+        # Croix de Saint-André (diagonales) : blanc épais puis rouge fin.
+        pygame.draw.line(surface, white, tl, br, max(3, h // 5))
+        pygame.draw.line(surface, white, tr, bl, max(3, h // 5))
+        pygame.draw.line(surface, red, tl, br, max(2, h // 11))
+        pygame.draw.line(surface, red, tr, bl, max(2, h // 11))
+        # Croix de Saint-Georges : bande blanche puis rouge, horizontale + verticale.
+        pygame.draw.rect(surface, white, (x, cy - h // 5, w, 2 * (h // 5)))
+        pygame.draw.rect(surface, white, (cx - w // 8, y, w // 4, h))
+        pygame.draw.rect(surface, red, (x, cy - h // 9, w, 2 * (h // 9)))
+        pygame.draw.rect(surface, red, (cx - w // 13, y, 2 * (w // 13), h))
+        surface.set_clip(clip)
 
     def _checkbox(self, surface: pygame.Surface, rect: pygame.Rect, on: bool, text: str) -> None:
         pygame.draw.rect(surface, theme.INPUT_BG, rect, border_radius=4)
