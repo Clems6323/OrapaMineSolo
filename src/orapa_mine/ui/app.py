@@ -72,7 +72,9 @@ class OrapaMineApp:
             self._resize(self.current.size)
         elif isinstance(screen, GameScreen) and screen.finished is not None:
             outcome, score = screen.finished
-            self._show_end(outcome == "win", score, screen.game.hidden_grid)
+            self._show_end(
+                outcome == "win", score, screen.game.hidden_grid, screen.palette_pieces
+            )
         elif isinstance(screen, EndScreen):
             if screen.restart:
                 self.current = ConfigScreen()
@@ -118,6 +120,8 @@ class OrapaMineApp:
         self.current = screen
         self._resize(self.current.size)
 
-    def _show_end(self, won: bool, score: int, hidden_grid) -> None:
-        self.current = EndScreen(won=won, score=score, hidden_grid=hidden_grid)
+    def _show_end(self, won: bool, score: int, hidden_grid, palette_pieces) -> None:
+        self.current = EndScreen(
+            won=won, score=score, hidden_grid=hidden_grid, palette_pieces=palette_pieces
+        )
         self._resize(self.current.size)
