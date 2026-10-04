@@ -14,8 +14,9 @@ rectangle) dont les arêtes réfléchissent le rayon : **90°** sur une arête
 diagonale, **180°** sur une face plate. Le rayon part transparent et se
 **teinte** en touchant les gemmes colorées, en mélangeant les couleurs comme de
 la peinture (rouge + jaune = orange, jaune + bleu = vert…), le blanc
-éclaircissant la teinte. Deux extensions : le **diamant** (dévie sans teinter)
-et le **corps noir** (absorbe le rayon).
+éclaircissant la teinte. Trois extensions : le **diamant** (dévie sans teinter),
+le **corps noir** (absorbe le rayon) et le **trou de ver** (deux cases jumelles :
+le rayon entré dans l'une ressort de l'autre dans la même direction).
 
 La fenêtre s'adapte à l'écran : la taille des cases est choisie automatiquement
 pour que le plateau tienne sur ton moniteur, et la palette des pièces est une

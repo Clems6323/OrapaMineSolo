@@ -13,7 +13,7 @@ from dataclasses import dataclass
 
 import pygame
 
-from orapa_mine.model.beam import BeamResult, fire_beam
+from orapa_mine.model.beam import BeamResult, TELEPORT_SEGMENT, fire_beam
 from orapa_mine.model.gems import Direction, Position
 from orapa_mine.model.grid import Grid
 from orapa_mine.ui import theme
@@ -46,6 +46,7 @@ class RayTester:
 
         self._points: list[tuple[float, float]] = []
         self._seg_colors: list[tuple[int, int, int]] = []
+        self._seg_skip: list[bool] = []  # segment de téléportation (non dessiné)
         self._absorbed = False
         self._total_len = 0.0
         self._progress = 0.0
@@ -89,8 +90,13 @@ class RayTester:
         result = fire_beam(grid, ep.entry, ep.direction)
         self._points = [theme.point_px(r, c) for r, c in result.vertices]
         self._seg_colors = [theme.ray_rgb(name) for name in result.segment_colors]
+        self._seg_skip = [name == TELEPORT_SEGMENT for name in result.segment_colors]
         self._absorbed = result.absorbed
-        self._total_len = _polyline_length(self._points)
+        # Longueur animée : on ignore les sauts de trou de ver (téléportation).
+        self._total_len = sum(
+            0.0 if self._seg_skip[i] else math.dist(self._points[i], self._points[i + 1])
+            for i in range(len(self._points) - 1)
+        )
         self._progress = 0.0
         self.last_test = f"Test {ep.label} → {self.result_label(result)}"
         return result
@@ -126,6 +132,9 @@ class RayTester:
             if remaining <= 0:
                 break
             a, b = pts[i], pts[i + 1]
+            if i < len(self._seg_skip) and self._seg_skip[i]:
+                head = b  # saut de trou de ver : téléportation instantanée, non tracée
+                continue
             seg = math.dist(a, b)
             if seg == 0:
                 continue
@@ -167,7 +176,3 @@ class RayTester:
             pygame.draw.circle(surface, theme.BACKGROUND, ep.center, 15 if hot else 12, width=2)
             label = self.font.render(ep.label, True, theme.BACKGROUND if hot else theme.TEXT_DIM)
             surface.blit(label, label.get_rect(center=ep.center))
-
-
-def _polyline_length(points: list[tuple[float, float]]) -> float:
-    return sum(math.dist(a, b) for a, b in zip(points, points[1:]))

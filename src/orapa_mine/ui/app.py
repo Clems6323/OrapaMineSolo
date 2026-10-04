@@ -99,6 +99,7 @@ class OrapaMineApp:
             size_index=size_index,
             diamant=cat.DIAMOND in difficulty.pieces,
             corps_noir=cat.BLACK_BODY in difficulty.pieces,
+            wormhole=cat.WORMHOLE in difficulty.pieces,
         )
         self._resize(self.current.size)
 
@@ -110,7 +111,10 @@ class OrapaMineApp:
     def _start_loaded(self, loaded) -> None:
         screen = GameScreen(loaded.game, palette_pieces=loaded.palette_pieces)
         screen.hypothesis = loaded.hypothesis
-        screen.used_names = {gem.piece.name for gem in loaded.hypothesis.gems}
+        counts: dict[str, int] = {}
+        for gem in loaded.hypothesis.gems:
+            counts[gem.piece.name] = counts.get(gem.piece.name, 0) + 1
+        screen.placed_counts = counts
         self.current = screen
         self._resize(self.current.size)
 

@@ -60,6 +60,21 @@ def test_round_trip_configuration_only():
     assert loaded.hypothesis.gems == []
 
 
+def test_round_trip_with_wormholes():
+    hidden = Grid(width=10, height=8)
+    hidden.place_gem(cat.WORMHOLE.at(Position(1, 1)))
+    hidden.place_gem(cat.WORMHOLE.at(Position(4, 5)))
+    palette = cat.base_set() + [cat.WORMHOLE]
+    data = serialization.to_dict(
+        width=10, height=8, palette_pieces=palette, hidden_grid=hidden,
+        include_progress=False,
+    )
+    loaded = serialization.from_dict(data)
+    worms = [g for g in loaded.game.hidden_grid.gems if g.piece.name == "trou-de-ver"]
+    assert len(worms) == 2
+    assert [p.name for p in loaded.palette_pieces] == [p.name for p in palette]
+
+
 def test_unknown_version_is_rejected():
     with pytest.raises(ValueError):
         serialization.from_dict({"version": 999, "width": 10, "height": 8, "palette": [], "hidden": []})

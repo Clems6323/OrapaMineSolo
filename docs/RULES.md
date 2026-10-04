@@ -151,6 +151,12 @@ les diagrammes du livret :
   jeu : « Le signal a été absorbé » (pas de point de sortie ; idem si on
   demande son contenu). Posé sur sa **base rectangulaire 1×2, pointe vers le
   haut** (empreinte = 2 cases pleines).
+- **Trou de ver** (extension ajoutée, non officielle) : deux cases **1×1**
+  posées par paire. Un rayon qui entre dans l'un des trous **ressort de l'autre
+  dans la même direction** (téléportation, par la face opposée), **sans teinter**
+  la couleur. Dessin : cercle sombre cerné d'un liseré blanc. Dans la palette, un
+  seul emplacement « ×2 » (puis « ×1 » après la première pose, grisé une fois les
+  deux posés).
 
 ## Variantes solo (spécifiques à cette implémentation) ✅
 

@@ -147,3 +147,68 @@ def test_beam_touching_same_color_twice_counts_once():
     grid.place_gem(cat.WHITE_SMALL.at(Position(2, 0)))
     result = fire_beam(grid, entry=Position(0, 3), direction=Direction.DOWN)
     assert result.color == "blanc"
+
+
+# --- Trou de ver (téléportation) ---------------------------------------------
+
+
+def test_wormhole_teleports_keeping_direction_vertical():
+    # Rayon descendant la colonne 1 : entre dans le trou (2,1), ressort de
+    # l'autre trou (2,4) dans la même direction (vers le bas), sort en (5,4).
+    grid = Grid(width=6, height=6)
+    grid.place_gem(cat.WORMHOLE.at(Position(2, 1)))
+    grid.place_gem(cat.WORMHOLE.at(Position(2, 4)))
+    result = fire_beam(grid, entry=Position(0, 1), direction=Direction.DOWN)
+    assert result.exit_point == Position(5, 4)
+    assert result.exit_direction is Direction.DOWN
+    assert result.color is None
+    assert not result.absorbed
+
+
+def test_wormhole_teleports_keeping_direction_horizontal():
+    grid = Grid(width=6, height=6)
+    grid.place_gem(cat.WORMHOLE.at(Position(2, 1)))
+    grid.place_gem(cat.WORMHOLE.at(Position(2, 4)))
+    result = fire_beam(grid, entry=Position(2, 0), direction=Direction.RIGHT)
+    assert result.exit_point == Position(2, 5)
+    assert result.exit_direction is Direction.RIGHT
+    assert result.color is None
+
+
+def test_wormhole_is_symmetric():
+    # Entrer par le second trou renvoie bien au premier.
+    grid = Grid(width=6, height=6)
+    grid.place_gem(cat.WORMHOLE.at(Position(2, 1)))
+    grid.place_gem(cat.WORMHOLE.at(Position(2, 4)))
+    result = fire_beam(grid, entry=Position(0, 4), direction=Direction.DOWN)
+    assert result.exit_point == Position(5, 1)
+
+
+def test_wormhole_jump_segment_is_marked_and_not_colored():
+    from orapa_mine.model.beam import TELEPORT_SEGMENT
+
+    grid = Grid(width=6, height=6)
+    grid.place_gem(cat.WORMHOLE.at(Position(2, 1)))
+    grid.place_gem(cat.WORMHOLE.at(Position(2, 4)))
+    result = fire_beam(grid, entry=Position(0, 1), direction=Direction.DOWN)
+    assert TELEPORT_SEGMENT in result.segment_colors
+    assert len(result.segment_colors) == len(result.vertices) - 1
+
+
+def test_wormhole_preserves_already_collected_color():
+    # Le rayon prend d'abord le jaune, puis traverse le trou de ver : la couleur
+    # reste jaune (le trou ne teinte pas).
+    grid = Grid(width=8, height=8)
+    grid.place_gem(cat.YELLOW.at(Position(2, 2)))           # dévie vers le bas en (2,3)
+    grid.place_gem(cat.WORMHOLE.at(Position(4, 3)))
+    grid.place_gem(cat.WORMHOLE.at(Position(6, 6)))
+    result = fire_beam(grid, entry=Position(2, 7), direction=Direction.LEFT)
+    assert result.color == "jaune"
+
+
+def test_single_wormhole_without_partner_is_passthrough():
+    grid = Grid(width=6, height=6)
+    grid.place_gem(cat.WORMHOLE.at(Position(2, 1)))
+    result = fire_beam(grid, entry=Position(0, 1), direction=Direction.DOWN)
+    assert result.exit_point == Position(5, 1)  # traverse comme une case vide
+    assert result.color is None

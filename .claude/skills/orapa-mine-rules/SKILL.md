@@ -32,6 +32,11 @@ subsiste, notamment sur les points `TODO-VALIDATION`).
 - **Corps noir (extension)** : absorbe le rayon. Pas de case de sortie, pas
   de couleur — résultat "absorbé" (`exit_point = None`). Toujours posé base
   rectangulaire, pointe vers le haut.
+- **Trou de ver (extension)** : paire de cases 1×1. Le rayon qui entre dans
+  un trou **ressort de l'autre dans la même direction** (téléportation), sans
+  teinter. Géré dans `beam.fire_beam` avant les autres interactions ; le
+  segment de liaison est marqué `TELEPORT_SEGMENT` (non dessiné). `Piece.quantity
+  = 2` : la pièce se pose en deux exemplaires.
 
 ## Couleur du rayon
 

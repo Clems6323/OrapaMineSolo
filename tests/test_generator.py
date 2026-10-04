@@ -60,6 +60,15 @@ def test_every_gem_is_visible():
         assert _gem_visible(grid, gem)
 
 
+def test_generation_places_two_wormholes():
+    # Le trou de ver (quantity=2) est posé en deux exemplaires.
+    diff = Difficulty(pieces=cat.base_set() + [cat.WORMHOLE], width=10, height=8)
+    grid = generate_hidden_grid(difficulty=diff, rng=random.Random(3))
+    worms = [g for g in grid.gems if g.piece.name == "trou-de-ver"]
+    assert len(worms) == 2
+    assert len(grid.gems) == 7  # 5 base + 2 trous de ver
+
+
 def test_many_seeds_all_produce_valid_boards():
     # Robustesse : la génération ne doit jamais échouer sur la version de base.
     for seed in range(50):

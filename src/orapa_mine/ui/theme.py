@@ -37,7 +37,7 @@ _LEFT_GUTTER = 22
 _RIGHT_GUTTER = 24
 _TOP_SPACE = 96     # au-dessus du plateau (= BOARD_Y : titre + entrées du haut)
 _BELOW_SPACE = 84   # sous le plateau (entrées du bas + ligne d'indices)
-_PANEL_MIN_H = 430  # hauteur minimale du panneau (sinon son contenu déborde)
+_PANEL_MIN_H = 470  # hauteur minimale du panneau (sinon son contenu déborde)
 _SCREEN_MARGIN_W = 40   # marge écran (bords de fenêtre)
 _SCREEN_MARGIN_H = 96   # marge écran (barre des tâches + barre de titre)
 _FALLBACK_SCREEN = (1366, 768)
@@ -167,7 +167,11 @@ GEM_FILL: dict[object, tuple[int, int, int]] = {
     GemColor.WHITE: (232, 234, 240),
     GemKind.DIAMOND: (150, 205, 220),
     GemKind.BLACK_BODY: (8, 8, 12),  # quasi noir : nettement plus sombre que le plateau
+    GemKind.WORMHOLE: (14, 14, 22),  # cercle sombre, cerné de blanc (voir board_render)
 }
+
+# Liseré blanc du trou de ver (le « O »).
+WORMHOLE_RING = (236, 238, 245)
 
 # Couleur finale annoncée du rayon -> RGB, pour dessiner le rayon et l'historique.
 RAY_COLORS: dict[str, tuple[int, int, int]] = {
