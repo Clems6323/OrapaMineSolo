@@ -11,6 +11,7 @@ from orapa_mine.ai.generator import (
     configuration_is_valid,
     configuration_problems,
     generate_hidden_grid,
+    placement_is_legal,
 )
 from orapa_mine.model.gems import Direction, HalfCell, Position
 from orapa_mine.model.grid import Grid
@@ -133,6 +134,41 @@ def test_point_contact_is_allowed():
     grid.place_gem(cat.WHITE_SMALL.at(Position(0, 0)))
     grid.place_gem(cat.WHITE_SMALL.at(Position(0, 2)))
     assert not any(code == "touche" for code, _ in configuration_problems(grid))
+
+
+# --- Légalité d'une pose (aperçu fantôme : jeu + mode créateur) --------------
+
+
+def test_placement_is_legal_on_empty_grid():
+    grid = Grid(width=10, height=8)
+    assert placement_is_legal(grid, cat.BLACK_BODY.at(Position(0, 0)))
+
+
+def test_placement_rejects_overlap():
+    grid = Grid(width=10, height=8)
+    grid.place_gem(cat.BLACK_BODY.at(Position(0, 0)))
+    # Même emplacement -> chevauchement.
+    assert not placement_is_legal(grid, cat.BLACK_BODY.at(Position(0, 0)))
+
+
+def test_placement_rejects_flat_face_adjacency():
+    # Régression #29 : deux rectangles pleins côte à côte (bords qui se touchent)
+    # doivent être refusés (aperçu rouge), pas acceptés.
+    grid = Grid(width=10, height=8)
+    grid.place_gem(cat.BLACK_BODY.at(Position(0, 0)))  # cases (0,0)-(0,1)
+    assert not placement_is_legal(grid, cat.BLACK_BODY.at(Position(0, 2)))
+
+
+def test_placement_allows_diagonal_contact():
+    # Contact seulement par un coin / une hypoténuse : autorisé (aperçu vert).
+    grid = Grid(width=10, height=8)
+    grid.place_gem(cat.WHITE_SMALL.at(Position(0, 0)))
+    assert placement_is_legal(grid, cat.WHITE_SMALL.at(Position(0, 2)))
+
+
+def test_placement_rejects_out_of_bounds():
+    grid = Grid(width=10, height=8)
+    assert not placement_is_legal(grid, cat.BLACK_BODY.at(Position(0, 9)))
 
 
 def test_fully_hidden_gem_is_reported():

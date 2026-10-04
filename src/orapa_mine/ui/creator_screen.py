@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import pygame
 
-from orapa_mine.ai.generator import configuration_problems
+from orapa_mine.ai.generator import configuration_problems, placement_is_legal
 from orapa_mine.model.gems import Piece, PlacedGem, Position
 from orapa_mine.model import gems_catalog as cat
 from orapa_mine.model import serialization
@@ -226,7 +226,7 @@ class CreatorScreen:
             return
         orientation = self.selected.orientations()[self.orientation_index]
         gem = PlacedGem(piece=self.selected, anchor=cell, orientation=orientation)
-        if self.grid.can_place(gem):
+        if placement_is_legal(self.grid, gem):
             self.grid.place_gem(gem)
             name = self.selected.name
             self.placed_counts[name] = self.placed_counts.get(name, 0) + 1
@@ -350,7 +350,7 @@ class CreatorScreen:
             return
         orientation = self.selected.orientations()[self.orientation_index]
         gem = PlacedGem(piece=self.selected, anchor=self.hovered_cell, orientation=orientation)
-        ok = self.grid.can_place(gem)
+        ok = placement_is_legal(self.grid, gem)
         color = theme.GHOST_OK if ok else theme.GHOST_BAD
         overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
         for pos, half in gem.absolute_cells().items():

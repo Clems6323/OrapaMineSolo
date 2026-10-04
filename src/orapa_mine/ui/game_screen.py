@@ -22,6 +22,7 @@ from dataclasses import dataclass
 
 import pygame
 
+from orapa_mine.ai.generator import placement_is_legal
 from orapa_mine.model.beam import mix_colors
 from orapa_mine.model.game import CellContent, CellQuery, GameState, RayShot
 from orapa_mine.model.gems import GemColor, GemKind, Piece, PlacedGem, Position
@@ -249,7 +250,7 @@ class GameScreen:
             return
         orientation = self.selected.orientations()[self.orientation_index]
         gem = PlacedGem(piece=self.selected, anchor=cell, orientation=orientation)
-        if self.hypothesis.can_place(gem):
+        if placement_is_legal(self.hypothesis, gem):
             self.hypothesis.place_gem(gem)
             name = self.selected.name
             self.placed_counts[name] = self.placed_counts.get(name, 0) + 1
@@ -380,7 +381,7 @@ class GameScreen:
             return
         orientation = self.selected.orientations()[self.orientation_index]
         gem = PlacedGem(piece=self.selected, anchor=self.hovered_cell, orientation=orientation)
-        ok = self.hypothesis.can_place(gem)
+        ok = placement_is_legal(self.hypothesis, gem)
         color = theme.GHOST_OK if ok else theme.GHOST_BAD
         overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
         for pos, half in gem.absolute_cells().items():
