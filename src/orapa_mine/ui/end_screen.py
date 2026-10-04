@@ -11,19 +11,26 @@ from __future__ import annotations
 
 import pygame
 
+from orapa_mine.model.gems import Piece
 from orapa_mine.model.grid import Grid
-from orapa_mine.ui import board_render, i18n, theme
+from orapa_mine.model import serialization
+from orapa_mine.ui import board_render, dialogs, i18n, theme
 
 
 class EndScreen:
     """Écran de fin de partie (plateau révélé + bandeau résultat)."""
 
-    def __init__(self, won: bool, score: int, hidden_grid: Grid) -> None:
+    def __init__(
+        self, won: bool, score: int, hidden_grid: Grid, palette_pieces: list[Piece]
+    ) -> None:
         self.won = won
         self.score = score
         self.grid = hidden_grid
+        self.palette_pieces = palette_pieces
         self.restart = False
         self.quit = False
+        self.message: str | None = None
+        self.message_color = theme.TEXT_DIM
         self.size = theme.window_size(hidden_grid.width, hidden_grid.height)
 
         pygame.font.init()
@@ -33,18 +40,43 @@ class EndScreen:
 
         self.panel = theme.PANEL.copy()
         inner = self.panel.x + 18
-        self.replay_rect = pygame.Rect(inner, self.panel.bottom - 108, theme.PANEL_WIDTH - 36, 44)
-        self.quit_rect = pygame.Rect(inner, self.panel.bottom - 56, theme.PANEL_WIDTH - 36, 40)
+        bw = theme.PANEL_WIDTH - 36
+        self.save_rect = pygame.Rect(inner, self.panel.bottom - 164, bw, 40)
+        self.replay_rect = pygame.Rect(inner, self.panel.bottom - 108, bw, 44)
+        self.quit_rect = pygame.Rect(inner, self.panel.bottom - 56, bw, 40)
 
     # --- Événements --------------------------------------------------------
 
     def handle_event(self, event: pygame.event.Event) -> None:
         if event.type != pygame.MOUSEBUTTONDOWN or event.button != 1:
             return
-        if self.replay_rect.collidepoint(event.pos):
+        if self.save_rect.collidepoint(event.pos):
+            self._save()
+        elif self.replay_rect.collidepoint(event.pos):
             self.restart = True
         elif self.quit_rect.collidepoint(event.pos):
             self.quit = True
+
+    def _save(self) -> None:
+        """Sauvegarde la configuration jouée (sans progression) pour la partager."""
+        path = dialogs.ask_save_path()
+        if not path:
+            return
+        data = serialization.to_dict(
+            width=self.grid.width,
+            height=self.grid.height,
+            palette_pieces=self.palette_pieces,
+            hidden_grid=self.grid,
+            include_progress=False,
+        )
+        try:
+            dialogs.write_json(path, data)
+        except OSError as exc:
+            self.message = i18n.t("Échec de la sauvegarde : ", "Save failed: ") + str(exc)
+            self.message_color = theme.LOSE_COLOR
+            return
+        self.message = i18n.t("Configuration enregistrée.", "Configuration saved.")
+        self.message_color = theme.WIN_COLOR
 
     def update(self, dt: float) -> None:  # noqa: D401 - rien à animer
         pass
@@ -74,6 +106,16 @@ class EndScreen:
         title = self.font_big.render(banner, True, color)
         surface.blit(title, (x, self.panel.top + 20))
         surface.blit(self.font.render(detail, True, theme.TEXT), (x, self.panel.top + 64))
+
+        # Bouton « Sauvegarder la configuration » (partage de l'énigme jouée).
+        pygame.draw.rect(surface, (54, 96, 120), self.save_rect, border_radius=8)
+        pygame.draw.rect(surface, theme.BOARD_BORDER, self.save_rect, width=1, border_radius=8)
+        sv = self.font_small.render(
+            i18n.t("Sauvegarder la configuration", "Save configuration"), True, theme.TEXT)
+        surface.blit(sv, sv.get_rect(center=self.save_rect.center))
+        if self.message:
+            msg = self.font_small.render(self.message, True, self.message_color)
+            surface.blit(msg, (x, self.save_rect.top - 24))
 
         pygame.draw.rect(surface, (54, 120, 90), self.replay_rect, border_radius=8)
         pygame.draw.rect(surface, theme.BOARD_BORDER, self.replay_rect, width=1, border_radius=8)
