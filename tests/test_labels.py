@@ -39,3 +39,32 @@ def test_exit_labels_use_the_travel_edge():
     assert theme.exit_label(Position(0, 9), Direction.UP, W, H) == "10"
     # Sortie vers la droite en ligne 0 -> bord droit -> chiffre 11.
     assert theme.exit_label(Position(0, 9), Direction.RIGHT, W, H) == "11"
+
+
+# --- Étiquetage des cases (question « Qu'y a-t-il en A1 ? ») ------------------
+
+
+def test_cell_label_is_row_letter_then_column_number():
+    # A1 = coin haut-gauche ; la lettre est la LIGNE, le chiffre la COLONNE.
+    assert theme.cell_label(Position(0, 0)) == "A1"
+    assert theme.cell_label(Position(2, 3)) == "C4"
+    assert theme.cell_label(Position(7, 9)) == "H10"
+
+
+def test_parse_cell_label_round_trips():
+    for pos in (Position(0, 0), Position(2, 3), Position(7, 9)):
+        assert theme.parse_cell_label(theme.cell_label(pos), W, H) == pos
+
+
+def test_parse_cell_label_rejects_off_board():
+    assert theme.parse_cell_label("A11", W, H) is None  # colonne 11 hors 10
+    assert theme.parse_cell_label("I1", W, H) is None  # ligne I hors 8
+
+
+def test_cell_and_edge_labels_do_not_collide():
+    # Un libellé de bord (chiffre seul ou lettre seule) n'est jamais lu comme case.
+    assert theme.looks_like_cell_label("5") is False
+    assert theme.looks_like_cell_label("C") is False
+    assert theme.looks_like_cell_label("18") is False
+    assert theme.looks_like_cell_label("A1") is True
+    assert theme.looks_like_cell_label("C4") is True

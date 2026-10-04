@@ -97,11 +97,20 @@ correcte (voir « Variantes solo »).
 ## Question alternative « Qu'y a-t-il en [coordonnées] ? » ✅
 
 Au lieu d'envoyer un rayon, le prospecteur peut demander le contenu d'une
-case précise (ex. « Qu'y a-t-il en E4 ? »). Réponse : « Rien », « Une gemme
-blanche », etc. (Pour le corps noir : « Le signal a été absorbé ».) Cette
-question **consomme aussi un tour** (donc compte dans le score solo). Il peut
-aussi **redemander confirmation d'une réponse déjà donnée sans consommer un
-tour** — variante à décider côté solo.
+case précise (ex. « Qu'y a-t-il en A1 ? »). La case est désignée par
+**ligne-lettre + colonne-numéro** (A1 = coin haut-gauche : la lettre reprend le
+bord gauche A–H, le chiffre le bord haut 1–10). Réponse :
+
+- case vide → « rien » ;
+- gemme colorée (même si la case n'est qu'à moitié occupée par la gemme) → sa
+  **couleur** ;
+- pièce d'**extension** (diamant, corps noir, trou de ver) → le **nom de la
+  pièce** (et non une couleur).
+
+Cette question **consomme aussi un tour** (donc compte dans le score solo).
+Côté UI (écran de jeu), elle se pose dans la même zone de saisie que les tirs :
+une saisie « lettre + chiffre » (A1) est interprétée comme une question de case,
+un libellé de bord (chiffre seul 1–18 ou lettre seule A–R) comme un tir.
 
 ## Mélange des couleurs ✅ (quelques combos `TODO-AIDE-JEU`)
 
