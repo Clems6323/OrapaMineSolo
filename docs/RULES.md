@@ -163,7 +163,8 @@ les diagrammes du livret :
 - **Trou de ver** (extension ajoutée, non officielle) : deux cases **1×1**
   posées par paire. Un rayon qui entre dans l'un des trous **ressort de l'autre
   dans la même direction** (téléportation, par la face opposée), **sans teinter**
-  la couleur. Dessin : cercle sombre cerné d'un liseré blanc. Dans la palette, un
+  la couleur. Dessin : un carré noir (comme le corps noir) marqué d'une spirale
+  blanche. Dans la palette, un
   seul emplacement « ×2 » (puis « ×1 » après la première pose, grisé une fois les
   deux posés).
 
