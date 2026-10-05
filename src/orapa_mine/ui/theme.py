@@ -169,10 +169,10 @@ GEM_FILL: dict[object, tuple[int, int, int]] = {
     GemColor.WHITE: (232, 234, 240),
     GemKind.DIAMOND: (150, 205, 220),
     GemKind.BLACK_BODY: (8, 8, 12),  # quasi noir : nettement plus sombre que le plateau
-    GemKind.WORMHOLE: (14, 14, 22),  # cercle sombre, cerné de blanc (voir board_render)
+    GemKind.WORMHOLE: (14, 14, 22),  # historique (marqueur) ; le dessin est un carré noir + spirale
 }
 
-# Liseré blanc du trou de ver (le « O »).
+# Couleur de la spirale blanche du trou de ver (voir board_render.draw_wormhole).
 WORMHOLE_RING = (236, 238, 245)
 
 # Couleur finale annoncée du rayon -> RGB, pour dessiner le rayon et l'historique.

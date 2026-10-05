@@ -6,6 +6,8 @@ duplication entre l'écran de jeu et l'écran de fin.
 
 from __future__ import annotations
 
+import math
+
 import pygame
 
 from orapa_mine.model.gems import GemKind, Piece
@@ -55,14 +57,30 @@ def draw_wormhole(
     surface: pygame.Surface,
     center: tuple[float, float],
     size: float,
-    ring_color: tuple[int, int, int] = theme.WORMHOLE_RING,
+    square_color: tuple[int, int, int] = theme.GEM_FILL[GemKind.BLACK_BODY],
+    spiral_color: tuple[int, int, int] = theme.WORMHOLE_RING,
 ) -> None:
-    """Dessine un trou de ver : cercle sombre cerné d'un liseré (le « O »)."""
-    cx, cy = int(center[0]), int(center[1])
-    radius = max(4, int(size * 0.34))
-    ring = max(2, int(size * 0.08))
-    pygame.draw.circle(surface, theme.GEM_FILL[GemKind.WORMHOLE], (cx, cy), radius)
-    pygame.draw.circle(surface, ring_color, (cx, cy), radius, width=ring)
+    """Dessine un trou de ver : un carré noir (comme le corps noir) + spirale blanche."""
+    cx, cy = center
+    side = max(4, int(size))
+    rect = pygame.Rect(0, 0, side, side)
+    rect.center = (int(cx), int(cy))
+    pygame.draw.rect(surface, square_color, rect)
+
+    # Spirale d'Archimède partant du centre vers l'extérieur (le « tourbillon »).
+    turns = 2.6
+    max_r = size * 0.36
+    steps = max(24, int(turns * 24))
+    points = [
+        (
+            cx + max_r * (i / steps) * math.cos(turns * 2 * math.pi * (i / steps)),
+            cy + max_r * (i / steps) * math.sin(turns * 2 * math.pi * (i / steps)),
+        )
+        for i in range(steps + 1)
+    ]
+    width = max(1, int(size * 0.055))
+    if len(points) >= 2:
+        pygame.draw.lines(surface, spiral_color, False, points, width)
 
 
 def draw_palette_slot(
@@ -97,8 +115,9 @@ def _draw_slot_icon(
     if piece.kind is GemKind.WORMHOLE:
         size = min(rect.width, rect.height) - 22
         center = (rect.centerx, rect.top + 8 + size / 2)
-        ring = theme.TEXT_DIM if faded else theme.WORMHOLE_RING
-        draw_wormhole(surface, center, size, ring_color=ring)
+        square = (72, 72, 82) if faded else theme.GEM_FILL[GemKind.BLACK_BODY]
+        spiral = theme.TEXT_DIM if faded else theme.WORMHOLE_RING
+        draw_wormhole(surface, center, size, square_color=square, spiral_color=spiral)
     else:
         cells = piece.cells
         rows = max(p.row for p, _ in cells) + 1
