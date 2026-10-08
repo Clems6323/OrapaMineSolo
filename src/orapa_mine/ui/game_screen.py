@@ -444,16 +444,22 @@ class GameScreen:
         pygame.draw.rect(surface, theme.SLOT_SELECTED, box, border_radius=3)
         surface.blit(img, img.get_rect(center=box.center))
 
-    def _draw_countdown(self, surface: pygame.Surface) -> None:
-        """Temps restant (M:SS) aligné à droite, juste avant le bouton d'aide."""
-        remaining = self._remaining()
-        if remaining <= 20:
-            color = theme.LOSE_COLOR
-        elif remaining <= 60:
-            color = (236, 170, 90)
+    def _draw_clock(self, surface: pygame.Surface) -> None:
+        """Horloge M:SS à droite du titre : compte à rebours si minuteur, sinon
+        temps écoulé (compte croissant). Reprend le temps déjà passé au rechargement."""
+        if self.time_limit:
+            remaining = self._remaining()
+            if remaining <= 20:
+                color = theme.LOSE_COLOR
+            elif remaining <= 60:
+                color = (236, 170, 90)
+            else:
+                color = theme.TEXT
+            text = _mmss(remaining)  # arrondi au-dessus : atteint 0:00 pile à la fin
         else:
-            color = theme.TEXT
-        img = self.font.render(_mmss(remaining), True, color)
+            color = theme.TEXT_DIM
+            text = _mmss(self.elapsed, ceil=False)  # temps écoulé (plancher)
+        img = self.font.render(text, True, color)
         surface.blit(img, img.get_rect(midright=(self.help_rect.left - 12, self.help_rect.centery)))
 
     def _draw_palette(self, surface: pygame.Surface) -> None:
@@ -477,8 +483,7 @@ class GameScreen:
         pygame.draw.circle(surface, theme.BOARD_BORDER, self.help_rect.center, 14, width=1)
         q = self.font.render("?", True, theme.TEXT)
         surface.blit(q, q.get_rect(center=self.help_rect.center))
-        if self.time_limit:
-            self._draw_countdown(surface)
+        self._draw_clock(surface)
         test_hint = self.ray.last_test or i18n.t("Clique un point d'entrée pour tester.", "Click an entry point to test.")
         surface.blit(
             self.font_small.render(test_hint, True, theme.TEXT_DIM),
@@ -827,9 +832,10 @@ _HELP: list[tuple[str, str, str, str]] = [
 ]
 
 
-def _mmss(seconds: float) -> str:
-    """Formate une durée en M:SS (minutes:secondes)."""
-    total = max(0, int(seconds + 0.999))  # arrondi au-dessus : 0 s n'apparaît qu'à la fin
+def _mmss(seconds: float, ceil: bool = True) -> str:
+    """Formate une durée en M:SS. `ceil` arrondit au-dessus (compte à rebours :
+    0:00 n'apparaît qu'à la toute fin) ; sinon au plancher (temps écoulé)."""
+    total = max(0, int(seconds + 0.999) if ceil else int(seconds))
     return f"{total // 60}:{total % 60:02d}"
 
 
