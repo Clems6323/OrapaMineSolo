@@ -175,6 +175,10 @@ les diagrammes du livret :
   questions « qu'y a-t-il en X ? ») utilisés — moins il y en a, mieux c'est.
 - **Difficulté** : contrôle du nombre de gemmes (5 base / 7 complet), de la
   taille de grille, et de l'activation des extensions.
+- **Minuteur** (optionnel, 0 = désactivé) : réglable sur l'écran de
+  configuration et en mode créateur, et sauvegardé avec la configuration. En
+  jeu, le temps restant s'affiche (compte à rebours) ; à 0, la partie se
+  termine (« Temps écoulé »). L'écran de fin indique le temps passé.
 - **Rival IA** (non retenu pour la v1) : simuler un second prospecteur qui
   déduit en parallèle pour recréer la course du jeu physique.
 

@@ -62,11 +62,13 @@ def to_dict(
     include_progress: bool,
     game: GameState | None = None,
     hypothesis_grid: Grid | None = None,
+    timer_minutes: int = 0,
 ) -> dict:
     """Sérialise une partie en dict. `include_progress` ajoute historique + board.
 
     `game` et `hypothesis_grid` ne sont requis que si `include_progress` est vrai
-    (le mode créateur sauvegarde la configuration seule).
+    (le mode créateur sauvegarde la configuration seule). `timer_minutes` (0 =
+    désactivé) voyage avec la configuration pour être rejoué à l'identique.
     """
     if include_progress and (game is None or hypothesis_grid is None):
         raise ValueError("game et hypothesis_grid sont requis quand include_progress=True")
@@ -77,6 +79,7 @@ def to_dict(
         "palette": [p.name for p in palette_pieces],
         "hidden": [_gem_to_dict(g) for g in hidden_grid.gems],
         "progress": bool(include_progress),
+        "timer": int(timer_minutes),
     }
     if include_progress:
         data["history"] = _history_to_list(game)
@@ -93,6 +96,7 @@ class LoadedGame:
     palette_pieces: list[Piece]
     game: GameState
     hypothesis: Grid
+    timer_minutes: int = 0
 
 
 def from_dict(data: dict) -> LoadedGame:
@@ -118,4 +122,4 @@ def from_dict(data: dict) -> LoadedGame:
         for gem_data in data.get("hypothesis", []):
             hypothesis.place_gem(_gem_from_dict(gem_data))
 
-    return LoadedGame(width, height, palette, game, hypothesis)
+    return LoadedGame(width, height, palette, game, hypothesis, int(data.get("timer", 0)))

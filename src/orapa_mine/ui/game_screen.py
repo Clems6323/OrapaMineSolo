@@ -53,13 +53,20 @@ class Slot:
 class GameScreen:
     """Gère l'affichage et les interactions de l'écran de jeu."""
 
-    def __init__(self, game: GameState, palette_pieces: list[Piece]) -> None:
+    def __init__(
+        self, game: GameState, palette_pieces: list[Piece], timer_minutes: int = 0
+    ) -> None:
         self.game = game
         self.grid = game.hidden_grid  # cachée (debug uniquement)
         self.palette_pieces = palette_pieces
         self.hypothesis = Grid(width=self.grid.width, height=self.grid.height)
         self.reveal = False
         self.save_progress = True  # sauver aussi historique + pièces posées
+
+        # Minuteur (optionnel) et temps écoulé (en secondes).
+        self.timer_minutes = max(0, int(timer_minutes))
+        self.time_limit = self.timer_minutes * 60.0  # 0 = pas de limite
+        self.elapsed = 0.0
 
         # Sélection / pose de pièces.
         self.selected: Piece | None = None
@@ -73,7 +80,7 @@ class GameScreen:
         self.message: str | None = None
         self.message_color = theme.TEXT_DIM
 
-        # Signal de fin de partie lu par l'app : ("win"|"giveup", score) ou None.
+        # Signal de fin de partie lu par l'app : ("win"|"giveup"|"timeout", score) ou None.
         self.finished: tuple[str, int] | None = None
 
         # Aide « comment jouer » (overlay paginé).
@@ -340,6 +347,7 @@ class GameScreen:
             include_progress=self.save_progress,
             game=self.game,
             hypothesis_grid=self.hypothesis,
+            timer_minutes=self.timer_minutes,
         )
         try:
             dialogs.write_json(path, data)
@@ -379,6 +387,18 @@ class GameScreen:
 
     def update(self, dt: float) -> None:
         self.ray.update(dt)
+        if self.finished is not None:
+            return
+        self.elapsed += dt
+        if self.time_limit and self.elapsed >= self.time_limit:
+            self.elapsed = self.time_limit
+            self.finished = ("timeout", self.game.score)
+
+    def _remaining(self) -> float:
+        """Secondes restantes avant la fin du minuteur (0 si désactivé/écoulé)."""
+        if not self.time_limit:
+            return 0.0
+        return max(0.0, self.time_limit - self.elapsed)
 
     def render(self, surface: pygame.Surface) -> None:
         surface.fill(theme.BACKGROUND)
@@ -423,6 +443,18 @@ class GameScreen:
         pygame.draw.rect(surface, theme.SLOT_SELECTED, box, border_radius=3)
         surface.blit(img, img.get_rect(center=box.center))
 
+    def _draw_countdown(self, surface: pygame.Surface) -> None:
+        """Temps restant (M:SS) aligné à droite, juste avant le bouton d'aide."""
+        remaining = self._remaining()
+        if remaining <= 20:
+            color = theme.LOSE_COLOR
+        elif remaining <= 60:
+            color = (236, 170, 90)
+        else:
+            color = theme.TEXT
+        img = self.font.render(_mmss(remaining), True, color)
+        surface.blit(img, img.get_rect(midright=(self.help_rect.left - 12, self.help_rect.centery)))
+
     def _draw_palette(self, surface: pygame.Surface) -> None:
         title = self.font_small.render(i18n.t("Pièces", "Pieces"), True, theme.TEXT_DIM)
         surface.blit(title, (theme.PALETTE.x + 4, theme.PALETTE.y - 22))
@@ -444,6 +476,8 @@ class GameScreen:
         pygame.draw.circle(surface, theme.BOARD_BORDER, self.help_rect.center, 14, width=1)
         q = self.font.render("?", True, theme.TEXT)
         surface.blit(q, q.get_rect(center=self.help_rect.center))
+        if self.time_limit:
+            self._draw_countdown(surface)
         test_hint = self.ray.last_test or i18n.t("Clique un point d'entrée pour tester.", "Click an entry point to test.")
         surface.blit(
             self.font_small.render(test_hint, True, theme.TEXT_DIM),
@@ -790,6 +824,12 @@ _HELP: list[tuple[str, str, str, str]] = [
         "to pick it up and move it; right-click removes it.",
     ),
 ]
+
+
+def _mmss(seconds: float) -> str:
+    """Formate une durée en M:SS (minutes:secondes)."""
+    total = max(0, int(seconds + 0.999))  # arrondi au-dessus : 0 s n'apparaît qu'à la fin
+    return f"{total // 60}:{total % 60:02d}"
 
 
 def _cell_answer_text(content: CellContent) -> str:

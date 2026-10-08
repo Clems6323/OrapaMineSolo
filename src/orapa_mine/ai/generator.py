@@ -41,6 +41,7 @@ class Difficulty:
     width: int = 10
     height: int = 8
     name: str = "base"
+    timer_minutes: int = 0  # minuteur optionnel (0 = désactivé)
 
     @staticmethod
     def base() -> Difficulty:

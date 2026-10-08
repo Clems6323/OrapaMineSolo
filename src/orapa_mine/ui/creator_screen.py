@@ -40,17 +40,21 @@ class CreatorScreen:
 
     _SIZES = [("Petit", 8, 6), ("Standard", 10, 8), ("Grand", 12, 10)]
 
+    _TIMER_MAX = 60  # minutes maximum pour le minuteur
+
     def __init__(
         self,
         size_index: int = 1,
         diamant: bool = False,
         corps_noir: bool = False,
         wormhole: bool = False,
+        timer_minutes: int = 0,
     ) -> None:
         self.size_index = size_index
         self.diamant = diamant
         self.corps_noir = corps_noir
         self.wormhole = wormhole
+        self.timer_minutes = max(0, int(timer_minutes))
 
         # Sélection / pose de pièces (même interaction que l'écran de jeu).
         self.selected: Piece | None = None
@@ -139,6 +143,14 @@ class CreatorScreen:
         self.diamant_rect = pygame.Rect(inner, top + 126, 20, 20)
         self.corps_rect = pygame.Rect(inner, top + 150, 20, 20)
         self.wormhole_rect = pygame.Rect(inner, top + 174, 20, 20)
+        # Minuteur : colonne de droite (aligné sur les extensions) pour ne pas
+        # allonger le panneau. Label + stepper − valeur +.
+        rx = inner + 176
+        self.timer_label_x = rx
+        self.timer_label_y = self.ext_label_y
+        self.timer_minus_rect = pygame.Rect(rx, top + 126, 26, 26)
+        self.timer_value_rect = pygame.Rect(rx + 30, top + 126, 68, 26)
+        self.timer_plus_rect = pygame.Rect(rx + 102, top + 126, 26, 26)
         self.status_y = top + 202
 
         # Actions (bas du panneau).
@@ -184,6 +196,12 @@ class CreatorScreen:
         if self.wormhole_rect.collidepoint(pos):
             self.wormhole = not self.wormhole
             self._rebuild(clear_gems=False)
+            return
+        if self.timer_minus_rect.collidepoint(pos):
+            self.timer_minutes = max(0, self.timer_minutes - 1)
+            return
+        if self.timer_plus_rect.collidepoint(pos):
+            self.timer_minutes = min(self._TIMER_MAX, self.timer_minutes + 1)
             return
         for i, rect in enumerate(self.size_rects):
             if rect.collidepoint(pos):
@@ -313,6 +331,7 @@ class CreatorScreen:
             include_progress=False,
             game=None,
             hypothesis_grid=None,
+            timer_minutes=self.timer_minutes,
         )
         try:
             dialogs.write_json(path, data)
@@ -415,6 +434,11 @@ class CreatorScreen:
         self._checkbox(surface, self.corps_rect, self.corps_noir, i18n.t("Corps noir", "Black body"))
         self._checkbox(surface, self.wormhole_rect, self.wormhole, i18n.t("Trou de ver (×2)", "Wormhole (×2)"))
 
+        # Minuteur (optionnel), colonne de droite.
+        surface.blit(self.font_small.render(i18n.t("Minuteur", "Timer"), True, theme.TEXT),
+                     (self.timer_label_x, self.timer_label_y))
+        self._draw_stepper(surface)
+
         # État de validité en direct.
         placed = len(self.grid.gems)
         problem = self._blocking_problem()
@@ -456,6 +480,18 @@ class CreatorScreen:
         color = theme.TEXT_DIM if dim else theme.TEXT
         label = self.font_small.render(text, True, color)
         surface.blit(label, label.get_rect(center=rect.center))
+
+    def _draw_stepper(self, surface: pygame.Surface) -> None:
+        for rect, glyph in ((self.timer_minus_rect, "−"), (self.timer_plus_rect, "+")):
+            pygame.draw.rect(surface, theme.SLOT_BG, rect, border_radius=6)
+            pygame.draw.rect(surface, theme.BOARD_BORDER, rect, width=1, border_radius=6)
+            g = self.font.render(glyph, True, theme.TEXT)
+            surface.blit(g, g.get_rect(center=rect.center))
+        pygame.draw.rect(surface, theme.INPUT_BG, self.timer_value_rect, border_radius=6)
+        pygame.draw.rect(surface, theme.BOARD_BORDER, self.timer_value_rect, width=1, border_radius=6)
+        text = i18n.t("Désactivé", "Off") if self.timer_minutes <= 0 else f"{self.timer_minutes} min"
+        val = self.font_small.render(text, True, theme.TEXT)
+        surface.blit(val, val.get_rect(center=self.timer_value_rect.center))
 
     def _checkbox(self, surface: pygame.Surface, rect: pygame.Rect, on: bool, text: str) -> None:
         pygame.draw.rect(surface, theme.INPUT_BG, rect, border_radius=4)

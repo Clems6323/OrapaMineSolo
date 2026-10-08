@@ -21,12 +21,22 @@ class EndScreen:
     """Écran de fin de partie (plateau révélé + bandeau résultat)."""
 
     def __init__(
-        self, won: bool, score: int, hidden_grid: Grid, palette_pieces: list[Piece]
+        self,
+        won: bool,
+        score: int,
+        hidden_grid: Grid,
+        palette_pieces: list[Piece],
+        elapsed_seconds: float = 0.0,
+        timed_out: bool = False,
+        timer_minutes: int = 0,
     ) -> None:
         self.won = won
         self.score = score
         self.grid = hidden_grid
         self.palette_pieces = palette_pieces
+        self.elapsed_seconds = max(0.0, elapsed_seconds)
+        self.timed_out = timed_out
+        self.timer_minutes = max(0, int(timer_minutes))
         self.restart = False
         self.quit = False
         self.message: str | None = None
@@ -68,6 +78,7 @@ class EndScreen:
             palette_pieces=self.palette_pieces,
             hidden_grid=self.grid,
             include_progress=False,
+            timer_minutes=self.timer_minutes,
         )
         try:
             dialogs.write_json(path, data)
@@ -99,6 +110,10 @@ class EndScreen:
             banner, color = i18n.t("Gagné !", "You win!"), theme.WIN_COLOR
             detail = i18n.t(f"Résolu en {self.score} tir(s)/question(s).",
                             f"Solved in {self.score} shot(s)/question(s).")
+        elif self.timed_out:
+            banner, color = i18n.t("Temps écoulé !", "Time's up!"), theme.LOSE_COLOR
+            detail = i18n.t(f"{self.score} tir(s)/question(s) joués.",
+                            f"{self.score} shot(s)/question(s) played.")
         else:
             banner, color = i18n.t("Partie abandonnée", "Game abandoned"), theme.LOSE_COLOR
             detail = i18n.t(f"{self.score} tir(s)/question(s) joués.",
@@ -106,6 +121,10 @@ class EndScreen:
         title = self.font_big.render(banner, True, color)
         surface.blit(title, (x, self.panel.top + 20))
         surface.blit(self.font.render(detail, True, theme.TEXT), (x, self.panel.top + 64))
+        spent = self.font.render(
+            i18n.t(f"Temps passé : {_duration(self.elapsed_seconds)}",
+                   f"Time spent: {_duration(self.elapsed_seconds)}"), True, theme.TEXT_DIM)
+        surface.blit(spent, (x, self.panel.top + 92))
 
         # Bouton « Sauvegarder la configuration » (partage de l'énigme jouée).
         pygame.draw.rect(surface, (54, 96, 120), self.save_rect, border_radius=8)
@@ -126,3 +145,12 @@ class EndScreen:
         pygame.draw.rect(surface, theme.BOARD_BORDER, self.quit_rect, width=1, border_radius=8)
         q = self.font.render(i18n.t("Quitter", "Quit"), True, theme.TEXT)
         surface.blit(q, q.get_rect(center=self.quit_rect.center))
+
+
+def _duration(seconds: float) -> str:
+    """Durée lisible « M min S s » (ou « S s » sous une minute)."""
+    total = int(seconds)
+    minutes, secs = divmod(total, 60)
+    if minutes:
+        return i18n.t(f"{minutes} min {secs} s", f"{minutes} min {secs} s")
+    return i18n.t(f"{secs} s", f"{secs} s")

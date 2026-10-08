@@ -14,7 +14,8 @@ from orapa_mine.model import serialization
 from orapa_mine.model.serialization import LoadedGame
 from orapa_mine.ui import dialogs, i18n, theme
 
-SIZE = (760, 660)
+SIZE = (760, 720)
+_TIMER_MAX = 60  # minutes maximum pour le minuteur
 
 
 class ConfigScreen:
@@ -27,6 +28,7 @@ class ConfigScreen:
         self.wormhole = False
         self.sizes = [("Petit", 8, 6), ("Standard", 10, 8), ("Grand", 12, 10)]
         self.size_index = 1
+        self.timer_minutes = 0  # 0 = pas de minuteur
         self.result: Difficulty | None = None
         self.loaded: LoadedGame | None = None
         self.creator: Difficulty | None = None  # lancer le mode créateur
@@ -47,12 +49,17 @@ class ConfigScreen:
         self.size_rects = [
             pygame.Rect(start_x + i * (bw + gap), 384, bw, 60) for i in range(3)
         ]
+        # Minuteur (stepper − valeur +), centré sous le total de gemmes.
+        self.timer_minus_rect = pygame.Rect(271, 542, 44, 40)
+        self.timer_value_rect = pygame.Rect(325, 542, 110, 40)
+        self.timer_plus_rect = pygame.Rect(445, 542, 44, 40)
+
         bw2, gap2 = 224, 16
         total2 = 3 * bw2 + 2 * gap2
         bx = (self.size[0] - total2) // 2
-        self.start_rect = pygame.Rect(bx, 556, bw2, 58)
-        self.creator_rect = pygame.Rect(bx + bw2 + gap2, 556, bw2, 58)
-        self.load_rect = pygame.Rect(bx + 2 * (bw2 + gap2), 556, bw2, 58)
+        self.start_rect = pygame.Rect(bx, 614, bw2, 58)
+        self.creator_rect = pygame.Rect(bx + bw2 + gap2, 614, bw2, 58)
+        self.load_rect = pygame.Rect(bx + 2 * (bw2 + gap2), 614, bw2, 58)
         fw, fh, fgap = 44, 28, 10
         fx = self.size[0] - 2 * fw - fgap - 24
         self.fr_flag_rect = pygame.Rect(fx, 24, fw, fh)
@@ -74,6 +81,10 @@ class ConfigScreen:
             self.corps_noir = not self.corps_noir
         elif self.wormhole_rect.collidepoint(p):
             self.wormhole = not self.wormhole
+        elif self.timer_minus_rect.collidepoint(p):
+            self.timer_minutes = max(0, self.timer_minutes - 1)
+        elif self.timer_plus_rect.collidepoint(p):
+            self.timer_minutes = min(_TIMER_MAX, self.timer_minutes + 1)
         elif self.start_rect.collidepoint(p):
             self._begin()
         elif self.creator_rect.collidepoint(p):
@@ -104,7 +115,10 @@ class ConfigScreen:
         if self.wormhole:
             pieces.append(cat.WORMHOLE)
         name, width, height = self.sizes[self.size_index]
-        return Difficulty(pieces=pieces, width=width, height=height, name=name.lower())
+        return Difficulty(
+            pieces=pieces, width=width, height=height, name=name.lower(),
+            timer_minutes=self.timer_minutes,
+        )
 
     def _begin(self) -> None:
         self.result = self._difficulty()
@@ -156,7 +170,12 @@ class ConfigScreen:
         total = 5 + (1 if self.diamant else 0) + (1 if self.corps_noir else 0) + (2 if self.wormhole else 0)
         count = self.font_small.render(
             i18n.t(f"Total : {total} gemmes à trouver", f"Total: {total} gems to find"), True, theme.TEXT_DIM)
-        surface.blit(count, count.get_rect(centerx=cx, y=478))
+        surface.blit(count, count.get_rect(centerx=cx, y=486))
+
+        # Minuteur (optionnel) : label + stepper − valeur +.
+        timer_label = self.font.render(i18n.t("Minuteur", "Timer"), True, theme.TEXT)
+        surface.blit(timer_label, timer_label.get_rect(centerx=cx, y=512))
+        self._draw_stepper(surface)
 
         self._button(surface, self.start_rect, (54, 120, 90), i18n.t("Commencer", "Start"))
         self._button(surface, self.creator_rect, (54, 96, 120), i18n.t("Mode créateur", "Creator mode"))
@@ -164,7 +183,22 @@ class ConfigScreen:
 
         if self.error:
             err = self.font_small.render(self.error, True, theme.LOSE_COLOR)
-            surface.blit(err, err.get_rect(centerx=cx, y=624))
+            surface.blit(err, err.get_rect(centerx=cx, y=684))
+
+    def _draw_stepper(self, surface: pygame.Surface) -> None:
+        for rect, glyph in ((self.timer_minus_rect, "−"), (self.timer_plus_rect, "+")):
+            pygame.draw.rect(surface, theme.SLOT_BG, rect, border_radius=8)
+            pygame.draw.rect(surface, theme.BOARD_BORDER, rect, width=1, border_radius=8)
+            g = self.font.render(glyph, True, theme.TEXT)
+            surface.blit(g, g.get_rect(center=rect.center))
+        pygame.draw.rect(surface, theme.INPUT_BG, self.timer_value_rect, border_radius=8)
+        pygame.draw.rect(surface, theme.BOARD_BORDER, self.timer_value_rect, width=1, border_radius=8)
+        if self.timer_minutes <= 0:
+            text = i18n.t("Désactivé", "Off")
+        else:
+            text = i18n.t(f"{self.timer_minutes} min", f"{self.timer_minutes} min")
+        val = self.font.render(text, True, theme.TEXT)
+        surface.blit(val, val.get_rect(center=self.timer_value_rect.center))
 
     def _button(self, surface: pygame.Surface, rect: pygame.Rect, bg, text: str) -> None:
         pygame.draw.rect(surface, bg, rect, border_radius=10)
