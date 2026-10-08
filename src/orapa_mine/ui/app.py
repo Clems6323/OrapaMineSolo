@@ -119,6 +119,7 @@ class OrapaMineApp:
         screen = GameScreen(
             loaded.game, palette_pieces=loaded.palette_pieces, timer_minutes=loaded.timer_minutes
         )
+        screen.elapsed = loaded.elapsed_seconds  # reprend le temps déjà écoulé
         screen.hypothesis = loaded.hypothesis
         counts: dict[str, int] = {}
         for gem in loaded.hypothesis.gems:

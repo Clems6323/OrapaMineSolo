@@ -23,6 +23,7 @@ from orapa_mine.model.grid import Grid
 from orapa_mine.ui import board_render, dialogs, i18n, theme
 from orapa_mine.ui.beam_test import RayTester
 from orapa_mine.ui.game_screen import Slot
+from orapa_mine.ui.timer_field import TimerField
 
 _BASE_PIECES = [cat.RED, cat.YELLOW, cat.BLUE, cat.WHITE_BIG, cat.WHITE_SMALL]
 # Panneau un peu plus large qu'en jeu : les boutons de taille de grille
@@ -40,8 +41,6 @@ class CreatorScreen:
 
     _SIZES = [("Petit", 8, 6), ("Standard", 10, 8), ("Grand", 12, 10)]
 
-    _TIMER_MAX = 60  # minutes maximum pour le minuteur
-
     def __init__(
         self,
         size_index: int = 1,
@@ -54,7 +53,7 @@ class CreatorScreen:
         self.diamant = diamant
         self.corps_noir = corps_noir
         self.wormhole = wormhole
-        self.timer_minutes = max(0, int(timer_minutes))
+        self.timer = TimerField(timer_minutes)  # minuteur optionnel (0 = désactivé)
 
         # Sélection / pose de pièces (même interaction que l'écran de jeu).
         self.selected: Piece | None = None
@@ -78,6 +77,11 @@ class CreatorScreen:
         self.grid = Grid(width=10, height=8)  # remplacé par _rebuild
         self._rebuild(clear_gems=True)
         self.pending_resize = False  # la taille initiale est posée par l'app
+
+    @property
+    def timer_minutes(self) -> int:
+        """Minutes du minuteur (lu par l'app pour lancer/sauvegarder la partie)."""
+        return self.timer.minutes
 
     # --- Construction ------------------------------------------------------
 
@@ -144,13 +148,15 @@ class CreatorScreen:
         self.corps_rect = pygame.Rect(inner, top + 150, 20, 20)
         self.wormhole_rect = pygame.Rect(inner, top + 174, 20, 20)
         # Minuteur : colonne de droite (aligné sur les extensions) pour ne pas
-        # allonger le panneau. Label + stepper − valeur +.
+        # allonger le panneau. Label + stepper − valeur + (éditable au clavier).
         rx = inner + 176
         self.timer_label_x = rx
         self.timer_label_y = self.ext_label_y
-        self.timer_minus_rect = pygame.Rect(rx, top + 126, 26, 26)
-        self.timer_value_rect = pygame.Rect(rx + 30, top + 126, 68, 26)
-        self.timer_plus_rect = pygame.Rect(rx + 102, top + 126, 26, 26)
+        self.timer.set_rects(
+            pygame.Rect(rx, top + 126, 26, 26),
+            pygame.Rect(rx + 30, top + 126, 68, 26),
+            pygame.Rect(rx + 102, top + 126, 26, 26),
+        )
         self.status_y = top + 202
 
         # Actions (bas du panneau).
@@ -176,6 +182,8 @@ class CreatorScreen:
             return
         if event.button != 1:
             return
+        if self.timer.handle_click(pos):  # − / + / case du minuteur (valide la saisie)
+            return
         if self.save_rect.collidepoint(pos):
             self._save()
             return
@@ -197,12 +205,6 @@ class CreatorScreen:
             self.wormhole = not self.wormhole
             self._rebuild(clear_gems=False)
             return
-        if self.timer_minus_rect.collidepoint(pos):
-            self.timer_minutes = max(0, self.timer_minutes - 1)
-            return
-        if self.timer_plus_rect.collidepoint(pos):
-            self.timer_minutes = min(self._TIMER_MAX, self.timer_minutes + 1)
-            return
         for i, rect in enumerate(self.size_rects):
             if rect.collidepoint(pos):
                 if i != self.size_index:
@@ -223,6 +225,8 @@ class CreatorScreen:
             self._place_or_pick(cell)
 
     def _on_key(self, event: pygame.event.Event) -> None:
+        if self.timer.handle_key(event):  # saisie du minuteur au clavier
+            return
         if event.key == pygame.K_r and self.selected is not None:
             count = len(self.selected.orientations())
             self.orientation_index = (self.orientation_index + 1) % count
@@ -437,7 +441,7 @@ class CreatorScreen:
         # Minuteur (optionnel), colonne de droite.
         surface.blit(self.font_small.render(i18n.t("Minuteur", "Timer"), True, theme.TEXT),
                      (self.timer_label_x, self.timer_label_y))
-        self._draw_stepper(surface)
+        self.timer.draw(surface, self.font_small, i18n.t("Désactivé", "Off"))
 
         # État de validité en direct.
         placed = len(self.grid.gems)
@@ -480,18 +484,6 @@ class CreatorScreen:
         color = theme.TEXT_DIM if dim else theme.TEXT
         label = self.font_small.render(text, True, color)
         surface.blit(label, label.get_rect(center=rect.center))
-
-    def _draw_stepper(self, surface: pygame.Surface) -> None:
-        for rect, glyph in ((self.timer_minus_rect, "−"), (self.timer_plus_rect, "+")):
-            pygame.draw.rect(surface, theme.SLOT_BG, rect, border_radius=6)
-            pygame.draw.rect(surface, theme.BOARD_BORDER, rect, width=1, border_radius=6)
-            g = self.font.render(glyph, True, theme.TEXT)
-            surface.blit(g, g.get_rect(center=rect.center))
-        pygame.draw.rect(surface, theme.INPUT_BG, self.timer_value_rect, border_radius=6)
-        pygame.draw.rect(surface, theme.BOARD_BORDER, self.timer_value_rect, width=1, border_radius=6)
-        text = i18n.t("Désactivé", "Off") if self.timer_minutes <= 0 else f"{self.timer_minutes} min"
-        val = self.font_small.render(text, True, theme.TEXT)
-        surface.blit(val, val.get_rect(center=self.timer_value_rect.center))
 
     def _checkbox(self, surface: pygame.Surface, rect: pygame.Rect, on: bool, text: str) -> None:
         pygame.draw.rect(surface, theme.INPUT_BG, rect, border_radius=4)

@@ -63,6 +63,7 @@ def to_dict(
     game: GameState | None = None,
     hypothesis_grid: Grid | None = None,
     timer_minutes: int = 0,
+    elapsed_seconds: float = 0.0,
 ) -> dict:
     """Sérialise une partie en dict. `include_progress` ajoute historique + board.
 
@@ -84,6 +85,7 @@ def to_dict(
     if include_progress:
         data["history"] = _history_to_list(game)
         data["hypothesis"] = [_gem_to_dict(g) for g in hypothesis_grid.gems]
+        data["elapsed"] = round(float(elapsed_seconds), 3)
     return data
 
 
@@ -97,6 +99,7 @@ class LoadedGame:
     game: GameState
     hypothesis: Grid
     timer_minutes: int = 0
+    elapsed_seconds: float = 0.0
 
 
 def from_dict(data: dict) -> LoadedGame:
@@ -122,4 +125,7 @@ def from_dict(data: dict) -> LoadedGame:
         for gem_data in data.get("hypothesis", []):
             hypothesis.place_gem(_gem_from_dict(gem_data))
 
-    return LoadedGame(width, height, palette, game, hypothesis, int(data.get("timer", 0)))
+    return LoadedGame(
+        width, height, palette, game, hypothesis,
+        int(data.get("timer", 0)), float(data.get("elapsed", 0.0)),
+    )

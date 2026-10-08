@@ -348,6 +348,7 @@ class GameScreen:
             game=self.game,
             hypothesis_grid=self.hypothesis,
             timer_minutes=self.timer_minutes,
+            elapsed_seconds=self.elapsed,
         )
         try:
             dialogs.write_json(path, data)
