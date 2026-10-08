@@ -202,7 +202,7 @@ class CreatorScreen:
             return
         cell = self._cell_at(pos)
         if cell is not None:
-            self._place_or_remove(cell)
+            self._place_or_pick(cell)
 
     def _on_key(self, event: pygame.event.Event) -> None:
         if event.key == pygame.K_r and self.selected is not None:
@@ -220,9 +220,13 @@ class CreatorScreen:
         self.selected = piece
         self.orientation_index = 0
 
-    def _place_or_remove(self, cell: Position) -> None:
+    def _place_or_pick(self, cell: Position) -> None:
+        """Clic gauche : poser la pièce tenue, sinon reprendre celle de la case.
+
+        Le retrait pur reste réservé au clic droit (`_remove_at`).
+        """
         if self.selected is None:
-            self._remove_at(cell)
+            self._pick_up(cell)
             return
         orientation = self.selected.orientations()[self.orientation_index]
         gem = PlacedGem(piece=self.selected, anchor=cell, orientation=orientation)
@@ -235,6 +239,22 @@ class CreatorScreen:
             if self.placed_counts[name] >= self.selected.quantity:
                 self.selected = None
             self.message = None
+
+    def _pick_up(self, cell: Position | None) -> None:
+        """Reprend la gemme posée en `cell` pour la redéplacer (clic gauche)."""
+        if cell is None:
+            return
+        gem = self.grid.gem_at(cell)
+        if gem is None:
+            return
+        self.grid.remove_gem(gem)
+        self.placed_counts[gem.piece.name] = max(0, self.placed_counts.get(gem.piece.name, 0) - 1)
+        self.selected = gem.piece
+        try:
+            self.orientation_index = gem.piece.orientations().index(gem.orientation)
+        except ValueError:
+            self.orientation_index = 0
+        self.message = None
 
     def _remove_at(self, cell: Position | None) -> None:
         if cell is None:
@@ -339,8 +359,8 @@ class CreatorScreen:
         self._draw_palette(surface)
         self._draw_panel(surface)
         hint = i18n.t(
-            "clic=choisir, clic plateau=poser, [R] tourner, clic droit=retirer, point d'entrée=tester le rayon, [Échap] désélectionner",
-            "click=select, click board=place, [R] rotate, right-click=remove, entry point=test the beam, [Esc] deselect",
+            "clic=choisir/poser, clic sur une pièce=reprendre, [R] tourner, clic droit=retirer, point d'entrée=tester le rayon, [Échap] désélectionner",
+            "click=select/place, click a piece=pick up, [R] rotate, right-click=remove, entry point=test the beam, [Esc] deselect",
         )
         surface.blit(
             self.font_small.render(hint, True, theme.TEXT_DIM),

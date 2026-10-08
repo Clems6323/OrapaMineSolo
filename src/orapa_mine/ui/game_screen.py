@@ -195,7 +195,7 @@ class GameScreen:
             return
         cell = self._cell_at(pos)
         if cell is not None:
-            self._place_or_remove(cell)
+            self._place_or_pick(cell)
 
     def _on_key(self, event: pygame.event.Event) -> None:
         if self.show_help:
@@ -244,9 +244,14 @@ class GameScreen:
         self.selected = piece
         self.orientation_index = 0
 
-    def _place_or_remove(self, cell: Position) -> None:
+    def _place_or_pick(self, cell: Position) -> None:
+        """Clic gauche : poser la pièce tenue, sinon reprendre celle de la case.
+
+        Le retrait pur est réservé au clic droit (`_remove_at`). Cliquer une
+        gemme déjà posée la « reprend » (retrait + sélection) pour la déplacer.
+        """
         if self.selected is None:
-            self._remove_at(cell)
+            self._pick_up(cell)
             return
         orientation = self.selected.orientations()[self.orientation_index]
         gem = PlacedGem(piece=self.selected, anchor=cell, orientation=orientation)
@@ -260,6 +265,21 @@ class GameScreen:
             # On garde la pièce sélectionnée tant qu'il en reste à poser (trou de ver).
             if self.placed_counts[name] >= self.selected.quantity:
                 self.selected = None
+
+    def _pick_up(self, cell: Position | None) -> None:
+        """Reprend la gemme posée en `cell` pour la redéplacer (clic gauche)."""
+        if cell is None:
+            return
+        gem = self.hypothesis.gem_at(cell)
+        if gem is None:
+            return
+        self.hypothesis.remove_gem(gem)
+        self.placed_counts[gem.piece.name] = max(0, self.placed_counts.get(gem.piece.name, 0) - 1)
+        self.selected = gem.piece
+        try:
+            self.orientation_index = gem.piece.orientations().index(gem.orientation)
+        except ValueError:
+            self.orientation_index = 0
 
     def _remove_at(self, cell: Position | None) -> None:
         if cell is None:
@@ -478,8 +498,8 @@ class GameScreen:
             surface.blit(msg, (x, self.input_rect.bottom + 10))
 
         hint = i18n.t(
-            "clic=choisir, clic plateau=poser, [R] tourner, clic droit=retirer, [H] aide, [Maj+D] debug",
-            "click=select, click board=place, [R] rotate, right-click=remove, [H] help, [Shift+D] debug",
+            "clic=choisir/poser, clic sur une pièce=reprendre, [R] tourner, clic droit=retirer, [H] aide, [Maj+D] debug",
+            "click=select/place, click a piece=pick up, [R] rotate, right-click=remove, [H] help, [Shift+D] debug",
         )
         surface.blit(
             self.font_small.render(hint, True, theme.TEXT_DIM),
@@ -707,8 +727,10 @@ _HELP: list[tuple[str, str, str, str]] = [
     ),
     (
         "Poser des hypothèses", "Place hypotheses",
-        "Choisis une pièce dans la palette, puis clique sur le plateau pour la poser.",
-        "Pick a piece from the palette, then click the board to place it.",
+        "Choisis une pièce dans la palette, puis clique sur le plateau pour la poser. "
+        "Clique une pièce déjà posée pour la reprendre et la déplacer ; le clic droit la retire.",
+        "Pick a piece from the palette, then click the board to place it. Click a placed "
+        "piece to pick it up and move it; right-click removes it.",
     ),
     (
         "Tester ton hypothèse", "Test your hypothesis",
@@ -762,8 +784,10 @@ _HELP: list[tuple[str, str, str, str]] = [
     ),
     (
         "Raccourcis", "Shortcuts",
-        "[H] aide, [S] sauvegarder, [Maj+D] debug. [R] tourne/retourne la pièce, le clic droit la retire.",
-        "[H] help, [S] save, [Shift+D] debug. [R] rotates/flips the piece, right-click removes it.",
+        "[H] aide, [S] sauvegarder, [Maj+D] debug. [R] tourne/retourne la pièce ; clic sur une "
+        "pièce posée = la reprendre pour la déplacer ; clic droit = la retirer.",
+        "[H] help, [S] save, [Shift+D] debug. [R] rotates/flips the piece; click a placed piece "
+        "to pick it up and move it; right-click removes it.",
     ),
 ]
 
