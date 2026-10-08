@@ -75,6 +75,47 @@ def test_round_trip_with_wormholes():
     assert [p.name for p in loaded.palette_pieces] == [p.name for p in palette]
 
 
+def test_round_trip_preserves_timer():
+    hidden, game, hypothesis, palette = _setup()
+    data = serialization.to_dict(
+        width=10, height=8, palette_pieces=palette, hidden_grid=hidden,
+        include_progress=False, timer_minutes=5,
+    )
+    assert data["timer"] == 5
+    assert serialization.from_dict(data).timer_minutes == 5
+
+
+def test_round_trip_preserves_elapsed_time():
+    # Le temps déjà passé est sauvegardé avec la progression et rechargé.
+    hidden, game, hypothesis, palette = _setup()
+    data = serialization.to_dict(
+        width=10, height=8, palette_pieces=palette, hidden_grid=hidden,
+        include_progress=True, game=game, hypothesis_grid=hypothesis,
+        timer_minutes=10, elapsed_seconds=123.5,
+    )
+    assert data["elapsed"] == 123.5
+    loaded = serialization.from_dict(data)
+    assert loaded.elapsed_seconds == 123.5 and loaded.timer_minutes == 10
+
+
+def test_elapsed_absent_without_progress():
+    hidden, game, hypothesis, palette = _setup()
+    data = serialization.to_dict(
+        width=10, height=8, palette_pieces=palette, hidden_grid=hidden,
+        include_progress=False, elapsed_seconds=42.0,
+    )
+    assert "elapsed" not in data
+    assert serialization.from_dict(data).elapsed_seconds == 0.0
+
+
+def test_timer_defaults_to_zero_when_absent():
+    # Compatibilité : une sauvegarde sans champ « timer » charge sans minuteur.
+    loaded = serialization.from_dict(
+        {"version": 1, "width": 10, "height": 8, "palette": [], "hidden": [], "progress": False}
+    )
+    assert loaded.timer_minutes == 0
+
+
 def test_unknown_version_is_rejected():
     with pytest.raises(ValueError):
         serialization.from_dict({"version": 999, "width": 10, "height": 8, "palette": [], "hidden": []})

@@ -66,14 +66,16 @@ class OrapaMineApp:
         elif isinstance(screen, ConfigScreen) and screen.result is not None:
             self._start_game(screen.result)
         elif isinstance(screen, CreatorScreen) and screen.play is not None:
-            self._start_from_grid(screen.play, screen.palette_pieces)
+            self._start_from_grid(screen.play, screen.palette_pieces, screen.timer_minutes)
         elif isinstance(screen, CreatorScreen) and screen.back:
             self.current = ConfigScreen()
             self._resize(self.current.size)
         elif isinstance(screen, GameScreen) and screen.finished is not None:
             outcome, score = screen.finished
             self._show_end(
-                outcome == "win", score, screen.game.hidden_grid, screen.palette_pieces
+                outcome == "win", score, screen.game.hidden_grid, screen.palette_pieces,
+                elapsed_seconds=screen.elapsed, timed_out=(outcome == "timeout"),
+                timer_minutes=screen.timer_minutes,
             )
         elif isinstance(screen, EndScreen):
             if screen.restart:
@@ -86,7 +88,9 @@ class OrapaMineApp:
         rng = random.Random(self.seed)
         grid = generate_hidden_grid(difficulty=difficulty, rng=rng)
         game = GameState(hidden_grid=grid)
-        self.current = GameScreen(game, palette_pieces=difficulty.pieces)
+        self.current = GameScreen(
+            game, palette_pieces=difficulty.pieces, timer_minutes=difficulty.timer_minutes
+        )
         self._resize(self.current.size)
 
     def _start_creator(self, difficulty: Difficulty) -> None:
@@ -102,16 +106,20 @@ class OrapaMineApp:
             diamant=cat.DIAMOND in difficulty.pieces,
             corps_noir=cat.BLACK_BODY in difficulty.pieces,
             wormhole=cat.WORMHOLE in difficulty.pieces,
+            timer_minutes=difficulty.timer_minutes,
         )
         self._resize(self.current.size)
 
-    def _start_from_grid(self, grid, palette_pieces) -> None:
+    def _start_from_grid(self, grid, palette_pieces, timer_minutes: int = 0) -> None:
         game = GameState(hidden_grid=grid)
-        self.current = GameScreen(game, palette_pieces=palette_pieces)
+        self.current = GameScreen(game, palette_pieces=palette_pieces, timer_minutes=timer_minutes)
         self._resize(self.current.size)
 
     def _start_loaded(self, loaded) -> None:
-        screen = GameScreen(loaded.game, palette_pieces=loaded.palette_pieces)
+        screen = GameScreen(
+            loaded.game, palette_pieces=loaded.palette_pieces, timer_minutes=loaded.timer_minutes
+        )
+        screen.elapsed = loaded.elapsed_seconds  # reprend le temps déjà écoulé
         screen.hypothesis = loaded.hypothesis
         counts: dict[str, int] = {}
         for gem in loaded.hypothesis.gems:
@@ -120,8 +128,12 @@ class OrapaMineApp:
         self.current = screen
         self._resize(self.current.size)
 
-    def _show_end(self, won: bool, score: int, hidden_grid, palette_pieces) -> None:
+    def _show_end(
+        self, won: bool, score: int, hidden_grid, palette_pieces,
+        elapsed_seconds: float = 0.0, timed_out: bool = False, timer_minutes: int = 0,
+    ) -> None:
         self.current = EndScreen(
-            won=won, score=score, hidden_grid=hidden_grid, palette_pieces=palette_pieces
+            won=won, score=score, hidden_grid=hidden_grid, palette_pieces=palette_pieces,
+            elapsed_seconds=elapsed_seconds, timed_out=timed_out, timer_minutes=timer_minutes,
         )
         self._resize(self.current.size)
