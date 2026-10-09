@@ -42,7 +42,10 @@ class RayTester:
         self.entries = self._build_entries()
         self.entry_by_label = {ep.label: ep for ep in self.entries}
         self.hovered_entry: int | None = None
-        self.last_test: str | None = None
+        # Dernier tir de test : on garde l'étiquette + le résultat bruts (et non
+        # une chaîne figée) pour que le libellé se traduise si la langue change.
+        self._last_label: str | None = None
+        self._last_result: BeamResult | None = None
 
         self._points: list[tuple[float, float]] = []
         self._seg_colors: list[tuple[int, int, int]] = []
@@ -98,8 +101,15 @@ class RayTester:
             for i in range(len(self._points) - 1)
         )
         self._progress = 0.0
-        self.last_test = f"Test {ep.label} → {self.result_label(result)}"
+        self._last_label, self._last_result = ep.label, result
         return result
+
+    @property
+    def last_test(self) -> str | None:
+        """Libellé du dernier tir de test, recalculé dans la langue courante."""
+        if self._last_result is None or self._last_label is None:
+            return None
+        return f"{i18n.t('Test', 'Test')} {self._last_label} → {self.result_label(self._last_result)}"
 
     def result_label(self, result: BeamResult) -> str:
         if result.absorbed:
