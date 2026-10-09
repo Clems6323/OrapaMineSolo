@@ -383,9 +383,10 @@ class CreatorScreen:
         theme_toggle.draw(surface)
         lang_toggle.draw(surface)
         board_render.draw_board(surface, self.grid)
+        self.ray.draw_beam(surface)  # rayon SOUS les gemmes
         board_render.draw_gems(surface, self.grid)
         self._draw_ghost(surface)
-        self.ray.draw(surface)
+        self.ray.draw_entries(surface)
         self._draw_palette(surface)
         self._draw_panel(surface)
         hint = i18n.t(

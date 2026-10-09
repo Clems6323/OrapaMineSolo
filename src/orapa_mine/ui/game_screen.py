@@ -410,12 +410,13 @@ class GameScreen:
     def render(self, surface: pygame.Surface) -> None:
         surface.fill(theme.BACKGROUND)
         board_render.draw_board(surface, self.grid)
+        self.ray.draw_beam(surface)  # rayon SOUS les gemmes (réflexion masquée par la pièce)
         board_render.draw_gems(surface, self.hypothesis)
         if self.reveal:
             self._draw_hidden_outline(surface)
         self._draw_ghost(surface)
         self._draw_hovered_coord(surface)
-        self.ray.draw(surface)
+        self.ray.draw_entries(surface)
         self._draw_palette(surface)
         self._draw_panel(surface)
         theme_toggle.draw(surface)

@@ -116,7 +116,17 @@ class RayTester:
     # --- Rendu -------------------------------------------------------------
 
     def draw(self, surface: pygame.Surface) -> None:
+        self.draw_beam(surface)
+        self.draw_entries(surface)
+
+    def draw_beam(self, surface: pygame.Surface) -> None:
+        """Dessine uniquement le rayon (à placer SOUS les gemmes : la réflexion a
+        lieu dans la case d'une gemme, qui masque ainsi le coude au lieu de le
+        laisser déborder sur la pièce)."""
         self._draw_ray(surface)
+
+    def draw_entries(self, surface: pygame.Surface) -> None:
+        """Dessine les points d'entrée cliquables (à placer au-dessus)."""
         self._draw_entries(surface)
 
     def _draw_ray(self, surface: pygame.Surface) -> None:
@@ -128,12 +138,15 @@ class RayTester:
         head = pts[0]
         head_rgb = self._seg_colors[0] if self._seg_colors else theme.RAY_TRANSPARENT
         drawn = False
+        prev_dir: tuple[int, int] | None = None  # direction du segment précédent dessiné
+        _sign = lambda t: (t > 0) - (t < 0)  # noqa: E731
         for i in range(len(pts) - 1):
             if remaining <= 0:
                 break
             a, b = pts[i], pts[i + 1]
             if i < len(self._seg_skip) and self._seg_skip[i]:
                 head = b  # saut de trou de ver : téléportation instantanée, non tracée
+                prev_dir = None  # la téléportation coupe la continuité
                 continue
             seg = math.dist(a, b)
             if seg == 0:
@@ -143,8 +156,14 @@ class RayTester:
                 a[0] + (b[0] - a[0]) * remaining / seg,
                 a[1] + (b[1] - a[1]) * remaining / seg,
             )
+            cur_dir = (_sign(b[0] - a[0]), _sign(b[1] - a[1]))
             self._glow_segment(overlay, a, end, rgb)
+            if prev_dir is not None and prev_dir != cur_dir:
+                # Vrai changement de direction (coude à 90°) : pastille concentrique
+                # pour arrondir le coude du rayon ET de son halo (pas d'encoche).
+                self._fillet(overlay, a, rgb)
             head, head_rgb, drawn = end, rgb, True
+            prev_dir = cur_dir
             remaining -= seg
         if not drawn:
             return
@@ -167,6 +186,21 @@ class RayTester:
         for width, alpha in ((16, 34), (9, 70), (4, 150)):
             pygame.draw.line(overlay, (r, g, bl, alpha), a, b, width)
         pygame.draw.line(overlay, (*_lighten(rgb, 0.5), 235), a, b, 2)
+
+    def _fillet(
+        self, overlay: pygame.Surface, point: tuple[float, float], rgb: tuple[int, int, int]
+    ) -> None:
+        """Pastilles concentriques à un coude pour l'arrondir (rayon + halo).
+
+        Les rayons/alphas reprennent la coupe transversale d'un segment (demi-
+        largeurs 8/4/2) afin que le coude ait exactement le même dégradé que le
+        trait droit, sans encoche ni chevauchement des bouts plats de ligne.
+        """
+        r, g, bl = rgb
+        px, py = int(point[0]), int(point[1])
+        for radius, alpha in ((8, 34), (4, 70), (2, 150)):
+            pygame.draw.circle(overlay, (r, g, bl, alpha), (px, py), radius)
+        pygame.draw.circle(overlay, (*_lighten(rgb, 0.5), 235), (px, py), 1)
 
     def _draw_entries(self, surface: pygame.Surface) -> None:
         for index, ep in enumerate(self.entries):
