@@ -82,6 +82,9 @@ class GameScreen:
 
         # Signal de fin de partie lu par l'app : ("win"|"giveup"|"timeout", score) ou None.
         self.finished: tuple[str, int] | None = None
+        # Retour au menu (sans révéler la solution), lu par l'app.
+        self.back_to_menu = False
+        self.show_leave_prompt = False  # popup « sauvegarder avant de quitter ? »
 
         # Aide « comment jouer » (overlay paginé).
         self.show_help = False
@@ -121,11 +124,13 @@ class GameScreen:
         # Ligne sauvegarde : case « progression » + bouton Sauvegarder.
         self.progress_toggle_rect = pygame.Rect(inner, top + 136, 20, 20)
         self.save_rect = pygame.Rect(inner + 150, top + 132, 132, 28)
+        # Bouton « Retour au menu » (ouvre le popup de sauvegarde avant de quitter).
+        self.menu_rect = pygame.Rect(inner, top + 170, theme.PANEL_WIDTH - 36, 30)
         self.input_rect = pygame.Rect(inner, self.panel.bottom - 92, theme.PANEL_WIDTH - 36, 32)
 
         # Zone d'historique : s'étire entre l'en-tête et la zone de saisie,
         # donc s'adapte à la hauteur du panneau.
-        self.history_header_y = top + 174
+        self.history_header_y = top + 208
         content_top = self.history_header_y + 24
         content_bottom = self.input_rect.top - 28  # laisse la place au libellé
         self.history_rect = pygame.Rect(
@@ -157,6 +162,16 @@ class GameScreen:
 
     def _on_click(self, event: pygame.event.Event) -> None:
         pos = event.pos
+        if self.show_leave_prompt:  # popup « sauvegarder avant de quitter ? »
+            if event.button == 1:
+                layout = self._leave_prompt_layout(self.size)
+                for (_fr, _en, _color, action), rect in zip(self._leave_buttons(), layout["rects"]):
+                    if rect.collidepoint(pos):
+                        action()
+                        return
+                if not layout["panel"].collidepoint(pos):
+                    self.show_leave_prompt = False  # clic en dehors = annuler
+            return
         if self.show_help:  # navigation dans l'aide, sinon fermeture
             if event.button == 1:
                 layout = self._help_layout(pygame.display.get_surface().get_size())
@@ -198,6 +213,9 @@ class GameScreen:
         if self.save_rect.collidepoint(pos):
             self._save()
             return
+        if self.menu_rect.collidepoint(pos):
+            self.show_leave_prompt = True
+            return
         entry = self.ray.entry_at(pos)
         if entry is not None:
             self.ray.fire(self.hypothesis, self.ray.entries[entry])
@@ -211,6 +229,10 @@ class GameScreen:
             self._place_or_pick(cell)
 
     def _on_key(self, event: pygame.event.Event) -> None:
+        if self.show_leave_prompt:
+            if event.key == pygame.K_ESCAPE:
+                self.show_leave_prompt = False
+            return
         if self.show_help:
             if event.key in (pygame.K_h, pygame.K_ESCAPE):
                 self.show_help = False
@@ -341,16 +363,21 @@ class GameScreen:
             return theme.GEM_FILL[content.kind]
         return theme.TEXT_DIM
 
-    def _save(self) -> None:
+    def _save(self, with_progress: bool | None = None) -> bool:
+        """Sauvegarde la partie. `with_progress=None` suit la case « Progression ».
+
+        Renvoie True si le fichier a bien été écrit (False si annulé/échec).
+        """
+        progress = self.save_progress if with_progress is None else with_progress
         path = dialogs.ask_save_path()
         if not path:
-            return
+            return False
         data = serialization.to_dict(
             width=self.grid.width,
             height=self.grid.height,
             palette_pieces=self.palette_pieces,
             hidden_grid=self.grid,
-            include_progress=self.save_progress,
+            include_progress=progress,
             game=self.game,
             hypothesis_grid=self.hypothesis,
             timer_minutes=self.timer_minutes,
@@ -361,11 +388,67 @@ class GameScreen:
         except OSError as exc:
             self.message = i18n.t("Échec de la sauvegarde : ", "Save failed: ") + str(exc)
             self.message_color = theme.LOSE_COLOR
-            return
-        kind = i18n.t("avec progression", "with progress") if self.save_progress \
+            return False
+        kind = i18n.t("avec progression", "with progress") if progress \
             else i18n.t("configuration seule", "configuration only")
         self.message = i18n.t(f"Partie sauvegardée ({kind}).", f"Game saved ({kind}).")
         self.message_color = theme.WIN_COLOR
+        return True
+
+    # --- Retour au menu (popup « sauvegarder avant de quitter ? ») ---------
+
+    def _leave_save(self, with_progress: bool) -> None:
+        """Sauvegarde puis retourne au menu ; reste en jeu si la sauvegarde est annulée."""
+        self.show_leave_prompt = False
+        if self._save(with_progress=with_progress):
+            self.back_to_menu = True
+
+    def _leave_no_save(self) -> None:
+        self.show_leave_prompt = False
+        self.back_to_menu = True
+
+    def _leave_buttons(self) -> list[tuple[str, str, tuple[int, int, int], object]]:
+        """(libellé FR, libellé EN, couleur, action) des boutons du popup de sortie."""
+        return [
+            ("Sauvegarder (avec progression)", "Save (with progress)", (54, 96, 120),
+             lambda: self._leave_save(True)),
+            ("Sauvegarder (configuration seule)", "Save (configuration only)", (54, 96, 120),
+             lambda: self._leave_save(False)),
+            ("Quitter sans sauvegarder", "Leave without saving", (96, 54, 60),
+             self._leave_no_save),
+            ("Annuler", "Cancel", theme.SLOT_BG, lambda: setattr(self, "show_leave_prompt", False)),
+        ]
+
+    def _leave_prompt_layout(self, size: tuple[int, int]) -> dict:
+        w, h = size
+        pw = min(400, w - 80)
+        btn_h, gap, pad, title_h = 42, 10, 24, 54
+        rows = self._leave_buttons()
+        ph = title_h + len(rows) * btn_h + (len(rows) - 1) * gap + pad
+        px, py = (w - pw) // 2, (h - ph) // 2
+        panel = pygame.Rect(px, py, pw, ph)
+        rects, y = [], py + title_h
+        for _ in rows:
+            rects.append(pygame.Rect(px + pad, y, pw - 2 * pad, btn_h))
+            y += btn_h + gap
+        return {"panel": panel, "rects": rects}
+
+    def _draw_leave_prompt(self, surface: pygame.Surface) -> None:
+        w, h = surface.get_size()
+        backdrop = pygame.Surface((w, h), pygame.SRCALPHA)
+        backdrop.fill((6, 8, 14, 214))
+        surface.blit(backdrop, (0, 0))
+        layout = self._leave_prompt_layout((w, h))
+        panel, rects = layout["panel"], layout["rects"]
+        pygame.draw.rect(surface, theme.PANEL_BG, panel, border_radius=12)
+        pygame.draw.rect(surface, theme.BOARD_BORDER, panel, width=2, border_radius=12)
+        title = self.font.render(i18n.t("Quitter la partie ?", "Leave the game?"), True, theme.TEXT)
+        surface.blit(title, title.get_rect(centerx=panel.centerx, y=panel.y + 18))
+        for (fr, en, color, _action), rect in zip(self._leave_buttons(), rects):
+            pygame.draw.rect(surface, color, rect, border_radius=8)
+            pygame.draw.rect(surface, theme.BOARD_BORDER, rect, width=1, border_radius=8)
+            label = self.font_small.render(i18n.t(fr, en), True, theme.TEXT)
+            surface.blit(label, label.get_rect(center=rect.center))
 
     def _submit(self) -> None:
         won = self.game.submit_guess(list(self.hypothesis.gems))
@@ -423,6 +506,8 @@ class GameScreen:
         lang_toggle.draw(surface)
         if self.show_help:
             self._draw_help(surface)
+        if self.show_leave_prompt:
+            self._draw_leave_prompt(surface)
 
     def _draw_hidden_outline(self, surface: pygame.Surface) -> None:
         for gem in self.grid.gems:
@@ -521,6 +606,12 @@ class GameScreen:
         pygame.draw.rect(surface, theme.BOARD_BORDER, self.save_rect, width=1, border_radius=6)
         sv = self.font_small.render(i18n.t("Sauvegarder", "Save"), True, theme.TEXT)
         surface.blit(sv, sv.get_rect(center=self.save_rect.center))
+
+        # Bouton « Retour au menu ».
+        pygame.draw.rect(surface, (54, 72, 104), self.menu_rect, border_radius=6)
+        pygame.draw.rect(surface, theme.BOARD_BORDER, self.menu_rect, width=1, border_radius=6)
+        mb = self.font_small.render(i18n.t("Retour au menu", "Back to menu"), True, theme.TEXT)
+        surface.blit(mb, mb.get_rect(center=self.menu_rect.center))
 
         surface.blit(self.font.render(i18n.t("Historique", "History"), True, theme.TEXT), (x, self.history_header_y))
         # Score en direct (nombre de questions posées), aligné à droite sur la

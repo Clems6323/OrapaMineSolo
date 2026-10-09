@@ -70,6 +70,9 @@ class OrapaMineApp:
         elif isinstance(screen, CreatorScreen) and screen.back:
             self.current = ConfigScreen()
             self._resize(self.current.size)
+        elif isinstance(screen, GameScreen) and screen.back_to_menu:
+            self.current = ConfigScreen()
+            self._resize(self.current.size)
         elif isinstance(screen, GameScreen) and screen.finished is not None:
             outcome, score = screen.finished
             self._show_end(
