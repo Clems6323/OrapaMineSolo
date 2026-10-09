@@ -174,5 +174,5 @@ class RayTester:
             color = theme.ENTRY_HOVER if hot else theme.ENTRY_IDLE
             pygame.draw.circle(surface, color, ep.center, 15 if hot else 12)
             pygame.draw.circle(surface, theme.BACKGROUND, ep.center, 15 if hot else 12, width=2)
-            label = self.font.render(ep.label, True, theme.BACKGROUND if hot else theme.TEXT_DIM)
+            label = self.font.render(ep.label, True, theme.ON_ACCENT if hot else theme.TEXT_DIM)
             surface.blit(label, label.get_rect(center=ep.center))

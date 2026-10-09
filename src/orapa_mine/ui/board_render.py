@@ -57,10 +57,15 @@ def draw_wormhole(
     surface: pygame.Surface,
     center: tuple[float, float],
     size: float,
-    square_color: tuple[int, int, int] = theme.GEM_FILL[GemKind.BLACK_BODY],
-    spiral_color: tuple[int, int, int] = theme.WORMHOLE_RING,
+    square_color: tuple[int, int, int] | None = None,
+    spiral_color: tuple[int, int, int] | None = None,
 ) -> None:
     """Dessine un trou de ver : un carré noir (comme le corps noir) + spirale blanche."""
+    # Résolu à l'appel (et non à la définition) pour suivre le mode sombre/clair.
+    if square_color is None:
+        square_color = theme.GEM_FILL[GemKind.BLACK_BODY]
+    if spiral_color is None:
+        spiral_color = theme.WORMHOLE_RING
     cx, cy = center
     side = max(4, int(size))
     rect = pygame.Rect(0, 0, side, side)

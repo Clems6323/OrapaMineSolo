@@ -20,7 +20,7 @@ from orapa_mine.model.gems import Piece, PlacedGem, Position
 from orapa_mine.model import gems_catalog as cat
 from orapa_mine.model import serialization
 from orapa_mine.model.grid import Grid
-from orapa_mine.ui import board_render, dialogs, i18n, theme
+from orapa_mine.ui import board_render, dialogs, i18n, theme, theme_toggle
 from orapa_mine.ui.beam_test import RayTester
 from orapa_mine.ui.game_screen import Slot
 from orapa_mine.ui.timer_field import TimerField
@@ -181,6 +181,9 @@ class CreatorScreen:
             self._remove_at(self._cell_at(pos))
             return
         if event.button != 1:
+            return
+        if theme_toggle.hit(pos):  # bascule mode sombre / clair
+            theme_toggle.toggle()
             return
         if self.timer.handle_click(pos):  # − / + / case du minuteur (valide la saisie)
             return
@@ -375,6 +378,7 @@ class CreatorScreen:
 
     def render(self, surface: pygame.Surface) -> None:
         surface.fill(theme.BACKGROUND)
+        theme_toggle.draw(surface)
         board_render.draw_board(surface, self.grid)
         board_render.draw_gems(surface, self.grid)
         self._draw_ghost(surface)
@@ -428,7 +432,7 @@ class CreatorScreen:
             pygame.draw.rect(surface, bg, rect, border_radius=6)
             pygame.draw.rect(surface, theme.BOARD_BORDER, rect, width=1, border_radius=6)
             name, w, h = self._SIZES[i]
-            fg = theme.BACKGROUND if selected else theme.TEXT
+            fg = theme.ON_ACCENT if selected else theme.TEXT
             label = self.font_small.render(f"{i18n.size_name(name)} {w}×{h}", True, fg)
             surface.blit(label, label.get_rect(center=rect.center))
 

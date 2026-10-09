@@ -12,7 +12,7 @@ from orapa_mine.ai.generator import Difficulty
 from orapa_mine.model import gems_catalog as cat
 from orapa_mine.model import serialization
 from orapa_mine.model.serialization import LoadedGame
-from orapa_mine.ui import dialogs, i18n, theme
+from orapa_mine.ui import dialogs, i18n, theme, theme_toggle
 from orapa_mine.ui.timer_field import TimerField
 
 SIZE = (760, 720)
@@ -76,6 +76,9 @@ class ConfigScreen:
         if event.type != pygame.MOUSEBUTTONDOWN or event.button != 1:
             return
         p = event.pos
+        if theme_toggle.hit(p):  # bascule mode sombre / clair
+            theme_toggle.toggle()
+            return
         if self.timer.handle_click(p):  # − / + / case du minuteur
             return
         if self.fr_flag_rect.collidepoint(p):
@@ -133,6 +136,7 @@ class ConfigScreen:
 
     def render(self, surface: pygame.Surface) -> None:
         surface.fill(theme.BACKGROUND)
+        theme_toggle.draw(surface)
         cx = self.size[0] // 2
         title = self.font_big.render("ORAPA MINE", True, theme.TEXT)
         surface.blit(title, title.get_rect(centerx=cx, y=56))
@@ -164,7 +168,7 @@ class ConfigScreen:
             pygame.draw.rect(surface, bg, rect, border_radius=8)
             pygame.draw.rect(surface, theme.BOARD_BORDER, rect, width=1, border_radius=8)
             name, w, h = self.sizes[i]
-            fg = theme.BACKGROUND if selected else theme.TEXT
+            fg = theme.ON_ACCENT if selected else theme.TEXT
             n = self.font.render(i18n.size_name(name), True, fg)
             d = self.font_small.render(f"{w} × {h}", True, fg if selected else theme.TEXT_DIM)
             surface.blit(n, n.get_rect(centerx=rect.centerx, y=rect.y + 10))

@@ -28,7 +28,7 @@ from orapa_mine.model.game import CellContent, CellQuery, GameState, RayShot
 from orapa_mine.model.gems import GemColor, GemKind, Piece, PlacedGem, Position
 from orapa_mine.model import serialization
 from orapa_mine.model.grid import Grid
-from orapa_mine.ui import board_render, dialogs, i18n, theme
+from orapa_mine.ui import board_render, dialogs, i18n, theme, theme_toggle
 from orapa_mine.ui.beam_test import RayTester
 
 _HISTORY_ROW_H = 22  # hauteur d'une ligne d'historique (px)
@@ -170,6 +170,9 @@ class GameScreen:
             self._remove_at(self._cell_at(pos))
             return
         if event.button != 1:
+            return
+        if theme_toggle.hit(pos):  # bascule mode sombre / clair
+            theme_toggle.toggle()
             return
         if self.help_rect.collidepoint(pos):
             self.show_help = True
@@ -412,6 +415,7 @@ class GameScreen:
         self.ray.draw(surface)
         self._draw_palette(surface)
         self._draw_panel(surface)
+        theme_toggle.draw(surface)
         if self.show_help:
             self._draw_help(surface)
 
@@ -438,7 +442,7 @@ class GameScreen:
         if self.hovered_cell is None:
             return
         label = theme.cell_label(self.hovered_cell)
-        img = self.font_small.render(label, True, theme.BACKGROUND)
+        img = self.font_small.render(label, True, theme.ON_ACCENT)
         x, y, _, _ = theme.cell_rect(self.hovered_cell)
         box = img.get_rect(topleft=(x + 3, y + 3)).inflate(6, 4)
         pygame.draw.rect(surface, theme.SLOT_SELECTED, box, border_radius=3)

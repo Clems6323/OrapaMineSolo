@@ -140,61 +140,116 @@ def palette_slots(count: int) -> list[pygame.Rect]:
     return rects
 
 
-# --- Couleurs ----------------------------------------------------------------
+# --- Couleurs (mode sombre / clair) ------------------------------------------
+#
+# Deux palettes complètes. `set_mode()` recopie l'une d'elles dans les variables
+# de module (BACKGROUND, TEXT, GEM_FILL, …) : tout le code continue de lire
+# `theme.X` et bascule en direct. Les gemmes ont des teintes adaptées pour
+# rester visibles sur fond clair (notamment le blanc, posé sur un plateau gris
+# bleuté) ; le corps noir et le trou de ver restent sombres dans les deux modes.
 
-BACKGROUND = (16, 18, 27)
-BOARD_BG = (26, 30, 44)
-BOARD_BORDER = (70, 80, 110)
-GRID_LINE = (40, 46, 66)
-TEXT = (222, 228, 240)
-TEXT_DIM = (140, 150, 172)
-ENTRY_IDLE = (58, 66, 92)
-ENTRY_HOVER = (250, 214, 120)
-PANEL_BG = (22, 25, 37)
-SLOT_BG = (30, 34, 50)
-SLOT_SELECTED = (250, 214, 120)
-SLOT_USED = (40, 44, 58)
-GHOST_OK = (120, 220, 150)
-GHOST_BAD = (224, 96, 96)
-INPUT_BG = (14, 16, 24)
-INPUT_ACTIVE = (250, 214, 120)
-WIN_COLOR = (120, 220, 150)
-LOSE_COLOR = (232, 110, 110)
+# Couleur de texte/éléments posés SUR l'accent doré (lisible dans les 2 modes).
+ON_ACCENT = (26, 28, 36)
 
-# Couleurs des gemmes (remplissage) et de leur brillance.
-GEM_FILL: dict[object, tuple[int, int, int]] = {
-    GemColor.RED: (206, 66, 68),
-    GemColor.YELLOW: (232, 198, 72),
-    GemColor.BLUE: (66, 122, 214),
-    GemColor.WHITE: (232, 234, 240),
-    GemKind.DIAMOND: (150, 205, 220),
-    GemKind.BLACK_BODY: (8, 8, 12),  # quasi noir : nettement plus sombre que le plateau
-    GemKind.WORMHOLE: (14, 14, 22),  # historique (marqueur) ; le dessin est un carré noir + spirale
+_DARK = {
+    "BACKGROUND": (16, 18, 27),
+    "BOARD_BG": (26, 30, 44),
+    "BOARD_BORDER": (70, 80, 110),
+    "GRID_LINE": (40, 46, 66),
+    "TEXT": (222, 228, 240),
+    "TEXT_DIM": (140, 150, 172),
+    "ENTRY_IDLE": (58, 66, 92),
+    "ENTRY_HOVER": (250, 214, 120),
+    "PANEL_BG": (22, 25, 37),
+    "SLOT_BG": (30, 34, 50),
+    "SLOT_SELECTED": (250, 214, 120),
+    "SLOT_USED": (40, 44, 58),
+    "GHOST_OK": (120, 220, 150),
+    "GHOST_BAD": (224, 96, 96),
+    "INPUT_BG": (14, 16, 24),
+    "INPUT_ACTIVE": (250, 214, 120),
+    "WIN_COLOR": (120, 220, 150),
+    "LOSE_COLOR": (232, 110, 110),
+    "WORMHOLE_RING": (236, 238, 245),
+    "RAY_TRANSPARENT": (170, 210, 235),
+    "RAY_ABSORBED": (120, 120, 132),
+    "GEM_FILL": {
+        GemColor.RED: (206, 66, 68),
+        GemColor.YELLOW: (232, 198, 72),
+        GemColor.BLUE: (66, 122, 214),
+        GemColor.WHITE: (232, 234, 240),
+        GemKind.DIAMOND: (150, 205, 220),
+        GemKind.BLACK_BODY: (8, 8, 12),
+        GemKind.WORMHOLE: (14, 14, 22),
+    },
+    "RAY_COLORS": {
+        "rouge": (224, 74, 74), "bleu": (74, 130, 224), "jaune": (238, 206, 82),
+        "blanc": (238, 240, 246), "orange": (234, 146, 58), "vert": (78, 186, 104),
+        "violet": (158, 96, 210), "rose": (238, 138, 180), "jaune clair": (240, 226, 150),
+        "bleu clair": (150, 200, 238), "vert clair": (168, 222, 160),
+        "orange clair": (242, 190, 138), "violet clair": (198, 162, 226),
+        "noir": (44, 44, 54), "gris": (150, 156, 170),
+    },
 }
 
-# Couleur de la spirale blanche du trou de ver (voir board_render.draw_wormhole).
-WORMHOLE_RING = (236, 238, 245)
-
-# Couleur finale annoncée du rayon -> RGB, pour dessiner le rayon et l'historique.
-RAY_COLORS: dict[str, tuple[int, int, int]] = {
-    "rouge": (224, 74, 74),
-    "bleu": (74, 130, 224),
-    "jaune": (238, 206, 82),
-    "blanc": (238, 240, 246),
-    "orange": (234, 146, 58),
-    "vert": (78, 186, 104),
-    "violet": (158, 96, 210),
-    "rose": (238, 138, 180),
-    "jaune clair": (240, 226, 150),
-    "bleu clair": (150, 200, 238),
-    "vert clair": (168, 222, 160),
-    "orange clair": (242, 190, 138),
-    "violet clair": (198, 162, 226),
-    "noir": (44, 44, 54),
-    "gris": (150, 156, 170),
+_LIGHT = {
+    "BACKGROUND": (226, 230, 238),
+    "BOARD_BG": (205, 212, 226),   # gris bleuté : le blanc des gemmes y ressort
+    "BOARD_BORDER": (150, 160, 184),
+    "GRID_LINE": (186, 194, 210),
+    "TEXT": (30, 36, 52),
+    "TEXT_DIM": (96, 106, 128),
+    "ENTRY_IDLE": (182, 190, 208),
+    "ENTRY_HOVER": (236, 176, 56),
+    "PANEL_BG": (236, 239, 245),
+    "SLOT_BG": (214, 220, 232),
+    "SLOT_SELECTED": (238, 184, 60),
+    "SLOT_USED": (196, 202, 216),
+    "GHOST_OK": (64, 172, 104),
+    "GHOST_BAD": (206, 74, 74),
+    "INPUT_BG": (248, 249, 252),
+    "INPUT_ACTIVE": (230, 168, 54),
+    "WIN_COLOR": (36, 146, 86),
+    "LOSE_COLOR": (198, 58, 58),
+    "WORMHOLE_RING": (248, 249, 252),
+    "RAY_TRANSPARENT": (72, 134, 190),
+    "RAY_ABSORBED": (110, 110, 124),
+    "GEM_FILL": {
+        GemColor.RED: (202, 56, 58),
+        GemColor.YELLOW: (222, 168, 32),
+        GemColor.BLUE: (46, 104, 200),
+        GemColor.WHITE: (250, 251, 254),
+        GemKind.DIAMOND: (96, 170, 196),
+        GemKind.BLACK_BODY: (22, 22, 30),   # reste « noir »
+        GemKind.WORMHOLE: (22, 22, 30),
+    },
+    "RAY_COLORS": {
+        "rouge": (210, 56, 56), "bleu": (48, 108, 206), "jaune": (208, 162, 24),
+        "blanc": (120, 128, 146), "orange": (220, 126, 34), "vert": (44, 158, 80),
+        "violet": (140, 76, 196), "rose": (222, 104, 158), "jaune clair": (190, 168, 60),
+        "bleu clair": (92, 156, 206), "vert clair": (104, 176, 114),
+        "orange clair": (222, 158, 92), "violet clair": (166, 126, 204),
+        "noir": (40, 40, 52), "gris": (116, 122, 138),
+    },
 }
-RAY_TRANSPARENT = (170, 210, 235)  # rayon sans couleur (aucune gemme touchée)
-RAY_ABSORBED = (120, 120, 132)
+
+_PALETTES = {"dark": _DARK, "light": _LIGHT}
+MODE = "dark"
+
+
+def set_mode(mode: str) -> None:
+    """Applique la palette « dark » ou « light » aux variables de module."""
+    global MODE
+    MODE = "light" if mode == "light" else "dark"
+    globals().update(_PALETTES[MODE])
+
+
+def toggle_mode() -> None:
+    set_mode("light" if MODE == "dark" else "dark")
+
+
+# Palette par défaut (mode sombre) appliquée dès l'import.
+set_mode("dark")
 
 
 def ray_rgb(color_name: str | None) -> tuple[int, int, int]:
