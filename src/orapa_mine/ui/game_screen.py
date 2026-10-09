@@ -28,7 +28,7 @@ from orapa_mine.model.game import CellContent, CellQuery, GameState, RayShot
 from orapa_mine.model.gems import GemColor, GemKind, Piece, PlacedGem, Position
 from orapa_mine.model import serialization
 from orapa_mine.model.grid import Grid
-from orapa_mine.ui import board_render, dialogs, i18n, theme, theme_toggle
+from orapa_mine.ui import board_render, dialogs, i18n, lang_toggle, theme, theme_toggle
 from orapa_mine.ui.beam_test import RayTester
 
 _HISTORY_ROW_H = 22  # hauteur d'une ligne d'historique (px)
@@ -174,6 +174,8 @@ class GameScreen:
             return
         if theme_toggle.hit(pos):  # bascule mode sombre / clair
             theme_toggle.toggle()
+            return
+        if lang_toggle.handle_click(pos, self.size[0]):  # drapeaux FR / UK
             return
         if self.help_rect.collidepoint(pos):
             self.show_help = True
@@ -417,6 +419,7 @@ class GameScreen:
         self._draw_palette(surface)
         self._draw_panel(surface)
         theme_toggle.draw(surface)
+        lang_toggle.draw(surface)
         if self.show_help:
             self._draw_help(surface)
 

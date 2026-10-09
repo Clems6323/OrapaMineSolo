@@ -22,9 +22,9 @@ La fenêtre s'adapte à l'écran : la taille des cases est choisie automatiqueme
 pour que le plateau tienne sur ton moniteur, et la palette des pièces est une
 bande verticale à gauche du plateau (panneau d'infos à droite).
 
-**Langue** : un bouton **FR / EN** en haut à droite du menu bascule toute
-l'interface entre français et anglais. / **Language**: an **FR / EN** toggle at
-the top-right of the menu switches the whole interface between French and English.
+**Langue** : des drapeaux **FR / EN** en haut à droite de chaque écran basculent
+toute l'interface entre français et anglais. / **Language**: **FR / EN** flags at
+the top-right of every screen switch the whole interface between French and English.
 
 **Thème** : un bouton **soleil / lune** en haut à gauche de chaque écran bascule
 entre mode sombre et mode clair. / **Theme**: a **sun / moon** button at the
