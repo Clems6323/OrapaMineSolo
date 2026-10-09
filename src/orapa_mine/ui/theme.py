@@ -212,8 +212,6 @@ _LIGHT = {
     "WIN_COLOR": (36, 146, 86),
     "LOSE_COLOR": (198, 58, 58),
     "WORMHOLE_RING": (248, 249, 252),
-    "RAY_TRANSPARENT": (72, 134, 190),
-    "RAY_ABSORBED": (110, 110, 124),
     "GEM_FILL": {
         GemColor.RED: (202, 56, 58),
         GemColor.YELLOW: (222, 168, 32),
@@ -223,14 +221,11 @@ _LIGHT = {
         GemKind.BLACK_BODY: (22, 22, 30),   # reste « noir »
         GemKind.WORMHOLE: (22, 22, 30),
     },
-    "RAY_COLORS": {
-        "rouge": (210, 56, 56), "bleu": (48, 108, 206), "jaune": (208, 162, 24),
-        "blanc": (120, 128, 146), "orange": (220, 126, 34), "vert": (44, 158, 80),
-        "violet": (140, 76, 196), "rose": (222, 104, 158), "jaune clair": (190, 168, 60),
-        "bleu clair": (92, 156, 206), "vert clair": (104, 176, 114),
-        "orange clair": (222, 158, 92), "violet clair": (166, 126, 204),
-        "noir": (40, 40, 52), "gris": (116, 122, 138),
-    },
+    # Couleurs du rayon identiques au mode sombre (demande utilisateur : garder
+    # exactement les mêmes teintes de laser, notamment le blanc et le transparent).
+    "RAY_TRANSPARENT": _DARK["RAY_TRANSPARENT"],
+    "RAY_ABSORBED": _DARK["RAY_ABSORBED"],
+    "RAY_COLORS": _DARK["RAY_COLORS"],
 }
 
 _PALETTES = {"dark": _DARK, "light": _LIGHT}
