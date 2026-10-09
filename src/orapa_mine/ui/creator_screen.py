@@ -116,11 +116,15 @@ class CreatorScreen:
         for gem in self.grid.gems:
             self.placed_counts[gem.piece.name] = self.placed_counts.get(gem.piece.name, 0) + 1
         self.selected = None
+        old_size = getattr(self, "size", None)
         self.size = theme.window_size(width, height, panel_width=_PANEL_WIDTH)
         self.ray = RayTester(width, height, self.font_small)
         self.slots = self._build_palette(self.palette_pieces)
         self._layout_panel()
-        self.pending_resize = True
+        # Ne redemander une recréation de fenêtre (set_mode) que si la taille change
+        # vraiment : (dé)cocher une extension garde la même fenêtre — sans ça, le
+        # set_mode inutile provoquait un bref flash noir (#38).
+        self.pending_resize = self.size != old_size
 
     # --- Construction ------------------------------------------------------
 
