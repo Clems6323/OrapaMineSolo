@@ -123,6 +123,8 @@ class GameScreen:
         self.abandon_rect = pygame.Rect(inner + 190, top + 92, 92, 34)
         # Ligne sauvegarde : case « progression » + bouton Sauvegarder.
         self.progress_toggle_rect = pygame.Rect(inner, top + 136, 20, 20)
+        # Zone cliquable case + libellé « Progression » (bornée avant Sauvegarder).
+        self.progress_row = pygame.Rect(inner, top + 134, 140, 24)
         self.save_rect = pygame.Rect(inner + 150, top + 132, 132, 28)
         # Bouton « Retour au menu » (ouvre le popup de sauvegarde avant de quitter).
         self.menu_rect = pygame.Rect(inner, top + 170, theme.PANEL_WIDTH - 36, 30)
@@ -207,7 +209,7 @@ class GameScreen:
         if self.abandon_rect.collidepoint(pos):
             self.finished = ("giveup", self.game.score)
             return
-        if self.progress_toggle_rect.collidepoint(pos):
+        if self.progress_row.collidepoint(pos):  # case OU libellé « Progression »
             self.save_progress = not self.save_progress
             return
         if self.save_rect.collidepoint(pos):
