@@ -92,9 +92,10 @@ class GameScreen:
         self.history_stick_bottom = True
 
         pygame.font.init()
-        self.font = pygame.font.SysFont("arial", 18)
+        self.font = pygame.font.SysFont("arial", 20)
         self.font_small = pygame.font.SysFont("arial", 15)
         self.font_big = pygame.font.SysFont("arial", 26, bold=True)
+        self.font_clock = pygame.font.SysFont("arial", 28, bold=True)  # horloge bien lisible
 
         # Mise en page adaptative (taille de case + positions selon l'écran).
         self.size = theme.window_size(self.grid.width, self.grid.height)
@@ -463,7 +464,7 @@ class GameScreen:
         else:
             color = theme.TEXT_DIM
             text = _mmss(self.elapsed, ceil=False)  # temps écoulé (plancher)
-        img = self.font.render(text, True, color)
+        img = self.font_clock.render(text, True, color)
         surface.blit(img, img.get_rect(midright=(self.help_rect.left - 12, self.help_rect.centery)))
 
     def _draw_palette(self, surface: pygame.Surface) -> None:
