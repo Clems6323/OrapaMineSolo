@@ -116,7 +116,17 @@ class RayTester:
     # --- Rendu -------------------------------------------------------------
 
     def draw(self, surface: pygame.Surface) -> None:
+        self.draw_beam(surface)
+        self.draw_entries(surface)
+
+    def draw_beam(self, surface: pygame.Surface) -> None:
+        """Dessine uniquement le rayon (à placer SOUS les gemmes : la réflexion a
+        lieu dans la case d'une gemme, qui masque ainsi le coude au lieu de le
+        laisser déborder sur la pièce)."""
         self._draw_ray(surface)
+
+    def draw_entries(self, surface: pygame.Surface) -> None:
+        """Dessine les points d'entrée cliquables (à placer au-dessus)."""
         self._draw_entries(surface)
 
     def _draw_ray(self, surface: pygame.Surface) -> None:
