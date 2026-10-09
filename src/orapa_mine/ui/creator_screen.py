@@ -151,6 +151,12 @@ class CreatorScreen:
         self.diamant_rect = pygame.Rect(inner, top + 126, 20, 20)
         self.corps_rect = pygame.Rect(inner, top + 150, 20, 20)
         self.wormhole_rect = pygame.Rect(inner, top + 174, 20, 20)
+        # Ligne cliquable (case + libellé). Largeur bornée avant la colonne de
+        # droite (minuteur) pour ne pas empiéter dessus (#35).
+        ext_row_w = 168
+        self.diamant_row = pygame.Rect(inner, top + 124, ext_row_w, 24)
+        self.corps_row = pygame.Rect(inner, top + 148, ext_row_w, 24)
+        self.wormhole_row = pygame.Rect(inner, top + 172, ext_row_w, 24)
         # Minuteur : colonne de droite (aligné sur les extensions) pour ne pas
         # allonger le panneau. Label + stepper − valeur + (éditable au clavier).
         rx = inner + 176
@@ -202,15 +208,15 @@ class CreatorScreen:
         if self.back_rect.collidepoint(pos):
             self.back = True
             return
-        if self.diamant_rect.collidepoint(pos):
+        if self.diamant_row.collidepoint(pos):
             self.diamant = not self.diamant
             self._rebuild(clear_gems=False)
             return
-        if self.corps_rect.collidepoint(pos):
+        if self.corps_row.collidepoint(pos):
             self.corps_noir = not self.corps_noir
             self._rebuild(clear_gems=False)
             return
-        if self.wormhole_rect.collidepoint(pos):
+        if self.wormhole_row.collidepoint(pos):
             self.wormhole = not self.wormhole
             self._rebuild(clear_gems=False)
             return
