@@ -14,7 +14,7 @@ import pygame
 from orapa_mine.model.gems import Piece
 from orapa_mine.model.grid import Grid
 from orapa_mine.model import serialization
-from orapa_mine.ui import board_render, dialogs, i18n, theme, theme_toggle
+from orapa_mine.ui import board_render, dialogs, i18n, lang_toggle, theme, theme_toggle
 
 
 class EndScreen:
@@ -62,6 +62,8 @@ class EndScreen:
             return
         if theme_toggle.hit(event.pos):  # bascule mode sombre / clair
             theme_toggle.toggle()
+        elif lang_toggle.handle_click(event.pos, self.size[0]):  # drapeaux FR / UK
+            pass
         elif self.save_rect.collidepoint(event.pos):
             self._save()
         elif self.replay_rect.collidepoint(event.pos):
@@ -99,6 +101,7 @@ class EndScreen:
     def render(self, surface: pygame.Surface) -> None:
         surface.fill(theme.BACKGROUND)
         theme_toggle.draw(surface)
+        lang_toggle.draw(surface)
         board_render.draw_board(surface, self.grid)
         board_render.draw_gems(surface, self.grid)  # solution révélée
 

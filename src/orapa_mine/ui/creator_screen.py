@@ -20,7 +20,7 @@ from orapa_mine.model.gems import Piece, PlacedGem, Position
 from orapa_mine.model import gems_catalog as cat
 from orapa_mine.model import serialization
 from orapa_mine.model.grid import Grid
-from orapa_mine.ui import board_render, dialogs, i18n, theme, theme_toggle
+from orapa_mine.ui import board_render, dialogs, i18n, lang_toggle, theme, theme_toggle
 from orapa_mine.ui.beam_test import RayTester
 from orapa_mine.ui.game_screen import Slot
 from orapa_mine.ui.timer_field import TimerField
@@ -184,6 +184,8 @@ class CreatorScreen:
             return
         if theme_toggle.hit(pos):  # bascule mode sombre / clair
             theme_toggle.toggle()
+            return
+        if lang_toggle.handle_click(pos, self.size[0]):  # drapeaux FR / UK
             return
         if self.timer.handle_click(pos):  # − / + / case du minuteur (valide la saisie)
             return
@@ -379,6 +381,7 @@ class CreatorScreen:
     def render(self, surface: pygame.Surface) -> None:
         surface.fill(theme.BACKGROUND)
         theme_toggle.draw(surface)
+        lang_toggle.draw(surface)
         board_render.draw_board(surface, self.grid)
         board_render.draw_gems(surface, self.grid)
         self._draw_ghost(surface)
