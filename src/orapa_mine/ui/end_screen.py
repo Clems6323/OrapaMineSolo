@@ -14,7 +14,7 @@ import pygame
 from orapa_mine.model.gems import Piece
 from orapa_mine.model.grid import Grid
 from orapa_mine.model import serialization
-from orapa_mine.ui import board_render, dialogs, i18n, theme
+from orapa_mine.ui import board_render, dialogs, i18n, theme, theme_toggle
 
 
 class EndScreen:
@@ -60,7 +60,9 @@ class EndScreen:
     def handle_event(self, event: pygame.event.Event) -> None:
         if event.type != pygame.MOUSEBUTTONDOWN or event.button != 1:
             return
-        if self.save_rect.collidepoint(event.pos):
+        if theme_toggle.hit(event.pos):  # bascule mode sombre / clair
+            theme_toggle.toggle()
+        elif self.save_rect.collidepoint(event.pos):
             self._save()
         elif self.replay_rect.collidepoint(event.pos):
             self.restart = True
@@ -96,6 +98,7 @@ class EndScreen:
 
     def render(self, surface: pygame.Surface) -> None:
         surface.fill(theme.BACKGROUND)
+        theme_toggle.draw(surface)
         board_render.draw_board(surface, self.grid)
         board_render.draw_gems(surface, self.grid)  # solution révélée
 

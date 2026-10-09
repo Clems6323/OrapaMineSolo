@@ -26,6 +26,10 @@ bande verticale à gauche du plateau (panneau d'infos à droite).
 l'interface entre français et anglais. / **Language**: an **FR / EN** toggle at
 the top-right of the menu switches the whole interface between French and English.
 
+**Thème** : un bouton **soleil / lune** en haut à gauche de chaque écran bascule
+entre mode sombre et mode clair. / **Theme**: a **sun / moon** button at the
+top-left of every screen switches between dark and light mode.
+
 Les règles complètes et confirmées sont dans [`docs/RULES.md`](docs/RULES.md).
 
 ## Démarrage rapide
