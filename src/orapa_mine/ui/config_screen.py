@@ -43,6 +43,11 @@ class ConfigScreen:
         self.diamant_rect = pygame.Rect(170, 228, 26, 26)
         self.corps_rect = pygame.Rect(170, 266, 26, 26)
         self.wormhole_rect = pygame.Rect(170, 304, 26, 26)
+        # Zone cliquable de chaque ligne (case + libellé) : on peut cocher en
+        # cliquant la case OU le texte (#35).
+        self.diamant_row = self.diamant_rect.union(pygame.Rect(170, 228, 360, 26))
+        self.corps_row = self.corps_rect.union(pygame.Rect(170, 266, 360, 26))
+        self.wormhole_row = self.wormhole_rect.union(pygame.Rect(170, 304, 360, 26))
         bw, gap = 180, 20
         total = 3 * bw + 2 * gap
         start_x = (self.size[0] - total) // 2
@@ -79,11 +84,11 @@ class ConfigScreen:
             return
         if self.timer.handle_click(p):  # − / + / case du minuteur
             return
-        if self.diamant_rect.collidepoint(p):
+        if self.diamant_row.collidepoint(p):
             self.diamant = not self.diamant
-        elif self.corps_rect.collidepoint(p):
+        elif self.corps_row.collidepoint(p):
             self.corps_noir = not self.corps_noir
-        elif self.wormhole_rect.collidepoint(p):
+        elif self.wormhole_row.collidepoint(p):
             self.wormhole = not self.wormhole
         elif self.start_rect.collidepoint(p):
             self._begin()
