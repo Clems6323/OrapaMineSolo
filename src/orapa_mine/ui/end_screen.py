@@ -144,7 +144,7 @@ class EndScreen:
 
         pygame.draw.rect(surface, (54, 120, 90), self.replay_rect, border_radius=8)
         pygame.draw.rect(surface, theme.BOARD_BORDER, self.replay_rect, width=1, border_radius=8)
-        r = self.font.render(i18n.t("Rejouer", "Replay"), True, theme.TEXT)
+        r = self.font.render(i18n.t("Retour au menu", "Back to menu"), True, theme.TEXT)
         surface.blit(r, r.get_rect(center=self.replay_rect.center))
 
         pygame.draw.rect(surface, theme.SLOT_BG, self.quit_rect, border_radius=8)
