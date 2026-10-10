@@ -35,6 +35,33 @@ def _override_scale() -> float | None:
     return None
 
 
+def _macos_backing_scale() -> float:
+    """Facteur Retina de l'écran principal (points → pixels), ou 1.0."""
+    try:
+        cg = ctypes.CDLL(
+            "/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics"
+        )
+        cg.CGMainDisplayID.restype = ctypes.c_uint32
+        cg.CGDisplayCopyDisplayMode.restype = ctypes.c_void_p
+        cg.CGDisplayCopyDisplayMode.argtypes = [ctypes.c_uint32]
+        cg.CGDisplayModeGetPixelWidth.restype = ctypes.c_size_t
+        cg.CGDisplayModeGetPixelWidth.argtypes = [ctypes.c_void_p]
+        cg.CGDisplayModeGetWidth.restype = ctypes.c_size_t
+        cg.CGDisplayModeGetWidth.argtypes = [ctypes.c_void_p]
+        cg.CGDisplayModeRelease.argtypes = [ctypes.c_void_p]
+        mode = cg.CGDisplayCopyDisplayMode(cg.CGMainDisplayID())
+        if not mode:
+            return 1.0
+        px = cg.CGDisplayModeGetPixelWidth(mode)
+        pt = cg.CGDisplayModeGetWidth(mode)
+        cg.CGDisplayModeRelease(mode)
+        if pt > 0 and px > 0:
+            return max(1.0, round(px / pt))
+    except Exception:
+        pass
+    return 1.0
+
+
 def _detect_ui_scale() -> float:
     # Headless (tests) : pas de DPI-awareness, échelle 1 sauf forçage explicite.
     if os.environ.get("SDL_VIDEODRIVER") == "dummy":
@@ -58,6 +85,10 @@ def _detect_ui_scale() -> float:
             return max(1.0, round(dpi / 96.0 * 4) / 4)  # arrondi au quart (1.0, 1.25, …)
         except Exception:
             return 1.0
+    if sys.platform == "darwin":
+        # Retina : on rend l'UI à la résolution physique ; l'app sur-échantillonne
+        # vers la surface fenêtre (net si backing haute densité, sinon sans perte).
+        return _macos_backing_scale()
     return 1.0
 
 
