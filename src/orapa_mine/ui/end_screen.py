@@ -43,17 +43,17 @@ class EndScreen:
         self.message_color = theme.TEXT_DIM
         self.size = theme.window_size(hidden_grid.width, hidden_grid.height)
 
-        pygame.font.init()
-        self.font_big = pygame.font.SysFont("arial", 32, bold=True)
-        self.font = pygame.font.SysFont("arial", 20)
-        self.font_small = pygame.font.SysFont("arial", 16)
+        self.font_big = theme.font(32, bold=True)
+        self.font = theme.font(20)
+        self.font_small = theme.font(16)
 
+        s = theme.s
         self.panel = theme.PANEL.copy()
-        inner = self.panel.x + 18
-        bw = theme.PANEL_WIDTH - 36
-        self.save_rect = pygame.Rect(inner, self.panel.bottom - 164, bw, 40)
-        self.replay_rect = pygame.Rect(inner, self.panel.bottom - 108, bw, 44)
-        self.quit_rect = pygame.Rect(inner, self.panel.bottom - 56, bw, 40)
+        inner = self.panel.x + s(18)
+        bw = theme.PANEL_WIDTH - s(36)
+        self.save_rect = pygame.Rect(inner, self.panel.bottom - s(164), bw, s(40))
+        self.replay_rect = pygame.Rect(inner, self.panel.bottom - s(108), bw, s(44))
+        self.quit_rect = pygame.Rect(inner, self.panel.bottom - s(56), bw, s(40))
 
     # --- Événements --------------------------------------------------------
 
@@ -106,11 +106,11 @@ class EndScreen:
         board_render.draw_gems(surface, self.grid)  # solution révélée
 
         caption = self.font.render(i18n.t("Voici la solution :", "Here is the solution:"), True, theme.TEXT_DIM)
-        surface.blit(caption, (theme.BOARD_X, theme.BOARD_Y - 34))
+        surface.blit(caption, (theme.BOARD_X, theme.BOARD_Y - theme.s(34)))
 
         pygame.draw.rect(surface, theme.PANEL_BG, self.panel, border_radius=8)
         pygame.draw.rect(surface, theme.BOARD_BORDER, self.panel, width=1, border_radius=8)
-        x = self.panel.x + 18
+        x = self.panel.x + theme.s(18)
 
         if self.won:
             banner, color = i18n.t("Gagné !", "You win!"), theme.WIN_COLOR
@@ -125,12 +125,12 @@ class EndScreen:
             detail = i18n.t(f"{self.score} tir(s)/question(s) joués.",
                             f"{self.score} shot(s)/question(s) played.")
         title = self.font_big.render(banner, True, color)
-        surface.blit(title, (x, self.panel.top + 20))
-        surface.blit(self.font.render(detail, True, theme.TEXT), (x, self.panel.top + 64))
+        surface.blit(title, (x, self.panel.top + theme.s(20)))
+        surface.blit(self.font.render(detail, True, theme.TEXT), (x, self.panel.top + theme.s(64)))
         spent = self.font.render(
             i18n.t(f"Temps passé : {_duration(self.elapsed_seconds)}",
                    f"Time spent: {_duration(self.elapsed_seconds)}"), True, theme.TEXT_DIM)
-        surface.blit(spent, (x, self.panel.top + 92))
+        surface.blit(spent, (x, self.panel.top + theme.s(92)))
 
         # Bouton « Sauvegarder la configuration » (partage de l'énigme jouée).
         pygame.draw.rect(surface, (54, 96, 120), self.save_rect, border_radius=8)
@@ -140,7 +140,7 @@ class EndScreen:
         surface.blit(sv, sv.get_rect(center=self.save_rect.center))
         if self.message:
             msg = self.font_small.render(self.message, True, self.message_color)
-            surface.blit(msg, (x, self.save_rect.top - 24))
+            surface.blit(msg, (x, self.save_rect.top - theme.s(24)))
 
         pygame.draw.rect(surface, (54, 120, 90), self.replay_rect, border_radius=8)
         pygame.draw.rect(surface, theme.BOARD_BORDER, self.replay_rect, width=1, border_radius=8)

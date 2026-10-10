@@ -15,14 +15,14 @@ from orapa_mine.model.serialization import LoadedGame
 from orapa_mine.ui import dialogs, i18n, lang_toggle, theme, theme_toggle
 from orapa_mine.ui.timer_field import TimerField
 
-SIZE = (760, 720)
+SIZE = (760, 720)  # taille logique ; mise à l'échelle DPI dans __init__
 
 
 class ConfigScreen:
     """Menu de configuration cliquable (rectangles + cases à cocher)."""
 
     def __init__(self) -> None:
-        self.size = SIZE
+        self.size = (theme.s(SIZE[0]), theme.s(SIZE[1]))
         self.diamant = False
         self.corps_noir = False
         self.wormhole = False
@@ -34,39 +34,38 @@ class ConfigScreen:
         self.creator: Difficulty | None = None  # lancer le mode créateur
         self.error: str | None = None
 
-        pygame.font.init()
-        self.font_big = pygame.font.SysFont("arial", 40, bold=True)
-        self.font = pygame.font.SysFont("arial", 20)
-        self.font_small = pygame.font.SysFont("arial", 16)
+        self.font_big = theme.font(40, bold=True)
+        self.font = theme.font(20)
+        self.font_small = theme.font(16)
 
-        cx = self.size[0] // 2
-        self.diamant_rect = pygame.Rect(170, 228, 26, 26)
-        self.corps_rect = pygame.Rect(170, 266, 26, 26)
-        self.wormhole_rect = pygame.Rect(170, 304, 26, 26)
+        s = theme.s
+        self.diamant_rect = pygame.Rect(s(170), s(228), s(26), s(26))
+        self.corps_rect = pygame.Rect(s(170), s(266), s(26), s(26))
+        self.wormhole_rect = pygame.Rect(s(170), s(304), s(26), s(26))
         # Zone cliquable de chaque ligne (case + libellé) : on peut cocher en
         # cliquant la case OU le texte (#35).
-        self.diamant_row = self.diamant_rect.union(pygame.Rect(170, 228, 360, 26))
-        self.corps_row = self.corps_rect.union(pygame.Rect(170, 266, 360, 26))
-        self.wormhole_row = self.wormhole_rect.union(pygame.Rect(170, 304, 360, 26))
-        bw, gap = 180, 20
+        self.diamant_row = self.diamant_rect.union(pygame.Rect(s(170), s(228), s(360), s(26)))
+        self.corps_row = self.corps_rect.union(pygame.Rect(s(170), s(266), s(360), s(26)))
+        self.wormhole_row = self.wormhole_rect.union(pygame.Rect(s(170), s(304), s(360), s(26)))
+        bw, gap = s(180), s(20)
         total = 3 * bw + 2 * gap
         start_x = (self.size[0] - total) // 2
         self.size_rects = [
-            pygame.Rect(start_x + i * (bw + gap), 384, bw, 60) for i in range(3)
+            pygame.Rect(start_x + i * (bw + gap), s(384), bw, s(60)) for i in range(3)
         ]
         # Minuteur (stepper − valeur + éditable), centré sous le total de gemmes.
         self.timer.set_rects(
-            pygame.Rect(271, 542, 44, 40),
-            pygame.Rect(325, 542, 110, 40),
-            pygame.Rect(445, 542, 44, 40),
+            pygame.Rect(s(271), s(542), s(44), s(40)),
+            pygame.Rect(s(325), s(542), s(110), s(40)),
+            pygame.Rect(s(445), s(542), s(44), s(40)),
         )
 
-        bw2, gap2 = 224, 16
+        bw2, gap2 = s(224), s(16)
         total2 = 3 * bw2 + 2 * gap2
         bx = (self.size[0] - total2) // 2
-        self.start_rect = pygame.Rect(bx, 614, bw2, 58)
-        self.creator_rect = pygame.Rect(bx + bw2 + gap2, 614, bw2, 58)
-        self.load_rect = pygame.Rect(bx + 2 * (bw2 + gap2), 614, bw2, 58)
+        self.start_rect = pygame.Rect(bx, s(614), bw2, s(58))
+        self.creator_rect = pygame.Rect(bx + bw2 + gap2, s(614), bw2, s(58))
+        self.load_rect = pygame.Rect(bx + 2 * (bw2 + gap2), s(614), bw2, s(58))
 
     # --- Événements --------------------------------------------------------
 
@@ -134,13 +133,14 @@ class ConfigScreen:
     # --- Rendu -------------------------------------------------------------
 
     def render(self, surface: pygame.Surface) -> None:
+        s = theme.s
         surface.fill(theme.BACKGROUND)
         theme_toggle.draw(surface)
         cx = self.size[0] // 2
         title = self.font_big.render("ORAPA MINE", True, theme.TEXT)
-        surface.blit(title, title.get_rect(centerx=cx, y=56))
+        surface.blit(title, title.get_rect(centerx=cx, y=s(56)))
         sub = self.font.render(i18n.t("Configuration de la partie", "Game setup"), True, theme.TEXT_DIM)
-        surface.blit(sub, sub.get_rect(centerx=cx, y=108))
+        surface.blit(sub, sub.get_rect(centerx=cx, y=s(108)))
 
         # Sélecteur de langue : drapeaux France / Royaume-Uni (haut droite).
         lang_toggle.draw(surface)
@@ -149,9 +149,9 @@ class ConfigScreen:
             i18n.t("Base : 1 rouge, 1 jaune, 1 bleu, 2 blanches (5 gemmes)",
                    "Base: 1 red, 1 yellow, 1 blue, 2 white (5 gems)"), True, theme.TEXT_DIM
         )
-        surface.blit(base, (100, 158))
+        surface.blit(base, (s(100), s(158)))
 
-        surface.blit(self.font.render(i18n.t("Extensions", "Extensions"), True, theme.TEXT), (100, 196))
+        surface.blit(self.font.render(i18n.t("Extensions", "Extensions"), True, theme.TEXT), (s(100), s(196)))
         self._checkbox(surface, self.diamant_rect, self.diamant,
                        i18n.t("Diamant (dévie sans teinter)", "Diamond (deviates without tinting)"))
         self._checkbox(surface, self.corps_rect, self.corps_noir,
@@ -159,7 +159,7 @@ class ConfigScreen:
         self._checkbox(surface, self.wormhole_rect, self.wormhole,
                        i18n.t("Trou de ver ×2 (téléporte le rayon)", "Wormhole ×2 (teleports the beam)"))
 
-        surface.blit(self.font.render(i18n.t("Taille de la grille", "Grid size"), True, theme.TEXT), (100, 344))
+        surface.blit(self.font.render(i18n.t("Taille de la grille", "Grid size"), True, theme.TEXT), (s(100), s(344)))
         for i, rect in enumerate(self.size_rects):
             selected = i == self.size_index
             bg = theme.SLOT_SELECTED if selected else theme.SLOT_BG
@@ -169,17 +169,17 @@ class ConfigScreen:
             fg = theme.ON_ACCENT if selected else theme.TEXT
             n = self.font.render(i18n.size_name(name), True, fg)
             d = self.font_small.render(f"{w} × {h}", True, fg if selected else theme.TEXT_DIM)
-            surface.blit(n, n.get_rect(centerx=rect.centerx, y=rect.y + 10))
-            surface.blit(d, d.get_rect(centerx=rect.centerx, y=rect.y + 34))
+            surface.blit(n, n.get_rect(centerx=rect.centerx, y=rect.y + s(10)))
+            surface.blit(d, d.get_rect(centerx=rect.centerx, y=rect.y + s(34)))
 
         total = 5 + (1 if self.diamant else 0) + (1 if self.corps_noir else 0) + (2 if self.wormhole else 0)
         count = self.font_small.render(
             i18n.t(f"Total : {total} gemmes à trouver", f"Total: {total} gems to find"), True, theme.TEXT_DIM)
-        surface.blit(count, count.get_rect(centerx=cx, y=486))
+        surface.blit(count, count.get_rect(centerx=cx, y=s(486)))
 
         # Minuteur (optionnel) : label + stepper − valeur + (éditable au clavier).
         timer_label = self.font.render(i18n.t("Minuteur", "Timer"), True, theme.TEXT)
-        surface.blit(timer_label, timer_label.get_rect(centerx=cx, y=512))
+        surface.blit(timer_label, timer_label.get_rect(centerx=cx, y=s(512)))
         self.timer.draw(surface, self.font, i18n.t("Désactivé", "Off"))
 
         self._button(surface, self.start_rect, (54, 120, 90), i18n.t("Commencer", "Start"))
@@ -188,7 +188,7 @@ class ConfigScreen:
 
         if self.error:
             err = self.font_small.render(self.error, True, theme.LOSE_COLOR)
-            surface.blit(err, err.get_rect(centerx=cx, y=684))
+            surface.blit(err, err.get_rect(centerx=cx, y=s(684)))
 
     def _button(self, surface: pygame.Surface, rect: pygame.Rect, bg, text: str) -> None:
         pygame.draw.rect(surface, bg, rect, border_radius=10)
@@ -200,7 +200,7 @@ class ConfigScreen:
         pygame.draw.rect(surface, theme.INPUT_BG, rect, border_radius=4)
         pygame.draw.rect(surface, theme.BOARD_BORDER, rect, width=1, border_radius=4)
         if on:
-            inner = rect.inflate(-8, -8)
+            inner = rect.inflate(theme.s(-8), theme.s(-8))
             pygame.draw.rect(surface, theme.SLOT_SELECTED, inner, border_radius=3)
         label = self.font.render(text, True, theme.TEXT)
-        surface.blit(label, (rect.right + 14, rect.y + 2))
+        surface.blit(label, (rect.right + theme.s(14), rect.y + theme.s(2)))

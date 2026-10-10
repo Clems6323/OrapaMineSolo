@@ -31,7 +31,7 @@ from orapa_mine.model.grid import Grid
 from orapa_mine.ui import board_render, dialogs, i18n, lang_toggle, theme, theme_toggle
 from orapa_mine.ui.beam_test import RayTester
 
-_HISTORY_ROW_H = 22  # hauteur d'une ligne d'historique (px)
+_HISTORY_ROW_H = theme.s(22)  # hauteur d'une ligne d'historique (px, échelle DPI)
 
 # Extensions : on annonce le NOM de la pièce (et non une couleur) en réponse à
 # une question de case. Clés = libellés français, traduits par `i18n.piece`.
@@ -94,11 +94,10 @@ class GameScreen:
         self.history_scroll = 0.0
         self.history_stick_bottom = True
 
-        pygame.font.init()
-        self.font = pygame.font.SysFont("arial", 20)
-        self.font_small = pygame.font.SysFont("arial", 15)
-        self.font_big = pygame.font.SysFont("arial", 26, bold=True)
-        self.font_clock = pygame.font.SysFont("arial", 28, bold=True)  # horloge bien lisible
+        self.font = theme.font(20)
+        self.font_small = theme.font(15)
+        self.font_big = theme.font(26, bold=True)
+        self.font_clock = theme.font(28, bold=True)  # horloge bien lisible
 
         # Mise en page adaptative (taille de case + positions selon l'écran).
         self.size = theme.window_size(self.grid.width, self.grid.height)
@@ -113,30 +112,32 @@ class GameScreen:
         return [Slot(piece, rect) for piece, rect in zip(pieces, rects)]
 
     def _layout_panel(self) -> None:
+        s = theme.s
         self.panel = theme.PANEL.copy()
         px = self.panel.x
         self.panel_x = px
-        inner = px + 18
+        inner = px + s(18)
         top = self.panel.top
-        self.help_rect = pygame.Rect(px + theme.PANEL_WIDTH - 44, top + 16, 28, 28)
-        self.submit_rect = pygame.Rect(inner, top + 92, 180, 34)
-        self.abandon_rect = pygame.Rect(inner + 190, top + 92, 92, 34)
+        bw = theme.PANEL_WIDTH - s(36)
+        self.help_rect = pygame.Rect(px + theme.PANEL_WIDTH - s(44), top + s(16), s(28), s(28))
+        self.submit_rect = pygame.Rect(inner, top + s(92), s(180), s(34))
+        self.abandon_rect = pygame.Rect(inner + s(190), top + s(92), s(92), s(34))
         # Ligne sauvegarde : case « progression » + bouton Sauvegarder.
-        self.progress_toggle_rect = pygame.Rect(inner, top + 136, 20, 20)
+        self.progress_toggle_rect = pygame.Rect(inner, top + s(136), s(20), s(20))
         # Zone cliquable case + libellé « Progression » (bornée avant Sauvegarder).
-        self.progress_row = pygame.Rect(inner, top + 134, 140, 24)
-        self.save_rect = pygame.Rect(inner + 150, top + 132, 132, 28)
+        self.progress_row = pygame.Rect(inner, top + s(134), s(140), s(24))
+        self.save_rect = pygame.Rect(inner + s(150), top + s(132), s(132), s(28))
         # Bouton « Retour au menu » (ouvre le popup de sauvegarde avant de quitter).
-        self.menu_rect = pygame.Rect(inner, top + 170, theme.PANEL_WIDTH - 36, 30)
-        self.input_rect = pygame.Rect(inner, self.panel.bottom - 92, theme.PANEL_WIDTH - 36, 32)
+        self.menu_rect = pygame.Rect(inner, top + s(170), bw, s(30))
+        self.input_rect = pygame.Rect(inner, self.panel.bottom - s(92), bw, s(32))
 
         # Zone d'historique : s'étire entre l'en-tête et la zone de saisie,
         # donc s'adapte à la hauteur du panneau.
-        self.history_header_y = top + 208
-        content_top = self.history_header_y + 24
-        content_bottom = self.input_rect.top - 28  # laisse la place au libellé
+        self.history_header_y = top + s(208)
+        content_top = self.history_header_y + s(24)
+        content_bottom = self.input_rect.top - s(28)  # laisse la place au libellé
         self.history_rect = pygame.Rect(
-            inner, content_top, theme.PANEL_WIDTH - 36, max(48, content_bottom - content_top)
+            inner, content_top, bw, max(s(48), content_bottom - content_top)
         )
 
     # --- Événements --------------------------------------------------------
@@ -422,9 +423,10 @@ class GameScreen:
         ]
 
     def _leave_prompt_layout(self, size: tuple[int, int]) -> dict:
+        s = theme.s
         w, h = size
-        pw = min(400, w - 80)
-        btn_h, gap, pad, title_h = 42, 10, 24, 54
+        pw = min(s(400), w - s(80))
+        btn_h, gap, pad, title_h = s(42), s(10), s(24), s(54)
         rows = self._leave_buttons()
         ph = title_h + len(rows) * btn_h + (len(rows) - 1) * gap + pad
         px, py = (w - pw) // 2, (h - ph) // 2
@@ -445,7 +447,7 @@ class GameScreen:
         pygame.draw.rect(surface, theme.PANEL_BG, panel, border_radius=12)
         pygame.draw.rect(surface, theme.BOARD_BORDER, panel, width=2, border_radius=12)
         title = self.font.render(i18n.t("Quitter la partie ?", "Leave the game?"), True, theme.TEXT)
-        surface.blit(title, title.get_rect(centerx=panel.centerx, y=panel.y + 18))
+        surface.blit(title, title.get_rect(centerx=panel.centerx, y=panel.y + theme.s(18)))
         for (fr, en, color, _action), rect in zip(self._leave_buttons(), rects):
             pygame.draw.rect(surface, color, rect, border_radius=8)
             pygame.draw.rect(surface, theme.BOARD_BORDER, rect, width=1, border_radius=8)
@@ -536,7 +538,7 @@ class GameScreen:
         label = theme.cell_label(self.hovered_cell)
         img = self.font_small.render(label, True, theme.ON_ACCENT)
         x, y, _, _ = theme.cell_rect(self.hovered_cell)
-        box = img.get_rect(topleft=(x + 3, y + 3)).inflate(6, 4)
+        box = img.get_rect(topleft=(x + theme.s(3), y + theme.s(3))).inflate(theme.s(6), theme.s(4))
         pygame.draw.rect(surface, theme.SLOT_SELECTED, box, border_radius=3)
         surface.blit(img, img.get_rect(center=box.center))
 
@@ -556,11 +558,11 @@ class GameScreen:
             color = theme.TEXT_DIM
             text = _mmss(self.elapsed, ceil=False)  # temps écoulé (plancher)
         img = self.font_clock.render(text, True, color)
-        surface.blit(img, img.get_rect(midright=(self.help_rect.left - 12, self.help_rect.centery)))
+        surface.blit(img, img.get_rect(midright=(self.help_rect.left - theme.s(12), self.help_rect.centery)))
 
     def _draw_palette(self, surface: pygame.Surface) -> None:
         title = self.font_small.render(i18n.t("Pièces", "Pieces"), True, theme.TEXT_DIM)
-        surface.blit(title, (theme.PALETTE.x + 4, theme.PALETTE.y - 22))
+        surface.blit(title, (theme.PALETTE.x + theme.s(4), theme.PALETTE.y - theme.s(22)))
         for slot in self.slots:
             board_render.draw_palette_slot(
                 surface, slot.rect, slot.piece,
@@ -570,20 +572,21 @@ class GameScreen:
             )
 
     def _draw_panel(self, surface: pygame.Surface) -> None:
+        s = theme.s
         pygame.draw.rect(surface, theme.PANEL_BG, self.panel, border_radius=8)
         pygame.draw.rect(surface, theme.BOARD_BORDER, self.panel, width=1, border_radius=8)
-        x = self.panel_x + 18
-        surface.blit(self.font_big.render("Orapa Mine", True, theme.TEXT), (x, self.panel.top + 12))
+        x = self.panel_x + s(18)
+        surface.blit(self.font_big.render("Orapa Mine", True, theme.TEXT), (x, self.panel.top + s(12)))
         # Bouton d'aide « ? ».
-        pygame.draw.circle(surface, theme.SLOT_BG, self.help_rect.center, 14)
-        pygame.draw.circle(surface, theme.BOARD_BORDER, self.help_rect.center, 14, width=1)
+        pygame.draw.circle(surface, theme.SLOT_BG, self.help_rect.center, s(14))
+        pygame.draw.circle(surface, theme.BOARD_BORDER, self.help_rect.center, s(14), width=1)
         q = self.font.render("?", True, theme.TEXT)
         surface.blit(q, q.get_rect(center=self.help_rect.center))
         self._draw_clock(surface)
         test_hint = self.ray.last_test or i18n.t("Clique un point d'entrée pour tester.", "Click an entry point to test.")
         surface.blit(
             self.font_small.render(test_hint, True, theme.TEXT_DIM),
-            (x, self.panel.top + 54),
+            (x, self.panel.top + s(54)),
         )
         # Boutons Proposer / Abandonner.
         pygame.draw.rect(surface, (54, 120, 90), self.submit_rect, border_radius=6)
@@ -599,10 +602,10 @@ class GameScreen:
         pygame.draw.rect(surface, theme.INPUT_BG, self.progress_toggle_rect, border_radius=4)
         pygame.draw.rect(surface, theme.BOARD_BORDER, self.progress_toggle_rect, width=1, border_radius=4)
         if self.save_progress:
-            pygame.draw.rect(surface, theme.SLOT_SELECTED, self.progress_toggle_rect.inflate(-8, -8), border_radius=2)
+            pygame.draw.rect(surface, theme.SLOT_SELECTED, self.progress_toggle_rect.inflate(s(-8), s(-8)), border_radius=2)
         surface.blit(
             self.font_small.render(i18n.t("Progression", "Progress"), True, theme.TEXT),
-            (self.progress_toggle_rect.right + 8, self.progress_toggle_rect.y + 2),
+            (self.progress_toggle_rect.right + s(8), self.progress_toggle_rect.y + s(2)),
         )
         pygame.draw.rect(surface, theme.SLOT_BG, self.save_rect, border_radius=6)
         pygame.draw.rect(surface, theme.BOARD_BORDER, self.save_rect, width=1, border_radius=6)
@@ -622,22 +625,22 @@ class GameScreen:
             i18n.t(f"Score : {self.game.score}", f"Score: {self.game.score}"),
             True, theme.SLOT_SELECTED,
         )
-        surface.blit(score_img, score_img.get_rect(topright=(self.panel.right - 18, self.history_header_y)))
+        surface.blit(score_img, score_img.get_rect(topright=(self.panel.right - s(18), self.history_header_y)))
         self._draw_history(surface)
 
         # Zone de proposition (saisie d'un point d'entrée à interroger).
         label = self.font_small.render(
             i18n.t("Point de bord (5/C) ou case (A1) :", "Edge point (5/C) or cell (A1):"), True, theme.TEXT_DIM)
-        surface.blit(label, (x, self.input_rect.top - 20))
+        surface.blit(label, (x, self.input_rect.top - s(20)))
         pygame.draw.rect(surface, theme.INPUT_BG, self.input_rect, border_radius=5)
         edge = theme.INPUT_ACTIVE if self.input_active else theme.BOARD_BORDER
         pygame.draw.rect(surface, edge, self.input_rect, width=2 if self.input_active else 1, border_radius=5)
         shown = self.input_text + ("|" if self.input_active else "")
-        surface.blit(self.font.render(shown, True, theme.TEXT), (self.input_rect.x + 8, self.input_rect.y + 6))
+        surface.blit(self.font.render(shown, True, theme.TEXT), (self.input_rect.x + s(8), self.input_rect.y + s(6)))
 
         if self.message:
             msg = self.font_small.render(self.message, True, self.message_color)
-            surface.blit(msg, (x, self.input_rect.bottom + 10))
+            surface.blit(msg, (x, self.input_rect.bottom + s(10)))
 
         hint = i18n.t(
             "clic=choisir/poser, clic sur une pièce=reprendre, [R] tourner, clic droit=retirer, [H] aide, [Maj+D] debug",
@@ -645,14 +648,14 @@ class GameScreen:
         )
         surface.blit(
             self.font_small.render(hint, True, theme.TEXT_DIM),
-            (theme.PALETTE.x, self.size[1] - 24),
+            (theme.PALETTE.x, self.size[1] - s(24)),
         )
 
     # --- Aide paginée ------------------------------------------------------
 
-    _TITLE_H = 52
-    _FOOTER_H = 42
-    _MARGIN = 26
+    _TITLE_H = theme.s(52)
+    _FOOTER_H = theme.s(42)
+    _MARGIN = theme.s(26)
 
     def _help_rows(self, content_width: int) -> list[tuple[int, "object"]]:
         """Construit la liste des lignes de l'aide (hauteur, fonction de dessin)."""
@@ -671,11 +674,11 @@ class GameScreen:
                 # « ligne » composite qui ne se coupe jamais entre deux pages
                 # (mais partage une page avec ce qui précède si ça tient).
                 block: list[tuple[int, object]] = [
-                    (28, heading_draw(head)),
-                    (22, line_draw(i18n.t(
+                    (theme.s(28), heading_draw(head)),
+                    (theme.s(22), line_draw(i18n.t(
                         "Le rayon se teinte au contact ; mélange peinture, le blanc éclaircit.",
                         "The beam is tinted on contact; paint-style mixing, white lightens."))),
-                    (22, line_draw(i18n.t(
+                    (theme.s(22), line_draw(i18n.t(
                         "Aucune gemme touchée → rayon transparent.",
                         "No gem touched → transparent beam."))),
                 ]
@@ -683,13 +686,13 @@ class GameScreen:
                 for i in range(0, len(_COLOR_COMBOS), 2):
                     left = _COLOR_COMBOS[i]
                     right = _COLOR_COMBOS[i + 1] if i + 1 < len(_COLOR_COMBOS) else None
-                    block.append((26, self._combo_pair_drawer(left, right, col_w)))
+                    block.append((theme.s(26), self._combo_pair_drawer(left, right, col_w)))
                 rows.append((sum(h for h, _ in block), _group_drawer(block)))
             else:
-                rows.append((28, heading_draw(head)))
+                rows.append((theme.s(28), heading_draw(head)))
                 for wrapped in _wrap(i18n.t(body_fr, body_en), self.font_small, content_width):
-                    rows.append((22, line_draw(wrapped)))
-            rows.append((12, _spacer))  # espace entre sections
+                    rows.append((theme.s(22), line_draw(wrapped)))
+            rows.append((theme.s(12), _spacer))  # espace entre sections
         return rows
 
     def _combo_pair_drawer(self, left: frozenset, right: frozenset | None, col_w: int):
@@ -708,27 +711,29 @@ class GameScreen:
         """Retourne une fonction dessinant une ligne « couleurs = résultat »."""
 
         def draw(surface: pygame.Surface, x: int, y: int) -> None:
+            s = theme.s
             cx = x
             inputs = [c for c in _COLOR_ORDER if c in combo]
             for i, gem_color in enumerate(inputs):
                 if i > 0:
-                    surface.blit(self.font_small.render("+", True, theme.TEXT_DIM), (cx, y + 1))
-                    cx += 13
+                    surface.blit(self.font_small.render("+", True, theme.TEXT_DIM), (cx, y + s(1)))
+                    cx += s(13)
                 _swatch(surface, cx, y, theme.GEM_FILL[gem_color])
-                cx += 20
-            surface.blit(self.font_small.render("=", True, theme.TEXT_DIM), (cx, y + 1))
-            cx += 18
+                cx += s(20)
+            surface.blit(self.font_small.render("=", True, theme.TEXT_DIM), (cx, y + s(1)))
+            cx += s(18)
             name = i18n.color(mix_colors(combo))
             _swatch(surface, cx, y, theme.ray_rgb(mix_colors(combo)))
-            cx += 24
-            surface.blit(self.font_small.render(name, True, theme.TEXT), (cx, y + 1))
+            cx += s(24)
+            surface.blit(self.font_small.render(name, True, theme.TEXT), (cx, y + s(1)))
 
         return draw
 
     def _help_layout(self, size: tuple[int, int]) -> dict:
+        s = theme.s
         w, h = size
-        panel_w = min(680, w - 80)
-        max_panel_h = h - 60
+        panel_w = min(s(680), w - s(80))
+        max_panel_h = h - s(60)
         content_w = panel_w - 2 * self._MARGIN
         max_content_h = max_panel_h - self._TITLE_H - self._FOOTER_H
 
@@ -739,8 +744,8 @@ class GameScreen:
         px = (w - panel_w) // 2
         py = (h - panel_h) // 2
         panel = pygame.Rect(px, py, panel_w, panel_h)
-        prev_rect = pygame.Rect(px + self._MARGIN, panel.bottom - 36, 40, 28)
-        next_rect = pygame.Rect(panel.right - self._MARGIN - 40, panel.bottom - 36, 40, 28)
+        prev_rect = pygame.Rect(px + self._MARGIN, panel.bottom - s(36), s(40), s(28))
+        next_rect = pygame.Rect(panel.right - self._MARGIN - s(40), panel.bottom - s(36), s(40), s(28))
         return {"panel": panel, "pages": pages, "prev": prev_rect, "next": next_rect}
 
     def _draw_help(self, surface: pygame.Surface) -> None:
@@ -755,7 +760,7 @@ class GameScreen:
         pygame.draw.rect(surface, theme.PANEL_BG, panel, border_radius=12)
         pygame.draw.rect(surface, theme.BOARD_BORDER, panel, width=2, border_radius=12)
 
-        surface.blit(self.font_big.render(i18n.t("Comment jouer", "How to play"), True, theme.TEXT), (panel.x + self._MARGIN, panel.y + 16))
+        surface.blit(self.font_big.render(i18n.t("Comment jouer", "How to play"), True, theme.TEXT), (panel.x + self._MARGIN, panel.y + theme.s(16)))
 
         y = panel.y + self._TITLE_H
         x = panel.x + self._MARGIN
@@ -788,13 +793,14 @@ class GameScreen:
         pygame.draw.rect(surface, theme.INPUT_BG, rect, border_radius=6)
         pygame.draw.rect(surface, theme.BOARD_BORDER, rect, width=1, border_radius=6)
 
+        s = theme.s
         actions = self.game.history
         if not actions:
             empty = self.font_small.render(i18n.t("Aucune question posée.", "No question asked yet."), True, theme.TEXT_DIM)
-            surface.blit(empty, (rect.x + 12, rect.y + 10))
+            surface.blit(empty, (rect.x + s(12), rect.y + s(10)))
             return
 
-        content_h = len(actions) * _HISTORY_ROW_H + 8
+        content_h = len(actions) * _HISTORY_ROW_H + s(8)
         max_scroll = max(0.0, content_h - rect.height)
         if self.history_stick_bottom:
             self.history_scroll = max_scroll
@@ -802,19 +808,19 @@ class GameScreen:
             self.history_scroll = min(self.history_scroll, max_scroll)
 
         previous_clip = surface.get_clip()
-        surface.set_clip(rect.inflate(-3, -3))
-        y0 = rect.y + 6 - self.history_scroll
+        surface.set_clip(rect.inflate(s(-3), s(-3)))
+        y0 = rect.y + s(6) - self.history_scroll
         for i, action in enumerate(actions):
             ry = y0 + i * _HISTORY_ROW_H
             if ry + _HISTORY_ROW_H >= rect.y and ry <= rect.bottom:
-                self._draw_history_row(surface, rect.x + 8, int(ry), action)
+                self._draw_history_row(surface, rect.x + s(8), int(ry), action)
         surface.set_clip(previous_clip)
 
         # Barre de défilement (si le contenu déborde).
         if max_scroll > 0:
-            thumb_h = max(24.0, rect.height * rect.height / content_h)
+            thumb_h = max(s(24), rect.height * rect.height / content_h)
             thumb_y = rect.y + (self.history_scroll / max_scroll) * (rect.height - thumb_h)
-            thumb = pygame.Rect(rect.right - 7, int(thumb_y), 4, int(thumb_h))
+            thumb = pygame.Rect(rect.right - s(7), int(thumb_y), s(4), int(thumb_h))
             pygame.draw.rect(surface, theme.BOARD_BORDER, thumb, border_radius=2)
 
     def _draw_history_row(
@@ -832,17 +838,17 @@ class GameScreen:
         else:
             text = f"{entry} → {self.ray.result_label(shot.result)}"
             dot = theme.ray_rgb(shot.result.color)
-        pygame.draw.circle(surface, dot, (x + 6, y + 8), 6)
-        surface.blit(self.font_small.render(text, True, theme.TEXT), (x + 20, y))
+        pygame.draw.circle(surface, dot, (x + theme.s(6), y + theme.s(8)), theme.s(6))
+        surface.blit(self.font_small.render(text, True, theme.TEXT), (x + theme.s(20), y))
 
     def _draw_query_row(self, surface: pygame.Surface, x: int, y: int, query: CellQuery) -> None:
         # Marqueur carré (vs cercle des tirs) pour distinguer d'un coup d'œil
         # une question de case d'un tir de rayon.
         text = f"{theme.cell_label(query.position)} → {_cell_answer_text(query.content)}"
-        marker = pygame.Rect(x, y + 2, 12, 12)
+        marker = pygame.Rect(x, y + theme.s(2), theme.s(12), theme.s(12))
         pygame.draw.rect(surface, self._query_marker_rgb(query.content), marker, border_radius=2)
         pygame.draw.rect(surface, theme.BOARD_BORDER, marker, width=1, border_radius=2)
-        surface.blit(self.font_small.render(text, True, theme.TEXT), (x + 20, y))
+        surface.blit(self.font_small.render(text, True, theme.TEXT), (x + theme.s(20), y))
 
 
 # --- Aide « comment jouer » --------------------------------------------------
@@ -969,8 +975,10 @@ def _wrap(text: str, font: "pygame.font.Font", max_width: int) -> list[str]:
     return lines
 
 
-def _swatch(surface: pygame.Surface, x: int, y: int, rgb: tuple[int, int, int], size: int = 16) -> None:
+def _swatch(surface: pygame.Surface, x: int, y: int, rgb: tuple[int, int, int], size: int | None = None) -> None:
     """Dessine un petit carré de couleur (avec liseré) pour la légende des couleurs."""
+    if size is None:
+        size = theme.s(16)
     rect = pygame.Rect(x, y, size, size)
     pygame.draw.rect(surface, rgb, rect, border_radius=3)
     pygame.draw.rect(surface, theme.BOARD_BORDER, rect, width=1, border_radius=3)

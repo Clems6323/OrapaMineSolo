@@ -12,7 +12,7 @@ import pygame
 
 from orapa_mine.ui import i18n, theme
 
-_FW, _FH, _GAP, _MARGIN, _TOP = 44, 28, 10, 24, 24
+_FW, _FH, _GAP, _MARGIN, _TOP = theme.s(44), theme.s(28), theme.s(10), theme.s(24), theme.s(24)
 
 
 def rects(width: int) -> tuple[pygame.Rect, pygame.Rect]:
