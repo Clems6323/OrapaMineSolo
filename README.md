@@ -22,13 +22,16 @@ La fenêtre s'adapte à l'écran : la taille des cases est choisie automatiqueme
 pour que le plateau tienne sur ton moniteur, et la palette des pièces est une
 bande verticale à gauche du plateau (panneau d'infos à droite).
 
-**Écrans haute résolution (DPI)** : sous Windows, le jeu se rend en pixels
-physiques (process DPI-aware) et met toute l'interface à l'échelle du facteur
-DPI — net, sans flou. On peut forcer le facteur avec la variable
-d'environnement `ORAPA_UI_SCALE` (ex. `ORAPA_UI_SCALE=2`). /
-**High-DPI screens**: on Windows the game renders at physical pixels (DPI-aware)
-and scales the whole UI by the DPI factor — crisp, not blurry. Override the
-factor with `ORAPA_UI_SCALE` (e.g. `ORAPA_UI_SCALE=2`).
+**Écrans haute résolution (DPI / Retina)** : le jeu se rend en pixels physiques
+et met toute l'interface à l'échelle du facteur d'écran — net, sans flou. Sous
+**Windows** via un process DPI-aware ; sous **macOS Retina** via un rendu pleine
+résolution recopié vers la fenêtre (sur-échantillonnage). On peut forcer le
+facteur avec la variable d'environnement `ORAPA_UI_SCALE` (ex. `ORAPA_UI_SCALE=2`).
+/ **High-DPI / Retina screens**: the game renders at physical pixels and scales
+the whole UI by the display factor — crisp, not blurry. On **Windows** via a
+DPI-aware process; on **macOS Retina** via full-resolution rendering blitted to
+the window (supersampling). Override the factor with `ORAPA_UI_SCALE`
+(e.g. `ORAPA_UI_SCALE=2`).
 
 **Langue** : des drapeaux **FR / EN** en haut à droite de chaque écran basculent
 toute l'interface entre français et anglais. / **Language**: **FR / EN** flags at
