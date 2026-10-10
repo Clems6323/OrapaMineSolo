@@ -111,15 +111,15 @@ def draw_palette_slot(
     _draw_slot_icon(surface, rect, piece, faded=used, font=font)
     if piece.quantity > 1 and not used:
         badge = font.render(f"x{piece.quantity - placed}", True, theme.TEXT)
-        surface.blit(badge, (rect.left + 6, rect.bottom - 38))  # au-dessus du nom
+        surface.blit(badge, (rect.left + theme.s(6), rect.bottom - theme.s(38)))  # au-dessus du nom
 
 
 def _draw_slot_icon(
     surface: pygame.Surface, rect: pygame.Rect, piece: Piece, faded: bool, font: pygame.font.Font
 ) -> None:
     if piece.kind is GemKind.WORMHOLE:
-        size = min(rect.width, rect.height) - 22
-        center = (rect.centerx, rect.top + 8 + size / 2)
+        size = min(rect.width, rect.height) - theme.s(22)
+        center = (rect.centerx, rect.top + theme.s(8) + size / 2)
         square = (72, 72, 82) if faded else theme.GEM_FILL[GemKind.BLACK_BODY]
         spiral = theme.TEXT_DIM if faded else theme.WORMHOLE_RING
         draw_wormhole(surface, center, size, square_color=square, spiral_color=spiral)
@@ -127,16 +127,16 @@ def _draw_slot_icon(
         cells = piece.cells
         rows = max(p.row for p, _ in cells) + 1
         cols = max(p.col for p, _ in cells) + 1
-        area = rect.inflate(-16, -22)
+        area = rect.inflate(theme.s(-16), theme.s(-22))
         cell_size = min(area.width / cols, area.height / rows)
         ox = rect.centerx - cols * cell_size / 2
-        oy = rect.top + 8
+        oy = rect.top + theme.s(8)
         base = faded_piece_color(piece) if faded else piece_color(piece)
         for pos, half in cells:
             pygame.draw.polygon(surface, base, theme.half_cell_polygon_at(pos, half, ox, oy, cell_size))
     label = i18n.piece(piece.color.value if piece.color else piece.name)
     name = font.render(label, True, theme.TEXT_DIM)
-    surface.blit(name, name.get_rect(centerx=rect.centerx, bottom=rect.bottom - 4))
+    surface.blit(name, name.get_rect(centerx=rect.centerx, bottom=rect.bottom - theme.s(4)))
 
 
 def draw_gems(surface: pygame.Surface, grid: Grid) -> None:

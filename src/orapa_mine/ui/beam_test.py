@@ -81,7 +81,7 @@ class RayTester:
 
     def entry_at(self, pos: tuple[int, int]) -> int | None:
         for index, ep in enumerate(self.entries):
-            if math.dist(pos, ep.center) <= 16:
+            if math.dist(pos, ep.center) <= theme.s(16):
                 return index
         return None
 
@@ -178,12 +178,12 @@ class RayTester:
         if not drawn:
             return
         r, g, b = head_rgb
-        for radius, alpha in ((14, 60), (8, 120), (4, 220)):
+        for radius, alpha in ((theme.s(14), 60), (theme.s(8), 120), (theme.s(4), 220)):
             pygame.draw.circle(overlay, (r, g, b, alpha), (int(head[0]), int(head[1])), radius)
         surface.blit(overlay, (0, 0))
         if self._absorbed and self._progress >= self._total_len:
-            pygame.draw.circle(surface, (30, 30, 40), (int(head[0]), int(head[1])), 12)
-            pygame.draw.circle(surface, (90, 90, 110), (int(head[0]), int(head[1])), 12, width=2)
+            pygame.draw.circle(surface, (30, 30, 40), (int(head[0]), int(head[1])), theme.s(12))
+            pygame.draw.circle(surface, (90, 90, 110), (int(head[0]), int(head[1])), theme.s(12), width=max(2, theme.s(2)))
 
     def _glow_segment(
         self,
@@ -193,9 +193,9 @@ class RayTester:
         rgb: tuple[int, int, int],
     ) -> None:
         r, g, bl = rgb
-        for width, alpha in ((16, 34), (9, 70), (4, 150)):
+        for width, alpha in ((theme.s(16), 34), (theme.s(9), 70), (theme.s(4), 150)):
             pygame.draw.line(overlay, (r, g, bl, alpha), a, b, width)
-        pygame.draw.line(overlay, (*_lighten(rgb, 0.5), 235), a, b, 2)
+        pygame.draw.line(overlay, (*_lighten(rgb, 0.5), 235), a, b, max(2, theme.s(2)))
 
     def _fillet(
         self, overlay: pygame.Surface, point: tuple[float, float], rgb: tuple[int, int, int]
@@ -208,15 +208,16 @@ class RayTester:
         """
         r, g, bl = rgb
         px, py = int(point[0]), int(point[1])
-        for radius, alpha in ((8, 34), (4, 70), (2, 150)):
+        for radius, alpha in ((theme.s(8), 34), (theme.s(4), 70), (theme.s(2), 150)):
             pygame.draw.circle(overlay, (r, g, bl, alpha), (px, py), radius)
-        pygame.draw.circle(overlay, (*_lighten(rgb, 0.5), 235), (px, py), 1)
+        pygame.draw.circle(overlay, (*_lighten(rgb, 0.5), 235), (px, py), max(1, theme.s(1)))
 
     def _draw_entries(self, surface: pygame.Surface) -> None:
+        hot_r, idle_r = theme.s(15), theme.s(12)
         for index, ep in enumerate(self.entries):
             hot = index == self.hovered_entry
             color = theme.ENTRY_HOVER if hot else theme.ENTRY_IDLE
-            pygame.draw.circle(surface, color, ep.center, 15 if hot else 12)
-            pygame.draw.circle(surface, theme.BACKGROUND, ep.center, 15 if hot else 12, width=2)
+            pygame.draw.circle(surface, color, ep.center, hot_r if hot else idle_r)
+            pygame.draw.circle(surface, theme.BACKGROUND, ep.center, hot_r if hot else idle_r, width=max(2, theme.s(2)))
             label = self.font.render(ep.label, True, theme.ON_ACCENT if hot else theme.TEXT_DIM)
             surface.blit(label, label.get_rect(center=ep.center))

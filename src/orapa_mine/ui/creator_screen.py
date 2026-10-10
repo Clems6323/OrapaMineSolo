@@ -28,7 +28,7 @@ from orapa_mine.ui.timer_field import TimerField
 _BASE_PIECES = [cat.RED, cat.YELLOW, cat.BLUE, cat.WHITE_BIG, cat.WHITE_SMALL]
 # Panneau un peu plus large qu'en jeu : les boutons de taille de grille
 # (« Standard 10×8 ») y tiennent confortablement.
-_PANEL_WIDTH = theme.PANEL_WIDTH + 44
+_PANEL_WIDTH = theme.PANEL_WIDTH + theme.s(44)
 
 
 class CreatorScreen:
@@ -69,10 +69,9 @@ class CreatorScreen:
         self.back = False  # « Retour au menu »
         self.pending_resize = False  # demande de redimensionnement de la fenêtre
 
-        pygame.font.init()
-        self.font = pygame.font.SysFont("arial", 18)
-        self.font_small = pygame.font.SysFont("arial", 15)
-        self.font_big = pygame.font.SysFont("arial", 26, bold=True)
+        self.font = theme.font(18)
+        self.font_small = theme.font(15)
+        self.font_big = theme.font(26, bold=True)
 
         self.grid = Grid(width=10, height=8)  # remplacé par _rebuild
         self._rebuild(clear_gems=True)
@@ -133,46 +132,47 @@ class CreatorScreen:
         return [Slot(piece, rect) for piece, rect in zip(pieces, rects)]
 
     def _layout_panel(self) -> None:
+        s = theme.s
         self.panel = theme.PANEL.copy()
         px = self.panel.x
         self.panel_x = px
-        inner = px + 18
-        bw = self.panel.width - 36
+        inner = px + s(18)
+        bw = self.panel.width - s(36)
         top = self.panel.top
 
         # Réglages (haut du panneau) : taille de grille + extensions.
-        self.size_label_y = top + 46
-        sgap = 8
+        self.size_label_y = top + s(46)
+        sgap = s(8)
         sbw = (bw - 2 * sgap) // 3
         self.size_rects = [
-            pygame.Rect(inner + i * (sbw + sgap), top + 66, sbw, 32) for i in range(3)
+            pygame.Rect(inner + i * (sbw + sgap), top + s(66), sbw, s(32)) for i in range(3)
         ]
-        self.ext_label_y = top + 104
-        self.diamant_rect = pygame.Rect(inner, top + 126, 20, 20)
-        self.corps_rect = pygame.Rect(inner, top + 150, 20, 20)
-        self.wormhole_rect = pygame.Rect(inner, top + 174, 20, 20)
+        self.ext_label_y = top + s(104)
+        self.diamant_rect = pygame.Rect(inner, top + s(126), s(20), s(20))
+        self.corps_rect = pygame.Rect(inner, top + s(150), s(20), s(20))
+        self.wormhole_rect = pygame.Rect(inner, top + s(174), s(20), s(20))
         # Ligne cliquable (case + libellé). Largeur bornée avant la colonne de
         # droite (minuteur) pour ne pas empiéter dessus (#35).
-        ext_row_w = 168
-        self.diamant_row = pygame.Rect(inner, top + 124, ext_row_w, 24)
-        self.corps_row = pygame.Rect(inner, top + 148, ext_row_w, 24)
-        self.wormhole_row = pygame.Rect(inner, top + 172, ext_row_w, 24)
+        ext_row_w = s(168)
+        self.diamant_row = pygame.Rect(inner, top + s(124), ext_row_w, s(24))
+        self.corps_row = pygame.Rect(inner, top + s(148), ext_row_w, s(24))
+        self.wormhole_row = pygame.Rect(inner, top + s(172), ext_row_w, s(24))
         # Minuteur : colonne de droite (aligné sur les extensions) pour ne pas
         # allonger le panneau. Label + stepper − valeur + (éditable au clavier).
-        rx = inner + 176
+        rx = inner + s(176)
         self.timer_label_x = rx
         self.timer_label_y = self.ext_label_y
         self.timer.set_rects(
-            pygame.Rect(rx, top + 126, 26, 26),
-            pygame.Rect(rx + 30, top + 126, 68, 26),
-            pygame.Rect(rx + 102, top + 126, 26, 26),
+            pygame.Rect(rx, top + s(126), s(26), s(26)),
+            pygame.Rect(rx + s(30), top + s(126), s(68), s(26)),
+            pygame.Rect(rx + s(102), top + s(126), s(26), s(26)),
         )
-        self.status_y = top + 202
+        self.status_y = top + s(202)
 
         # Actions (bas du panneau).
-        self.save_rect = pygame.Rect(inner, self.panel.bottom - 152, bw, 40)
-        self.play_rect = pygame.Rect(inner, self.panel.bottom - 106, bw, 40)
-        self.back_rect = pygame.Rect(inner, self.panel.bottom - 54, bw, 40)
+        self.save_rect = pygame.Rect(inner, self.panel.bottom - s(152), bw, s(40))
+        self.play_rect = pygame.Rect(inner, self.panel.bottom - s(106), bw, s(40))
+        self.back_rect = pygame.Rect(inner, self.panel.bottom - s(54), bw, s(40))
 
     # --- Événements --------------------------------------------------------
 
@@ -405,7 +405,7 @@ class CreatorScreen:
         )
         surface.blit(
             self.font_small.render(hint, True, theme.TEXT_DIM),
-            (theme.PALETTE.x, self.size[1] - 24),
+            (theme.PALETTE.x, self.size[1] - theme.s(24)),
         )
 
     def _draw_ghost(self, surface: pygame.Surface) -> None:
@@ -423,7 +423,7 @@ class CreatorScreen:
 
     def _draw_palette(self, surface: pygame.Surface) -> None:
         title = self.font_small.render(i18n.t("Pièces", "Pieces"), True, theme.TEXT_DIM)
-        surface.blit(title, (theme.PALETTE.x + 4, theme.PALETTE.y - 22))
+        surface.blit(title, (theme.PALETTE.x + theme.s(4), theme.PALETTE.y - theme.s(22)))
         for slot in self.slots:
             board_render.draw_palette_slot(
                 surface, slot.rect, slot.piece,
@@ -433,10 +433,11 @@ class CreatorScreen:
             )
 
     def _draw_panel(self, surface: pygame.Surface) -> None:
+        s = theme.s
         pygame.draw.rect(surface, theme.PANEL_BG, self.panel, border_radius=8)
         pygame.draw.rect(surface, theme.BOARD_BORDER, self.panel, width=1, border_radius=8)
-        x = self.panel_x + 18
-        surface.blit(self.font_big.render(i18n.t("Mode créateur", "Creator mode"), True, theme.TEXT), (x, self.panel.top + 14))
+        x = self.panel_x + s(18)
+        surface.blit(self.font_big.render(i18n.t("Mode créateur", "Creator mode"), True, theme.TEXT), (x, self.panel.top + s(14)))
 
         # Réglages : taille de grille.
         surface.blit(self.font_small.render(i18n.t("Taille de la grille", "Grid size"), True, theme.TEXT), (x, self.size_label_y))
@@ -470,16 +471,16 @@ class CreatorScreen:
         else:
             status = i18n.t(f"Attention : {problem}", f"Warning: {problem}")
             color = theme.LOSE_COLOR
-        status_lines = _wrap(status, self.font_small, self.panel.width - 40)
+        status_lines = _wrap(status, self.font_small, self.panel.width - s(40))
         for i, text in enumerate(status_lines):
-            surface.blit(self.font_small.render(text, True, color), (x, self.status_y + i * 18))
+            surface.blit(self.font_small.render(text, True, color), (x, self.status_y + i * s(18)))
 
         # Résultat du dernier rayon de test (sous l'état, position dynamique).
-        ray_y = self.status_y + len(status_lines) * 18 + 10
+        ray_y = self.status_y + len(status_lines) * s(18) + s(10)
         ray_line = self.ray.last_test or i18n.t("Clique un point d'entrée pour tester le rayon.",
                                                 "Click an entry point to test the beam.")
-        for i, text in enumerate(_wrap(ray_line, self.font_small, self.panel.width - 40)):
-            surface.blit(self.font_small.render(text, True, theme.TEXT_DIM), (x, ray_y + i * 18))
+        for i, text in enumerate(_wrap(ray_line, self.font_small, self.panel.width - s(40))):
+            surface.blit(self.font_small.render(text, True, theme.TEXT_DIM), (x, ray_y + i * s(18)))
 
         self._button(surface, self.save_rect, (54, 96, 120), i18n.t("Sauvegarder la configuration", "Save configuration"))
         can_play = problem is None
@@ -493,8 +494,8 @@ class CreatorScreen:
         self._button(surface, self.back_rect, theme.SLOT_BG, i18n.t("Retour au menu", "Back to menu"))
 
         if self.message:
-            for i, text in enumerate(_wrap(self.message, self.font_small, self.panel.width - 40)):
-                surface.blit(self.font_small.render(text, True, self.message_color), (x, self.save_rect.top - 46 + i * 18))
+            for i, text in enumerate(_wrap(self.message, self.font_small, self.panel.width - s(40))):
+                surface.blit(self.font_small.render(text, True, self.message_color), (x, self.save_rect.top - s(46) + i * s(18)))
 
     def _button(self, surface: pygame.Surface, rect: pygame.Rect, bg, text: str, dim: bool = False) -> None:
         pygame.draw.rect(surface, bg, rect, border_radius=8)
@@ -507,9 +508,9 @@ class CreatorScreen:
         pygame.draw.rect(surface, theme.INPUT_BG, rect, border_radius=4)
         pygame.draw.rect(surface, theme.BOARD_BORDER, rect, width=1, border_radius=4)
         if on:
-            pygame.draw.rect(surface, theme.SLOT_SELECTED, rect.inflate(-8, -8), border_radius=2)
+            pygame.draw.rect(surface, theme.SLOT_SELECTED, rect.inflate(theme.s(-8), theme.s(-8)), border_radius=2)
         label = self.font_small.render(text, True, theme.TEXT)
-        surface.blit(label, (rect.right + 10, rect.y + 2))
+        surface.blit(label, (rect.right + theme.s(10), rect.y + theme.s(2)))
 
 
 def _wrap(text: str, font: pygame.font.Font, max_width: int) -> list[str]:

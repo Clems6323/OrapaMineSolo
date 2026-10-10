@@ -7,11 +7,81 @@ retoucher le rendu en un seul endroit.
 
 from __future__ import annotations
 
+import ctypes
+import os
 import re
+import sys
 
 import pygame
 
 from orapa_mine.model.gems import Direction, GemColor, GemKind, HalfCell, Position
+
+# --- Haute résolution (DPI) --------------------------------------------------
+#
+# Sur un écran haute densité, un process « DPI-unaware » est rendu par l'OS en
+# basse résolution puis **étiré** (flou). On rend donc le process DPI-aware
+# (plus d'étirement) et on met toute l'UI à l'échelle du facteur DPI via `s()`
+# et `font()` : la fenêtre garde sa taille apparente mais est dessinée en pixels
+# physiques (net). En mode headless (tests) : échelle 1, comportement inchangé.
+
+
+def _override_scale() -> float | None:
+    raw = os.environ.get("ORAPA_UI_SCALE")  # forçage manuel (ex. "2", "1.5")
+    if raw:
+        try:
+            return max(1.0, float(raw))
+        except ValueError:
+            pass
+    return None
+
+
+def _detect_ui_scale() -> float:
+    # Headless (tests) : pas de DPI-awareness, échelle 1 sauf forçage explicite.
+    if os.environ.get("SDL_VIDEODRIVER") == "dummy":
+        return _override_scale() or 1.0
+    # Run réel sous Windows : rendre le process DPI-aware (sinon l'OS étire la
+    # fenêtre → flou), AVANT toute création de fenêtre.
+    if sys.platform == "win32":
+        try:
+            try:  # PROCESS_PER_MONITOR_DPI_AWARE (2)
+                ctypes.windll.shcore.SetProcessDpiAwareness(2)
+            except Exception:
+                ctypes.windll.user32.SetProcessDPIAware()
+        except Exception:
+            pass
+    override = _override_scale()
+    if override is not None:
+        return override
+    if sys.platform == "win32":
+        try:
+            dpi = ctypes.windll.user32.GetDpiForSystem()
+            return max(1.0, round(dpi / 96.0 * 4) / 4)  # arrondi au quart (1.0, 1.25, …)
+        except Exception:
+            return 1.0
+    return 1.0
+
+
+UI_SCALE = _detect_ui_scale()
+
+
+def s(value: float) -> int:
+    """Met un nombre de pixels « logiques » à l'échelle DPI."""
+    return int(round(value * UI_SCALE))
+
+
+_FONT_CACHE: dict[tuple[int, bool], pygame.font.Font] = {}
+
+
+def font(size: int, bold: bool = False) -> pygame.font.Font:
+    """Police arial à l'échelle DPI (mise en cache)."""
+    key = (size, bold)
+    cached = _FONT_CACHE.get(key)
+    if cached is None:
+        pygame.font.init()
+        cached = pygame.font.SysFont("arial", s(size), bold=bold)
+        _FONT_CACHE[key] = cached
+    return cached
+
 
 # --- Dimensions (mise en page adaptative) -----------------------------------
 #
@@ -21,28 +91,30 @@ from orapa_mine.model.gems import Direction, GemColor, GemKind, HalfCell, Positi
 # défauts (remplacés dès le premier appel à `configure()` / `window_size()`).
 # La palette des pièces est une bande **verticale à gauche** du plateau.
 
-CELL = 72          # taille d'une case (px) — dynamique
-CELL_MAX = 64      # cases jamais plus grandes (évite des tuiles absurdes)
-CELL_MIN = 30      # cases jamais plus petites (grandes grilles / petits écrans)
-BOARD_X = 180      # coin haut-gauche du plateau (dynamique)
-BOARD_Y = 96
+# Toutes les dimensions sont exprimées en pixels « logiques » puis mises à
+# l'échelle DPI via s() (voir ci-dessus) pour un rendu net en haute résolution.
+CELL = s(72)          # taille d'une case (px) — dynamique
+CELL_MAX = s(64)      # cases jamais plus grandes (évite des tuiles absurdes)
+CELL_MIN = s(30)      # cases jamais plus petites (grandes grilles / petits écrans)
+BOARD_X = s(180)      # coin haut-gauche du plateau (dynamique)
+BOARD_Y = s(96)
 
-ENTRY_MARGIN = 46  # marge autour du plateau pour les points d'entrée
-PANEL_WIDTH = 320  # panneau d'informations à droite
-PANEL_MARGIN = 48  # espace entre le plateau et le panneau
-PALETTE_WIDTH = 88  # largeur de la bande de palette (à gauche)
+ENTRY_MARGIN = s(46)  # marge autour du plateau pour les points d'entrée
+PANEL_WIDTH = s(320)  # panneau d'informations à droite
+PANEL_MARGIN = s(48)  # espace entre le plateau et le panneau
+PALETTE_WIDTH = s(88)  # largeur de la bande de palette (à gauche)
 
-_PALETTE_GAP = 20   # espace entre la palette et le plateau
-_SLOT_H = 74        # hauteur d'une case de palette (fixe, pour garder des icônes mesurées)
-_SLOT_GAP = 8
-_LEFT_GUTTER = 22
-_RIGHT_GUTTER = 24
-_TOP_SPACE = 96     # au-dessus du plateau (= BOARD_Y : titre + entrées du haut)
-_BELOW_SPACE = 84   # sous le plateau (entrées du bas + ligne d'indices)
-_PANEL_MIN_H = 470  # hauteur minimale du panneau (sinon son contenu déborde)
-_SCREEN_MARGIN_W = 40   # marge écran (bords de fenêtre)
-_SCREEN_MARGIN_H = 96   # marge écran (barre des tâches + barre de titre)
-_FALLBACK_SCREEN = (1366, 768)
+_PALETTE_GAP = s(20)   # espace entre la palette et le plateau
+_SLOT_H = s(74)        # hauteur d'une case de palette (fixe, pour garder des icônes mesurées)
+_SLOT_GAP = s(8)
+_LEFT_GUTTER = s(22)
+_RIGHT_GUTTER = s(24)
+_TOP_SPACE = s(96)     # au-dessus du plateau (= BOARD_Y : titre + entrées du haut)
+_BELOW_SPACE = s(84)   # sous le plateau (entrées du bas + ligne d'indices)
+_PANEL_MIN_H = s(470)  # hauteur minimale du panneau (sinon son contenu déborde)
+_SCREEN_MARGIN_W = s(40)   # marge écran (bords de fenêtre)
+_SCREEN_MARGIN_H = s(96)   # marge écran (barre des tâches + barre de titre)
+_FALLBACK_SCREEN = (1366, 768)  # résolution physique de repli (déjà en pixels réels)
 
 # Géométrie calculée par `configure()`.
 PANEL = pygame.Rect(0, 0, PANEL_WIDTH, _PANEL_MIN_H)
@@ -77,7 +149,7 @@ def available_screen() -> tuple[int, int]:
             pass
     if w <= 0 or h <= 0:
         w, h = _FALLBACK_SCREEN
-    return max(760, w - _SCREEN_MARGIN_W), max(560, h - _SCREEN_MARGIN_H)
+    return max(s(760), w - _SCREEN_MARGIN_W), max(s(560), h - _SCREEN_MARGIN_H)
 
 
 def configure(cols: int, rows: int, panel_width: int | None = None) -> tuple[int, int]:
@@ -128,14 +200,14 @@ def palette_slots(count: int) -> list[pygame.Rect]:
     """
     if count <= 0:
         return []
-    pad = 6
+    pad = s(6)
     inner_h = PALETTE.height - 2 * pad
     slot_h = min(float(_SLOT_H), (inner_h - (count - 1) * _SLOT_GAP) / count)
-    slot_w = PALETTE_WIDTH - 6
+    slot_w = PALETTE_WIDTH - s(6)
     rects: list[pygame.Rect] = []
     y = PALETTE.y + pad
     for _ in range(count):
-        rects.append(pygame.Rect(PALETTE.x + 3, int(y), slot_w, int(slot_h)))
+        rects.append(pygame.Rect(PALETTE.x + s(3), int(y), slot_w, int(slot_h)))
         y += slot_h + _SLOT_GAP
     return rects
 
