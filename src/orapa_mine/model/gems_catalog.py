@@ -114,6 +114,9 @@ WHITE_SMALL = _piece(
     "blanc-petit", GemColor.WHITE, GemKind.NORMAL, [(0, 1), (1, 2), (2, 1), (1, 0)]
 )
 DIAMOND = _piece("diamant", None, GemKind.DIAMOND, [(0, 1), (2, 1), (1, 0)])
+# Filtre : même forme que le petit losange blanc (boîte 2×2, 4 arêtes à 45°).
+# Dévie le rayon et remet sa couleur à transparent (efface les couleurs).
+FILTER = _piece("filtre", None, GemKind.FILTER, [(0, 1), (1, 2), (2, 1), (1, 0)])
 BLACK_BODY = _piece(
     "corps-noir", None, GemKind.BLACK_BODY, [(0, 0), (2, 0), (2, 1), (0, 1)]
 )
@@ -140,5 +143,5 @@ def full_set() -> list[Piece]:
 
 ALL_PIECES: dict[str, Piece] = {
     p.name: p
-    for p in (RED, BLUE, WHITE_BIG, YELLOW, WHITE_SMALL, DIAMOND, BLACK_BODY, WORMHOLE)
+    for p in (RED, BLUE, WHITE_BIG, YELLOW, WHITE_SMALL, DIAMOND, FILTER, BLACK_BODY, WORMHOLE)
 }

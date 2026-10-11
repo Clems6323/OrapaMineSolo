@@ -15,7 +15,7 @@ from orapa_mine.model.serialization import LoadedGame
 from orapa_mine.ui import dialogs, i18n, lang_toggle, theme, theme_toggle
 from orapa_mine.ui.timer_field import TimerField
 
-SIZE = (760, 720)  # taille logique ; mise à l'échelle DPI dans __init__
+SIZE = (760, 758)  # taille logique ; mise à l'échelle DPI dans __init__
 
 
 class ConfigScreen:
@@ -26,6 +26,7 @@ class ConfigScreen:
         self.diamant = False
         self.corps_noir = False
         self.wormhole = False
+        self.filter = False
         self.sizes = [("Petit", 8, 6), ("Standard", 10, 8), ("Grand", 12, 10)]
         self.size_index = 1
         self.timer = TimerField()  # minuteur optionnel (0 = désactivé)
@@ -42,30 +43,32 @@ class ConfigScreen:
         self.diamant_rect = pygame.Rect(s(170), s(228), s(26), s(26))
         self.corps_rect = pygame.Rect(s(170), s(266), s(26), s(26))
         self.wormhole_rect = pygame.Rect(s(170), s(304), s(26), s(26))
+        self.filter_rect = pygame.Rect(s(170), s(342), s(26), s(26))
         # Zone cliquable de chaque ligne (case + libellé) : on peut cocher en
         # cliquant la case OU le texte (#35).
         self.diamant_row = self.diamant_rect.union(pygame.Rect(s(170), s(228), s(360), s(26)))
         self.corps_row = self.corps_rect.union(pygame.Rect(s(170), s(266), s(360), s(26)))
         self.wormhole_row = self.wormhole_rect.union(pygame.Rect(s(170), s(304), s(360), s(26)))
+        self.filter_row = self.filter_rect.union(pygame.Rect(s(170), s(342), s(360), s(26)))
         bw, gap = s(180), s(20)
         total = 3 * bw + 2 * gap
         start_x = (self.size[0] - total) // 2
         self.size_rects = [
-            pygame.Rect(start_x + i * (bw + gap), s(384), bw, s(60)) for i in range(3)
+            pygame.Rect(start_x + i * (bw + gap), s(422), bw, s(60)) for i in range(3)
         ]
         # Minuteur (stepper − valeur + éditable), centré sous le total de gemmes.
         self.timer.set_rects(
-            pygame.Rect(s(271), s(542), s(44), s(40)),
-            pygame.Rect(s(325), s(542), s(110), s(40)),
-            pygame.Rect(s(445), s(542), s(44), s(40)),
+            pygame.Rect(s(271), s(580), s(44), s(40)),
+            pygame.Rect(s(325), s(580), s(110), s(40)),
+            pygame.Rect(s(445), s(580), s(44), s(40)),
         )
 
         bw2, gap2 = s(224), s(16)
         total2 = 3 * bw2 + 2 * gap2
         bx = (self.size[0] - total2) // 2
-        self.start_rect = pygame.Rect(bx, s(614), bw2, s(58))
-        self.creator_rect = pygame.Rect(bx + bw2 + gap2, s(614), bw2, s(58))
-        self.load_rect = pygame.Rect(bx + 2 * (bw2 + gap2), s(614), bw2, s(58))
+        self.start_rect = pygame.Rect(bx, s(652), bw2, s(58))
+        self.creator_rect = pygame.Rect(bx + bw2 + gap2, s(652), bw2, s(58))
+        self.load_rect = pygame.Rect(bx + 2 * (bw2 + gap2), s(652), bw2, s(58))
 
     # --- Événements --------------------------------------------------------
 
@@ -89,6 +92,8 @@ class ConfigScreen:
             self.corps_noir = not self.corps_noir
         elif self.wormhole_row.collidepoint(p):
             self.wormhole = not self.wormhole
+        elif self.filter_row.collidepoint(p):
+            self.filter = not self.filter
         elif self.start_rect.collidepoint(p):
             self._begin()
         elif self.creator_rect.collidepoint(p):
@@ -114,6 +119,8 @@ class ConfigScreen:
         pieces = [cat.RED, cat.YELLOW, cat.BLUE, cat.WHITE_BIG, cat.WHITE_SMALL]
         if self.diamant:
             pieces.append(cat.DIAMOND)
+        if self.filter:
+            pieces.append(cat.FILTER)
         if self.corps_noir:
             pieces.append(cat.BLACK_BODY)
         if self.wormhole:
@@ -158,8 +165,10 @@ class ConfigScreen:
                        i18n.t("Corps noir (absorbe le rayon)", "Black body (absorbs the beam)"))
         self._checkbox(surface, self.wormhole_rect, self.wormhole,
                        i18n.t("Trou de ver ×2 (téléporte le rayon)", "Wormhole ×2 (teleports the beam)"))
+        self._checkbox(surface, self.filter_rect, self.filter,
+                       i18n.t("Filtre (remet le rayon transparent)", "Filter (resets the beam to transparent)"))
 
-        surface.blit(self.font.render(i18n.t("Taille de la grille", "Grid size"), True, theme.TEXT), (s(100), s(344)))
+        surface.blit(self.font.render(i18n.t("Taille de la grille", "Grid size"), True, theme.TEXT), (s(100), s(382)))
         for i, rect in enumerate(self.size_rects):
             selected = i == self.size_index
             bg = theme.SLOT_SELECTED if selected else theme.SLOT_BG
@@ -172,14 +181,15 @@ class ConfigScreen:
             surface.blit(n, n.get_rect(centerx=rect.centerx, y=rect.y + s(10)))
             surface.blit(d, d.get_rect(centerx=rect.centerx, y=rect.y + s(34)))
 
-        total = 5 + (1 if self.diamant else 0) + (1 if self.corps_noir else 0) + (2 if self.wormhole else 0)
+        total = (5 + (1 if self.diamant else 0) + (1 if self.filter else 0)
+                 + (1 if self.corps_noir else 0) + (2 if self.wormhole else 0))
         count = self.font_small.render(
             i18n.t(f"Total : {total} gemmes à trouver", f"Total: {total} gems to find"), True, theme.TEXT_DIM)
-        surface.blit(count, count.get_rect(centerx=cx, y=s(486)))
+        surface.blit(count, count.get_rect(centerx=cx, y=s(524)))
 
         # Minuteur (optionnel) : label + stepper − valeur + (éditable au clavier).
         timer_label = self.font.render(i18n.t("Minuteur", "Timer"), True, theme.TEXT)
-        surface.blit(timer_label, timer_label.get_rect(centerx=cx, y=s(512)))
+        surface.blit(timer_label, timer_label.get_rect(centerx=cx, y=s(550)))
         self.timer.draw(surface, self.font, i18n.t("Désactivé", "Off"))
 
         self._button(surface, self.start_rect, (54, 120, 90), i18n.t("Commencer", "Start"))
@@ -188,7 +198,7 @@ class ConfigScreen:
 
         if self.error:
             err = self.font_small.render(self.error, True, theme.LOSE_COLOR)
-            surface.blit(err, err.get_rect(centerx=cx, y=s(684)))
+            surface.blit(err, err.get_rect(centerx=cx, y=s(722)))
 
     def _button(self, surface: pygame.Surface, rect: pygame.Rect, bg, text: str) -> None:
         pygame.draw.rect(surface, bg, rect, border_radius=10)

@@ -47,12 +47,14 @@ class CreatorScreen:
         diamant: bool = False,
         corps_noir: bool = False,
         wormhole: bool = False,
+        filter: bool = False,
         timer_minutes: int = 0,
     ) -> None:
         self.size_index = size_index
         self.diamant = diamant
         self.corps_noir = corps_noir
         self.wormhole = wormhole
+        self.filter = filter
         self.timer = TimerField(timer_minutes)  # minuteur optionnel (0 = désactivé)
 
         # Sélection / pose de pièces (même interaction que l'écran de jeu).
@@ -88,6 +90,8 @@ class CreatorScreen:
         pieces = list(_BASE_PIECES)
         if self.diamant:
             pieces.append(cat.DIAMOND)
+        if self.filter:
+            pieces.append(cat.FILTER)
         if self.corps_noir:
             pieces.append(cat.BLACK_BODY)
         if self.wormhole:
@@ -151,12 +155,14 @@ class CreatorScreen:
         self.diamant_rect = pygame.Rect(inner, top + s(126), s(20), s(20))
         self.corps_rect = pygame.Rect(inner, top + s(150), s(20), s(20))
         self.wormhole_rect = pygame.Rect(inner, top + s(174), s(20), s(20))
+        self.filter_rect = pygame.Rect(inner, top + s(198), s(20), s(20))
         # Ligne cliquable (case + libellé). Largeur bornée avant la colonne de
         # droite (minuteur) pour ne pas empiéter dessus (#35).
         ext_row_w = s(168)
         self.diamant_row = pygame.Rect(inner, top + s(124), ext_row_w, s(24))
         self.corps_row = pygame.Rect(inner, top + s(148), ext_row_w, s(24))
         self.wormhole_row = pygame.Rect(inner, top + s(172), ext_row_w, s(24))
+        self.filter_row = pygame.Rect(inner, top + s(196), ext_row_w, s(24))
         # Minuteur : colonne de droite (aligné sur les extensions) pour ne pas
         # allonger le panneau. Label + stepper − valeur + (éditable au clavier).
         rx = inner + s(176)
@@ -167,7 +173,7 @@ class CreatorScreen:
             pygame.Rect(rx + s(30), top + s(126), s(68), s(26)),
             pygame.Rect(rx + s(102), top + s(126), s(26), s(26)),
         )
-        self.status_y = top + s(202)
+        self.status_y = top + s(226)
 
         # Actions (bas du panneau).
         self.save_rect = pygame.Rect(inner, self.panel.bottom - s(152), bw, s(40))
@@ -218,6 +224,10 @@ class CreatorScreen:
             return
         if self.wormhole_row.collidepoint(pos):
             self.wormhole = not self.wormhole
+            self._rebuild(clear_gems=False)
+            return
+        if self.filter_row.collidepoint(pos):
+            self.filter = not self.filter
             self._rebuild(clear_gems=False)
             return
         for i, rect in enumerate(self.size_rects):
@@ -456,6 +466,7 @@ class CreatorScreen:
         self._checkbox(surface, self.diamant_rect, self.diamant, i18n.t("Diamant", "Diamond"))
         self._checkbox(surface, self.corps_rect, self.corps_noir, i18n.t("Corps noir", "Black body"))
         self._checkbox(surface, self.wormhole_rect, self.wormhole, i18n.t("Trou de ver (×2)", "Wormhole (×2)"))
+        self._checkbox(surface, self.filter_rect, self.filter, i18n.t("Filtre", "Filter"))
 
         # Minuteur (optionnel), colonne de droite.
         surface.blit(self.font_small.render(i18n.t("Minuteur", "Timer"), True, theme.TEXT),

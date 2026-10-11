@@ -37,6 +37,7 @@ _HISTORY_ROW_H = theme.s(22)  # hauteur d'une ligne d'historique (px, échelle D
 # une question de case. Clés = libellés français, traduits par `i18n.piece`.
 _KIND_PIECE_NAME: dict[GemKind, str] = {
     GemKind.DIAMOND: "diamant",
+    GemKind.FILTER: "filtre",
     GemKind.BLACK_BODY: "corps-noir",
     GemKind.WORMHOLE: "trou-de-ver",
 }

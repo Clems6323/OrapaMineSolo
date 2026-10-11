@@ -132,8 +132,15 @@ def _draw_slot_icon(
         ox = rect.centerx - cols * cell_size / 2
         oy = rect.top + theme.s(8)
         base = faded_piece_color(piece) if faded else piece_color(piece)
-        for pos, half in cells:
-            pygame.draw.polygon(surface, base, theme.half_cell_polygon_at(pos, half, ox, oy, cell_size))
+        if piece.kind is GemKind.FILTER:  # icône translucide
+            overlay = pygame.Surface(rect.size, pygame.SRCALPHA)
+            for pos, half in cells:
+                poly = theme.half_cell_polygon_at(pos, half, ox - rect.x, oy - rect.y, cell_size)
+                pygame.draw.polygon(overlay, (*base, theme.FILTER_ALPHA), poly)
+            surface.blit(overlay, rect.topleft)
+        else:
+            for pos, half in cells:
+                pygame.draw.polygon(surface, base, theme.half_cell_polygon_at(pos, half, ox, oy, cell_size))
     label = i18n.piece(piece.color.value if piece.color else piece.name)
     name = font.render(label, True, theme.TEXT_DIM)
     surface.blit(name, name.get_rect(centerx=rect.centerx, bottom=rect.bottom - theme.s(4)))
@@ -146,6 +153,9 @@ def draw_gems(surface: pygame.Surface, grid: Grid) -> None:
             for pos in gem.absolute_cells():
                 draw_wormhole(surface, theme.cell_center(pos), theme.CELL)
             continue
+        if gem.kind is GemKind.FILTER:  # couleur du diamant, translucide
+            _draw_translucent(surface, gem.absolute_cells(), piece_color(gem.piece), theme.FILTER_ALPHA)
+            continue
         base = piece_color(gem.piece)
         for pos, half in gem.absolute_cells().items():
             poly = theme.half_cell_polygon(pos, half)
@@ -153,3 +163,13 @@ def draw_gems(surface: pygame.Surface, grid: Grid) -> None:
             pygame.draw.polygon(surface, lighten(base, 0.35), poly, width=1)
         for pos, half in gem.absolute_cells().items():
             pygame.draw.polygon(surface, darken(base, 0.4), theme.half_cell_polygon(pos, half), width=1)
+
+
+def _draw_translucent(surface, cells, base, alpha) -> None:
+    """Dessine une pièce (demi-cases) translucide sur le plateau (pour le filtre)."""
+    overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
+    for pos, half in cells.items():
+        poly = theme.half_cell_polygon(pos, half)
+        pygame.draw.polygon(overlay, (*base, alpha), poly)
+        pygame.draw.polygon(overlay, (*lighten(base, 0.35), min(255, alpha + 70)), poly, width=1)
+    surface.blit(overlay, (0, 0))

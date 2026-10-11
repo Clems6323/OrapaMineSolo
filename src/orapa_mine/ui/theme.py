@@ -254,6 +254,9 @@ def palette_slots(count: int) -> list[pygame.Rect]:
 # Couleur de texte/éléments posés SUR l'accent doré (lisible dans les 2 modes).
 ON_ACCENT = (26, 28, 36)
 
+# Opacité du filtre (couleur du diamant dessinée translucide : « plus de transparence »).
+FILTER_ALPHA = 115
+
 _DARK = {
     "BACKGROUND": (16, 18, 27),
     "BOARD_BG": (26, 30, 44),
@@ -282,6 +285,7 @@ _DARK = {
         GemColor.BLUE: (66, 122, 214),
         GemColor.WHITE: (232, 234, 240),
         GemKind.DIAMOND: (150, 205, 220),
+        GemKind.FILTER: (150, 205, 220),  # couleur du diamant, dessinée translucide
         GemKind.BLACK_BODY: (8, 8, 12),
         GemKind.WORMHOLE: (14, 14, 22),
     },
@@ -321,6 +325,7 @@ _LIGHT = {
         GemColor.BLUE: (46, 104, 200),
         GemColor.WHITE: (250, 251, 254),
         GemKind.DIAMOND: (96, 170, 196),
+        GemKind.FILTER: (96, 170, 196),     # couleur du diamant, dessinée translucide
         GemKind.BLACK_BODY: (22, 22, 30),   # reste « noir »
         GemKind.WORMHOLE: (22, 22, 30),
     },

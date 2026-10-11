@@ -118,7 +118,9 @@ def fire_beam(grid: Grid, entry: Position, direction: Direction) -> BeamResult:
     last_inside = entry
 
     def collect(gem) -> None:
-        if gem.kind is not GemKind.DIAMOND and gem.color is not None:
+        if gem.kind is GemKind.FILTER:
+            colors.clear()  # le filtre remet le rayon à transparent
+        elif gem.kind is not GemKind.DIAMOND and gem.color is not None:
             colors.add(gem.color)
 
     def add_vertex(row: float, col: float, segment_color: str | None) -> None:

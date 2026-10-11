@@ -104,7 +104,7 @@ bord gauche A–H, le chiffre le bord haut 1–10). Réponse :
 - case vide → « rien » ;
 - gemme colorée (même si la case n'est qu'à moitié occupée par la gemme) → sa
   **couleur** ;
-- pièce d'**extension** (diamant, corps noir, trou de ver) → le **nom de la
+- pièce d'**extension** (diamant, filtre, corps noir, trou de ver) → le **nom de la
   pièce** (et non une couleur).
 
 Cette question **consomme aussi un tour** (donc compte dans le score solo).
@@ -156,6 +156,11 @@ les diagrammes du livret :
 - **Diamant** : gemme transparente. Dévie le rayon comme une arête diagonale
   mais **ne modifie jamais sa couleur** (si le rayon touche le diamant *et*
   d'autres gemmes, la couleur ne dépend que des autres).
+- **Filtre** (extension ajoutée, non officielle) : **même forme que le petit
+  losange blanc** (boîte 2×2, 4 arêtes à 45°). Dévie le rayon comme une arête
+  diagonale et **remet sa couleur à transparent** (efface toutes les couleurs
+  collectées jusque-là ; le rayon peut ensuite re-collecter des couleurs).
+  Dessin : losange de la **couleur du diamant mais translucide**.
 - **Corps noir** : **absorbe** le rayon sans le renvoyer. Réponse du maître du
   jeu : « Le signal a été absorbé » (pas de point de sortie ; idem si on
   demande son contenu). Posé sur sa **base rectangulaire 1×2, pointe vers le
