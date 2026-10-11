@@ -136,6 +136,7 @@ PANEL_MARGIN = s(48)  # espace entre le plateau et le panneau
 PALETTE_WIDTH = s(88)  # largeur de la bande de palette (à gauche)
 
 _PALETTE_GAP = s(20)   # espace entre la palette et le plateau
+_PALETTE_COL_GAP = s(10)  # espace entre deux colonnes de palette (classiques / extensions)
 _SLOT_H = s(74)        # hauteur d'une case de palette (fixe, pour garder des icônes mesurées)
 _SLOT_GAP = s(8)
 _LEFT_GUTTER = s(22)
@@ -183,22 +184,32 @@ def available_screen() -> tuple[int, int]:
     return max(s(760), w - _SCREEN_MARGIN_W), max(s(560), h - _SCREEN_MARGIN_H)
 
 
-def configure(cols: int, rows: int, panel_width: int | None = None) -> tuple[int, int]:
+def palette_region_width(palette_cols: int) -> int:
+    """Largeur totale de la zone palette pour `palette_cols` colonnes côte à côte."""
+    cols = max(1, palette_cols)
+    return cols * PALETTE_WIDTH + (cols - 1) * _PALETTE_COL_GAP
+
+
+def configure(
+    cols: int, rows: int, panel_width: int | None = None, palette_cols: int = 1
+) -> tuple[int, int]:
     """Recalcule la mise en page pour une grille `cols`×`rows` tenant à l'écran.
 
     Choisit la plus grande taille de case (≤ CELL_MAX) telle que plateau +
     palette (gauche) + panneau (droite) tiennent dans l'écran disponible, puis
     positionne le plateau, la palette et le panneau. `panel_width` permet à un
-    écran (p. ex. le mode créateur) d'élargir son panneau ; la fenêtre s'ajuste.
+    écran (p. ex. le mode créateur) d'élargir son panneau ; `palette_cols` élargit
+    la palette (2 colonnes : classiques | extensions). La fenêtre s'ajuste.
     Renvoie la taille fenêtre.
     """
     global CELL, BOARD_X, BOARD_Y, PANEL, PALETTE, WINDOW
     pw = PANEL_WIDTH if panel_width is None else panel_width
+    region_w = palette_region_width(palette_cols)
     avail_w, avail_h = available_screen()
     pad = ENTRY_MARGIN  # place pour les points d'entrée de chaque côté
 
     fixed_w = (
-        _LEFT_GUTTER + PALETTE_WIDTH + _PALETTE_GAP + pad
+        _LEFT_GUTTER + region_w + _PALETTE_GAP + pad
         + pad + PANEL_MARGIN + pw + _RIGHT_GUTTER
     )
     fixed_h = _TOP_SPACE + _BELOW_SPACE
@@ -207,40 +218,44 @@ def configure(cols: int, rows: int, panel_width: int | None = None) -> tuple[int
     CELL = int(max(CELL_MIN, min(CELL_MAX, cell_w, cell_h)))
 
     BOARD_Y = _TOP_SPACE
-    BOARD_X = _LEFT_GUTTER + PALETTE_WIDTH + _PALETTE_GAP + pad
+    BOARD_X = _LEFT_GUTTER + region_w + _PALETTE_GAP + pad
     board_w, board_h = cols * CELL, rows * CELL
     panel_h = max(board_h, _PANEL_MIN_H)
     panel_x = BOARD_X + board_w + pad + PANEL_MARGIN
 
     PANEL = pygame.Rect(panel_x, BOARD_Y, pw, panel_h)
-    PALETTE = pygame.Rect(_LEFT_GUTTER, BOARD_Y, PALETTE_WIDTH, panel_h)
+    PALETTE = pygame.Rect(_LEFT_GUTTER, BOARD_Y, region_w, panel_h)
     WINDOW = (panel_x + pw + _RIGHT_GUTTER, BOARD_Y + panel_h + _BELOW_SPACE)
     return WINDOW
 
 
-def window_size(cols: int, rows: int, panel_width: int | None = None) -> tuple[int, int]:
+def window_size(
+    cols: int, rows: int, panel_width: int | None = None, palette_cols: int = 1
+) -> tuple[int, int]:
     """Configure la mise en page pour `cols`×`rows` et renvoie la taille fenêtre."""
-    return configure(cols, rows, panel_width)
+    return configure(cols, rows, panel_width, palette_cols)
 
 
-def palette_slots(count: int) -> list[pygame.Rect]:
-    """Rectangles des `count` cases de la palette, empilés verticalement à gauche.
-
-    Les cases ont une hauteur fixe (`_SLOT_H`) pour rester mesurées quelle que
-    soit la taille du plateau ; elles ne rétrécissent que si l'espace manque.
+def palette_columns(counts: list[int]) -> list[list[pygame.Rect]]:
+    """Rectangles des cases de palette, en colonnes côte à côte (une par entrée de
+    `counts`). La hauteur de case est fixée par la colonne la plus remplie, pour
+    garder des icônes de **même taille** d'une colonne à l'autre.
     """
-    if count <= 0:
-        return []
+    rows = max([c for c in counts if c > 0] + [1])
     pad = s(6)
     inner_h = PALETTE.height - 2 * pad
-    slot_h = min(float(_SLOT_H), (inner_h - (count - 1) * _SLOT_GAP) / count)
+    slot_h = min(float(_SLOT_H), (inner_h - (rows - 1) * _SLOT_GAP) / rows)
     slot_w = PALETTE_WIDTH - s(6)
-    rects: list[pygame.Rect] = []
-    y = PALETTE.y + pad
-    for _ in range(count):
-        rects.append(pygame.Rect(PALETTE.x + s(3), int(y), slot_w, int(slot_h)))
-        y += slot_h + _SLOT_GAP
-    return rects
+    columns: list[list[pygame.Rect]] = []
+    for col, count in enumerate(counts):
+        cx = PALETTE.x + col * (PALETTE_WIDTH + _PALETTE_COL_GAP) + s(3)
+        rects: list[pygame.Rect] = []
+        y = PALETTE.y + pad
+        for _ in range(max(0, count)):
+            rects.append(pygame.Rect(int(cx), int(y), slot_w, int(slot_h)))
+            y += slot_h + _SLOT_GAP
+        columns.append(rects)
+    return columns
 
 
 # --- Couleurs (mode sombre / clair) ------------------------------------------

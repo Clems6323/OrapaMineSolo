@@ -16,7 +16,7 @@ from __future__ import annotations
 import pygame
 
 from orapa_mine.ai.generator import configuration_problems, placement_is_legal
-from orapa_mine.model.gems import Piece, PlacedGem, Position
+from orapa_mine.model.gems import GemKind, Piece, PlacedGem, Position
 from orapa_mine.model import gems_catalog as cat
 from orapa_mine.model import serialization
 from orapa_mine.model.grid import Grid
@@ -120,7 +120,10 @@ class CreatorScreen:
             self.placed_counts[gem.piece.name] = self.placed_counts.get(gem.piece.name, 0) + 1
         self.selected = None
         old_size = getattr(self, "size", None)
-        self.size = theme.window_size(width, height, panel_width=_PANEL_WIDTH)
+        # Palette sur deux colonnes (classiques | extensions) dès qu'une extension
+        # est présente → fenêtre plus large, icônes plus grandes.
+        palette_cols = 2 if any(p.kind is not GemKind.NORMAL for p in self.palette_pieces) else 1
+        self.size = theme.window_size(width, height, panel_width=_PANEL_WIDTH, palette_cols=palette_cols)
         self.ray = RayTester(width, height, self.font_small)
         self.slots = self._build_palette(self.palette_pieces)
         self._layout_panel()
@@ -132,8 +135,14 @@ class CreatorScreen:
     # --- Construction ------------------------------------------------------
 
     def _build_palette(self, pieces: list[Piece]) -> list[Slot]:
-        rects = theme.palette_slots(len(pieces))
-        return [Slot(piece, rect) for piece, rect in zip(pieces, rects)]
+        base = [p for p in pieces if p.kind is GemKind.NORMAL]
+        ext = [p for p in pieces if p.kind is not GemKind.NORMAL]
+        counts = [len(base), len(ext)] if ext else [len(base)]
+        columns = theme.palette_columns(counts)
+        pairs = list(zip(base, columns[0]))
+        if ext:
+            pairs += list(zip(ext, columns[1]))
+        return [Slot(piece, rect) for piece, rect in pairs]
 
     def _layout_panel(self) -> None:
         s = theme.s
@@ -434,6 +443,10 @@ class CreatorScreen:
     def _draw_palette(self, surface: pygame.Surface) -> None:
         title = self.font_small.render(i18n.t("Pièces", "Pieces"), True, theme.TEXT_DIM)
         surface.blit(title, (theme.PALETTE.x + theme.s(4), theme.PALETTE.y - theme.s(22)))
+        ext_slots = [sl for sl in self.slots if sl.piece.kind is not GemKind.NORMAL]
+        if ext_slots:  # en-tête de la 2e colonne
+            head = self.font_small.render(i18n.t("Extensions", "Extensions"), True, theme.TEXT_DIM)
+            surface.blit(head, (ext_slots[0].rect.x + theme.s(1), theme.PALETTE.y - theme.s(22)))
         for slot in self.slots:
             board_render.draw_palette_slot(
                 surface, slot.rect, slot.piece,

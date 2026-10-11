@@ -20,8 +20,10 @@ le rayon) et le **trou de ver** (deux cases jumelles : le rayon entré dans l'un
 ressort de l'autre dans la même direction).
 
 La fenêtre s'adapte à l'écran : la taille des cases est choisie automatiquement
-pour que le plateau tienne sur ton moniteur, et la palette des pièces est une
-bande verticale à gauche du plateau (panneau d'infos à droite).
+pour que le plateau tienne sur ton moniteur, et la palette des pièces est à
+gauche du plateau (panneau d'infos à droite). Dès qu'une extension est activée,
+la palette passe sur **deux colonnes** (pièces classiques | extensions) pour
+garder des icônes bien lisibles — la fenêtre s'élargit en conséquence.
 
 **Écrans haute résolution (DPI / Retina)** : le jeu se rend en pixels physiques
 et met toute l'interface à l'échelle du facteur d'écran — net, sans flou. Sous
