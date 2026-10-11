@@ -116,6 +116,20 @@ def test_timer_defaults_to_zero_when_absent():
     assert loaded.timer_minutes == 0
 
 
+def test_round_trip_with_filter():
+    hidden = Grid(width=10, height=8)
+    hidden.place_gem(cat.FILTER.at(Position(2, 2)))
+    palette = cat.base_set() + [cat.FILTER]
+    data = serialization.to_dict(
+        width=10, height=8, palette_pieces=palette, hidden_grid=hidden,
+        include_progress=False,
+    )
+    loaded = serialization.from_dict(data)
+    worms = [g for g in loaded.game.hidden_grid.gems if g.piece.name == "filtre"]
+    assert len(worms) == 1
+    assert [p.name for p in loaded.palette_pieces] == [p.name for p in palette]
+
+
 def test_unknown_version_is_rejected():
     with pytest.raises(ValueError):
         serialization.from_dict({"version": 999, "width": 10, "height": 8, "palette": [], "hidden": []})

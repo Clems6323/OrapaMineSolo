@@ -10,13 +10,27 @@ from orapa_mine.ui.creator_screen import CreatorScreen
 
 
 def test_toggling_extension_keeps_same_window():
-    cr = CreatorScreen(size_index=1)
+    # Avec une extension déjà active (palette à 2 colonnes), (dé)cocher une AUTRE
+    # extension garde la même fenêtre → aucun set_mode → pas de flash (#38).
+    cr = CreatorScreen(size_index=1, diamant=True)
     cr.pending_resize = False
     before = cr.size
-    cr.diamant = not cr.diamant          # (dé)coche le diamant
+    cr.corps_noir = not cr.corps_noir
     cr._rebuild(clear_gems=False)
-    assert cr.size == before             # même fenêtre
-    assert cr.pending_resize is False    # aucun set_mode demandé -> pas de flash
+    assert cr.size == before
+    assert cr.pending_resize is False
+
+
+def test_first_extension_widens_window():
+    # Passer de 0 à 1 extension ajoute la 2e colonne de palette : la fenêtre
+    # s'élargit vraiment (resize légitime, pas un flash inutile).
+    cr = CreatorScreen(size_index=1)
+    cr.pending_resize = False
+    before_w = cr.size[0]
+    cr.diamant = True
+    cr._rebuild(clear_gems=False)
+    assert cr.size[0] > before_w
+    assert cr.pending_resize is True
 
 
 def test_changing_grid_size_requests_resize():

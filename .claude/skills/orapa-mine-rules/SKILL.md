@@ -29,6 +29,9 @@ subsiste, notamment sur les points `TODO-VALIDATION`).
   sa case d'entrée (conséquence géométrique, pas une "pièce mur" dédiée).
 - **Diamant (extension)** : dévie comme une arête diagonale, mais **ne teinte
   jamais le rayon**.
+- **Filtre (extension)** : même forme que le petit losange blanc (dévie comme
+  une arête diagonale) mais **remet le rayon à transparent** (`colors.clear()`
+  dans `beam.collect`). Dessiné en losange couleur diamant **translucide**.
 - **Corps noir (extension)** : absorbe le rayon. Pas de case de sortie, pas
   de couleur — résultat "absorbé" (`exit_point = None`). Toujours posé base
   rectangulaire, pointe vers le haut.

@@ -16,7 +16,7 @@ from __future__ import annotations
 import pygame
 
 from orapa_mine.ai.generator import configuration_problems, placement_is_legal
-from orapa_mine.model.gems import Piece, PlacedGem, Position
+from orapa_mine.model.gems import GemKind, Piece, PlacedGem, Position
 from orapa_mine.model import gems_catalog as cat
 from orapa_mine.model import serialization
 from orapa_mine.model.grid import Grid
@@ -47,12 +47,14 @@ class CreatorScreen:
         diamant: bool = False,
         corps_noir: bool = False,
         wormhole: bool = False,
+        filter: bool = False,
         timer_minutes: int = 0,
     ) -> None:
         self.size_index = size_index
         self.diamant = diamant
         self.corps_noir = corps_noir
         self.wormhole = wormhole
+        self.filter = filter
         self.timer = TimerField(timer_minutes)  # minuteur optionnel (0 = désactivé)
 
         # Sélection / pose de pièces (même interaction que l'écran de jeu).
@@ -88,6 +90,8 @@ class CreatorScreen:
         pieces = list(_BASE_PIECES)
         if self.diamant:
             pieces.append(cat.DIAMOND)
+        if self.filter:
+            pieces.append(cat.FILTER)
         if self.corps_noir:
             pieces.append(cat.BLACK_BODY)
         if self.wormhole:
@@ -116,7 +120,10 @@ class CreatorScreen:
             self.placed_counts[gem.piece.name] = self.placed_counts.get(gem.piece.name, 0) + 1
         self.selected = None
         old_size = getattr(self, "size", None)
-        self.size = theme.window_size(width, height, panel_width=_PANEL_WIDTH)
+        # Palette sur deux colonnes (classiques | extensions) dès qu'une extension
+        # est présente → fenêtre plus large, icônes plus grandes.
+        palette_cols = 2 if any(p.kind is not GemKind.NORMAL for p in self.palette_pieces) else 1
+        self.size = theme.window_size(width, height, panel_width=_PANEL_WIDTH, palette_cols=palette_cols)
         self.ray = RayTester(width, height, self.font_small)
         self.slots = self._build_palette(self.palette_pieces)
         self._layout_panel()
@@ -128,8 +135,14 @@ class CreatorScreen:
     # --- Construction ------------------------------------------------------
 
     def _build_palette(self, pieces: list[Piece]) -> list[Slot]:
-        rects = theme.palette_slots(len(pieces))
-        return [Slot(piece, rect) for piece, rect in zip(pieces, rects)]
+        base = [p for p in pieces if p.kind is GemKind.NORMAL]
+        ext = [p for p in pieces if p.kind is not GemKind.NORMAL]
+        counts = [len(base), len(ext)] if ext else [len(base)]
+        columns = theme.palette_columns(counts)
+        pairs = list(zip(base, columns[0]))
+        if ext:
+            pairs += list(zip(ext, columns[1]))
+        return [Slot(piece, rect) for piece, rect in pairs]
 
     def _layout_panel(self) -> None:
         s = theme.s
@@ -151,12 +164,14 @@ class CreatorScreen:
         self.diamant_rect = pygame.Rect(inner, top + s(126), s(20), s(20))
         self.corps_rect = pygame.Rect(inner, top + s(150), s(20), s(20))
         self.wormhole_rect = pygame.Rect(inner, top + s(174), s(20), s(20))
+        self.filter_rect = pygame.Rect(inner, top + s(198), s(20), s(20))
         # Ligne cliquable (case + libellé). Largeur bornée avant la colonne de
         # droite (minuteur) pour ne pas empiéter dessus (#35).
         ext_row_w = s(168)
         self.diamant_row = pygame.Rect(inner, top + s(124), ext_row_w, s(24))
         self.corps_row = pygame.Rect(inner, top + s(148), ext_row_w, s(24))
         self.wormhole_row = pygame.Rect(inner, top + s(172), ext_row_w, s(24))
+        self.filter_row = pygame.Rect(inner, top + s(196), ext_row_w, s(24))
         # Minuteur : colonne de droite (aligné sur les extensions) pour ne pas
         # allonger le panneau. Label + stepper − valeur + (éditable au clavier).
         rx = inner + s(176)
@@ -167,7 +182,7 @@ class CreatorScreen:
             pygame.Rect(rx + s(30), top + s(126), s(68), s(26)),
             pygame.Rect(rx + s(102), top + s(126), s(26), s(26)),
         )
-        self.status_y = top + s(202)
+        self.status_y = top + s(226)
 
         # Actions (bas du panneau).
         self.save_rect = pygame.Rect(inner, self.panel.bottom - s(152), bw, s(40))
@@ -218,6 +233,10 @@ class CreatorScreen:
             return
         if self.wormhole_row.collidepoint(pos):
             self.wormhole = not self.wormhole
+            self._rebuild(clear_gems=False)
+            return
+        if self.filter_row.collidepoint(pos):
+            self.filter = not self.filter
             self._rebuild(clear_gems=False)
             return
         for i, rect in enumerate(self.size_rects):
@@ -424,6 +443,10 @@ class CreatorScreen:
     def _draw_palette(self, surface: pygame.Surface) -> None:
         title = self.font_small.render(i18n.t("Pièces", "Pieces"), True, theme.TEXT_DIM)
         surface.blit(title, (theme.PALETTE.x + theme.s(4), theme.PALETTE.y - theme.s(22)))
+        ext_slots = [sl for sl in self.slots if sl.piece.kind is not GemKind.NORMAL]
+        if ext_slots:  # en-tête de la 2e colonne
+            head = self.font_small.render(i18n.t("Extensions", "Extensions"), True, theme.TEXT_DIM)
+            surface.blit(head, (ext_slots[0].rect.x + theme.s(1), theme.PALETTE.y - theme.s(22)))
         for slot in self.slots:
             board_render.draw_palette_slot(
                 surface, slot.rect, slot.piece,
@@ -456,6 +479,7 @@ class CreatorScreen:
         self._checkbox(surface, self.diamant_rect, self.diamant, i18n.t("Diamant", "Diamond"))
         self._checkbox(surface, self.corps_rect, self.corps_noir, i18n.t("Corps noir", "Black body"))
         self._checkbox(surface, self.wormhole_rect, self.wormhole, i18n.t("Trou de ver (×2)", "Wormhole (×2)"))
+        self._checkbox(surface, self.filter_rect, self.filter, i18n.t("Filtre", "Filter"))
 
         # Minuteur (optionnel), colonne de droite.
         surface.blit(self.font_small.render(i18n.t("Minuteur", "Timer"), True, theme.TEXT),

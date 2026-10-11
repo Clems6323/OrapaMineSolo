@@ -37,6 +37,7 @@ _HISTORY_ROW_H = theme.s(22)  # hauteur d'une ligne d'historique (px, échelle D
 # une question de case. Clés = libellés français, traduits par `i18n.piece`.
 _KIND_PIECE_NAME: dict[GemKind, str] = {
     GemKind.DIAMOND: "diamant",
+    GemKind.FILTER: "filtre",
     GemKind.BLACK_BODY: "corps-noir",
     GemKind.WORMHOLE: "trou-de-ver",
 }
@@ -99,8 +100,11 @@ class GameScreen:
         self.font_big = theme.font(26, bold=True)
         self.font_clock = theme.font(28, bold=True)  # horloge bien lisible
 
-        # Mise en page adaptative (taille de case + positions selon l'écran).
-        self.size = theme.window_size(self.grid.width, self.grid.height)
+        # Mise en page adaptative : palette sur deux colonnes (classiques |
+        # extensions) dès qu'une extension est présente → fenêtre plus large,
+        # icônes plus grandes.
+        palette_cols = 2 if any(p.kind is not GemKind.NORMAL for p in palette_pieces) else 1
+        self.size = theme.window_size(self.grid.width, self.grid.height, palette_cols=palette_cols)
         self.ray = RayTester(self.grid.width, self.grid.height, self.font_small)
         self.slots = self._build_palette(palette_pieces)
         self._layout_panel()
@@ -108,8 +112,14 @@ class GameScreen:
     # --- Construction ------------------------------------------------------
 
     def _build_palette(self, pieces: list[Piece]) -> list[Slot]:
-        rects = theme.palette_slots(len(pieces))
-        return [Slot(piece, rect) for piece, rect in zip(pieces, rects)]
+        base = [p for p in pieces if p.kind is GemKind.NORMAL]
+        ext = [p for p in pieces if p.kind is not GemKind.NORMAL]
+        counts = [len(base), len(ext)] if ext else [len(base)]
+        columns = theme.palette_columns(counts)
+        pairs = list(zip(base, columns[0]))
+        if ext:
+            pairs += list(zip(ext, columns[1]))
+        return [Slot(piece, rect) for piece, rect in pairs]
 
     def _layout_panel(self) -> None:
         s = theme.s
@@ -563,6 +573,10 @@ class GameScreen:
     def _draw_palette(self, surface: pygame.Surface) -> None:
         title = self.font_small.render(i18n.t("Pièces", "Pieces"), True, theme.TEXT_DIM)
         surface.blit(title, (theme.PALETTE.x + theme.s(4), theme.PALETTE.y - theme.s(22)))
+        ext_slots = [sl for sl in self.slots if sl.piece.kind is not GemKind.NORMAL]
+        if ext_slots:  # en-tête de la 2e colonne
+            head = self.font_small.render(i18n.t("Extensions", "Extensions"), True, theme.TEXT_DIM)
+            surface.blit(head, (ext_slots[0].rect.x + theme.s(1), theme.PALETTE.y - theme.s(22)))
         for slot in self.slots:
             board_render.draw_palette_slot(
                 surface, slot.rect, slot.piece,

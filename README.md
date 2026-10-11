@@ -14,13 +14,16 @@ rectangle) dont les arêtes réfléchissent le rayon : **90°** sur une arête
 diagonale, **180°** sur une face plate. Le rayon part transparent et se
 **teinte** en touchant les gemmes colorées, en mélangeant les couleurs comme de
 la peinture (rouge + jaune = orange, jaune + bleu = vert…), le blanc
-éclaircissant la teinte. Trois extensions : le **diamant** (dévie sans teinter),
-le **corps noir** (absorbe le rayon) et le **trou de ver** (deux cases jumelles :
-le rayon entré dans l'une ressort de l'autre dans la même direction).
+éclaircissant la teinte. Quatre extensions : le **diamant** (dévie sans teinter),
+le **filtre** (dévie et remet le rayon transparent), le **corps noir** (absorbe
+le rayon) et le **trou de ver** (deux cases jumelles : le rayon entré dans l'une
+ressort de l'autre dans la même direction).
 
 La fenêtre s'adapte à l'écran : la taille des cases est choisie automatiquement
-pour que le plateau tienne sur ton moniteur, et la palette des pièces est une
-bande verticale à gauche du plateau (panneau d'infos à droite).
+pour que le plateau tienne sur ton moniteur, et la palette des pièces est à
+gauche du plateau (panneau d'infos à droite). Dès qu'une extension est activée,
+la palette passe sur **deux colonnes** (pièces classiques | extensions) pour
+garder des icônes bien lisibles — la fenêtre s'élargit en conséquence.
 
 **Écrans haute résolution (DPI / Retina)** : le jeu se rend en pixels physiques
 et met toute l'interface à l'échelle du facteur d'écran — net, sans flou. Sous

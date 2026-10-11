@@ -41,7 +41,8 @@ _COLORS_EN = {
 # Libellés de pièces dans la palette (couleurs + extensions).
 _PIECES_EN = {
     "rouge": "red", "jaune": "yellow", "bleu": "blue", "blanc": "white",
-    "diamant": "diamond", "corps-noir": "black body", "trou-de-ver": "wormhole",
+    "diamant": "diamond", "filtre": "filter", "corps-noir": "black body",
+    "trou-de-ver": "wormhole",
 }
 
 _SIZES_EN = {"Petit": "Small", "Standard": "Standard", "Grand": "Large"}

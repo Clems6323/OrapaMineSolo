@@ -32,6 +32,8 @@ class GemKind(Enum):
 
     - NORMAL : gemme colorée classique (teinte le rayon).
     - DIAMOND : extension. Dévie comme une gemme normale mais ne teinte jamais.
+    - FILTER : extension. Dévie (même forme que le petit losange blanc) et
+      **remet le rayon à transparent** (efface les couleurs collectées).
     - BLACK_BODY : extension. Absorbe le rayon (aucune sortie).
     - WORMHOLE : extension. Va par paires : un rayon qui entre dans un trou
       ressort de l'autre dans la **même direction** (téléportation, sans teinter).
@@ -39,6 +41,7 @@ class GemKind(Enum):
 
     NORMAL = "normal"
     DIAMOND = "diamond"
+    FILTER = "filter"
     BLACK_BODY = "black_body"
     WORMHOLE = "wormhole"
 
