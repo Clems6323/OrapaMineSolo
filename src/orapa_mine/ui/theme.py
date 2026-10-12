@@ -272,6 +272,16 @@ ON_ACCENT = (26, 28, 36)
 # Opacité du filtre (couleur du diamant dessinée translucide : « plus de transparence »).
 FILTER_ALPHA = 115
 
+# Couleurs des boutons d'action, **identiques en mode sombre et clair** (#67) :
+# assez vives pour rester lisibles sur le panneau clair comme sombre, avec un
+# libellé clair fixe (BTN_TEXT) — sinon, en mode clair, le texte devenait sombre
+# sur un bouton sombre et illisible.
+BTN_GREEN = (56, 162, 100)   # valider / commencer / jouer
+BTN_RED = (206, 80, 84)      # abandonner / quitter sans sauvegarder
+BTN_BLUE = (72, 126, 198)    # retour au menu / mode créateur (navigation)
+BTN_SAVE = (58, 142, 168)    # sauvegarder (bleu-sarcelle, distinct de la navigation)
+BTN_TEXT = (250, 250, 252)   # libellé des boutons colorés (clair, dans les 2 modes)
+
 _DARK = {
     "BACKGROUND": (16, 18, 27),
     "BOARD_BG": (26, 30, 44),

@@ -506,14 +506,16 @@ class CreatorScreen:
         for i, text in enumerate(_wrap(ray_line, self.font_small, self.panel.width - s(40))):
             surface.blit(self.font_small.render(text, True, theme.TEXT_DIM), (x, ray_y + i * s(18)))
 
-        self._button(surface, self.save_rect, (54, 96, 120), i18n.t("Sauvegarder la configuration", "Save configuration"))
+        self._button(surface, self.save_rect, theme.BTN_SAVE,
+                     i18n.t("Sauvegarder la configuration", "Save configuration"), text_color=theme.BTN_TEXT)
         can_play = problem is None
         self._button(
             surface,
             self.play_rect,
-            (54, 120, 90) if can_play else theme.SLOT_USED,
+            theme.BTN_GREEN if can_play else theme.SLOT_USED,
             i18n.t("Jouer cette configuration", "Play this configuration"),
             dim=not can_play,
+            text_color=theme.BTN_TEXT if can_play else None,
         )
         self._button(surface, self.back_rect, theme.SLOT_BG, i18n.t("Retour au menu", "Back to menu"))
 
@@ -521,10 +523,10 @@ class CreatorScreen:
             for i, text in enumerate(_wrap(self.message, self.font_small, self.panel.width - s(40))):
                 surface.blit(self.font_small.render(text, True, self.message_color), (x, self.save_rect.top - s(46) + i * s(18)))
 
-    def _button(self, surface: pygame.Surface, rect: pygame.Rect, bg, text: str, dim: bool = False) -> None:
+    def _button(self, surface: pygame.Surface, rect: pygame.Rect, bg, text: str, dim: bool = False, text_color=None) -> None:
         pygame.draw.rect(surface, bg, rect, border_radius=8)
         pygame.draw.rect(surface, theme.BOARD_BORDER, rect, width=1, border_radius=8)
-        color = theme.TEXT_DIM if dim else theme.TEXT
+        color = text_color or (theme.TEXT_DIM if dim else theme.TEXT)
         label = self.font_small.render(text, True, color)
         surface.blit(label, label.get_rect(center=rect.center))
 
