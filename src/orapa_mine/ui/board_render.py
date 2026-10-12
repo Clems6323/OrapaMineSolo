@@ -23,12 +23,23 @@ def piece_color(piece: Piece) -> tuple[int, int, int]:
 def faded_piece_color(piece: Piece) -> tuple[int, int, int]:
     """Couleur « posée/utilisée » d'une pièce dans la palette.
 
-    Les pièces colorées sont assombries ; le corps noir (déjà quasi noir) est au
-    contraire éclairci en gris foncé, sinon son état « posé » serait invisible.
+    On désature vers le gris puis on assombrit : une pièce posée a l'air
+    « désactivée » plutôt que colorée en plus terne — ce qui évite notamment
+    qu'un diamant posé ressemble au filtre (même teinte translucide) (#66).
+    Le corps noir (déjà quasi noir) est au contraire éclairci en gris foncé,
+    sinon son état « posé » serait invisible.
     """
     if piece.kind is GemKind.BLACK_BODY:
         return (72, 72, 82)
-    return darken(piece_color(piece), 0.5)
+    r, g, b = piece_color(piece)
+    lum = int(0.299 * r + 0.587 * g + 0.114 * b)
+    mix = 0.78  # part de gris (désaturation)
+    grey = (
+        int(r * (1 - mix) + lum * mix),
+        int(g * (1 - mix) + lum * mix),
+        int(b * (1 - mix) + lum * mix),
+    )
+    return darken(grey, 0.35)
 
 
 def lighten(color: tuple[int, int, int], amount: float) -> tuple[int, int, int]:
@@ -156,7 +167,12 @@ def _draw_slot_icon(
             for pos, half in cells:
                 pygame.draw.polygon(surface, base, theme.half_cell_polygon_at(pos, half, ox, oy, cell_size))
     label = i18n.piece(piece.color.value if piece.color else piece.name)
-    name = font.render(label, True, theme.TEXT_DIM)
+    # Texte vif quand la pièce est disponible, atténué quand elle est posée :
+    # second indice (avec la couleur) de l'état de la pièce (#66). TEXT/TEXT_DIM
+    # s'adaptent au mode (clair/sombre) — vif = sombre en mode clair, clair en
+    # mode sombre, comme demandé.
+    color = theme.TEXT_DIM if faded else theme.TEXT
+    name = font.render(label, True, color)
     surface.blit(name, name.get_rect(centerx=rect.centerx, bottom=rect.bottom - theme.s(4)))
 
 
