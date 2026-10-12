@@ -192,18 +192,18 @@ class ConfigScreen:
         surface.blit(timer_label, timer_label.get_rect(centerx=cx, y=s(550)))
         self.timer.draw(surface, self.font, i18n.t("Désactivé", "Off"))
 
-        self._button(surface, self.start_rect, (54, 120, 90), i18n.t("Commencer", "Start"))
-        self._button(surface, self.creator_rect, (54, 96, 120), i18n.t("Mode créateur", "Creator mode"))
+        self._button(surface, self.start_rect, theme.BTN_GREEN, i18n.t("Commencer", "Start"), theme.BTN_TEXT)
+        self._button(surface, self.creator_rect, theme.BTN_BLUE, i18n.t("Mode créateur", "Creator mode"), theme.BTN_TEXT)
         self._button(surface, self.load_rect, theme.SLOT_BG, i18n.t("Charger…", "Load…"))
 
         if self.error:
             err = self.font_small.render(self.error, True, theme.LOSE_COLOR)
             surface.blit(err, err.get_rect(centerx=cx, y=s(722)))
 
-    def _button(self, surface: pygame.Surface, rect: pygame.Rect, bg, text: str) -> None:
+    def _button(self, surface: pygame.Surface, rect: pygame.Rect, bg, text: str, text_color=None) -> None:
         pygame.draw.rect(surface, bg, rect, border_radius=10)
         pygame.draw.rect(surface, theme.BOARD_BORDER, rect, width=1, border_radius=10)
-        label = self.font.render(text, True, theme.TEXT)
+        label = self.font.render(text, True, text_color or theme.TEXT)
         surface.blit(label, label.get_rect(center=rect.center))
 
     def _checkbox(self, surface: pygame.Surface, rect: pygame.Rect, on: bool, text: str) -> None:

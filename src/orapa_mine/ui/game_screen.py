@@ -423,11 +423,11 @@ class GameScreen:
     def _leave_buttons(self) -> list[tuple[str, str, tuple[int, int, int], object]]:
         """(libellé FR, libellé EN, couleur, action) des boutons du popup de sortie."""
         return [
-            ("Sauvegarder (avec progression)", "Save (with progress)", (54, 96, 120),
+            ("Sauvegarder (avec progression)", "Save (with progress)", theme.BTN_SAVE,
              lambda: self._leave_save(True)),
-            ("Sauvegarder (configuration seule)", "Save (configuration only)", (54, 96, 120),
+            ("Sauvegarder (configuration seule)", "Save (configuration only)", theme.BTN_SAVE,
              lambda: self._leave_save(False)),
-            ("Quitter sans sauvegarder", "Leave without saving", (96, 54, 60),
+            ("Quitter sans sauvegarder", "Leave without saving", theme.BTN_RED,
              self._leave_no_save),
             ("Annuler", "Cancel", theme.SLOT_BG, lambda: setattr(self, "show_leave_prompt", False)),
         ]
@@ -461,7 +461,8 @@ class GameScreen:
         for (fr, en, color, _action), rect in zip(self._leave_buttons(), rects):
             pygame.draw.rect(surface, color, rect, border_radius=8)
             pygame.draw.rect(surface, theme.BOARD_BORDER, rect, width=1, border_radius=8)
-            label = self.font_small.render(i18n.t(fr, en), True, theme.TEXT)
+            text_color = theme.TEXT if color is theme.SLOT_BG else theme.BTN_TEXT
+            label = self.font_small.render(i18n.t(fr, en), True, text_color)
             surface.blit(label, label.get_rect(center=rect.center))
 
     def _submit(self) -> None:
@@ -603,13 +604,13 @@ class GameScreen:
             (x, self.panel.top + s(54)),
         )
         # Boutons Proposer / Abandonner.
-        pygame.draw.rect(surface, (54, 120, 90), self.submit_rect, border_radius=6)
+        pygame.draw.rect(surface, theme.BTN_GREEN, self.submit_rect, border_radius=6)
         pygame.draw.rect(surface, theme.BOARD_BORDER, self.submit_rect, width=1, border_radius=6)
-        btn = self.font_small.render(i18n.t("Proposer la solution", "Submit solution"), True, theme.TEXT)
+        btn = self.font_small.render(i18n.t("Proposer la solution", "Submit solution"), True, theme.BTN_TEXT)
         surface.blit(btn, btn.get_rect(center=self.submit_rect.center))
-        pygame.draw.rect(surface, (96, 54, 60), self.abandon_rect, border_radius=6)
+        pygame.draw.rect(surface, theme.BTN_RED, self.abandon_rect, border_radius=6)
         pygame.draw.rect(surface, theme.BOARD_BORDER, self.abandon_rect, width=1, border_radius=6)
-        ab = self.font_small.render(i18n.t("Abandonner", "Give up"), True, theme.TEXT)
+        ab = self.font_small.render(i18n.t("Abandonner", "Give up"), True, theme.BTN_TEXT)
         surface.blit(ab, ab.get_rect(center=self.abandon_rect.center))
 
         # Ligne sauvegarde : case « progression » + bouton Sauvegarder.
@@ -627,9 +628,9 @@ class GameScreen:
         surface.blit(sv, sv.get_rect(center=self.save_rect.center))
 
         # Bouton « Retour au menu ».
-        pygame.draw.rect(surface, (54, 72, 104), self.menu_rect, border_radius=6)
+        pygame.draw.rect(surface, theme.BTN_BLUE, self.menu_rect, border_radius=6)
         pygame.draw.rect(surface, theme.BOARD_BORDER, self.menu_rect, width=1, border_radius=6)
-        mb = self.font_small.render(i18n.t("Retour au menu", "Back to menu"), True, theme.TEXT)
+        mb = self.font_small.render(i18n.t("Retour au menu", "Back to menu"), True, theme.BTN_TEXT)
         surface.blit(mb, mb.get_rect(center=self.menu_rect.center))
 
         surface.blit(self.font.render(i18n.t("Historique", "History"), True, theme.TEXT), (x, self.history_header_y))

@@ -133,18 +133,18 @@ class EndScreen:
         surface.blit(spent, (x, self.panel.top + theme.s(92)))
 
         # Bouton « Sauvegarder la configuration » (partage de l'énigme jouée).
-        pygame.draw.rect(surface, (54, 96, 120), self.save_rect, border_radius=8)
+        pygame.draw.rect(surface, theme.BTN_SAVE, self.save_rect, border_radius=8)
         pygame.draw.rect(surface, theme.BOARD_BORDER, self.save_rect, width=1, border_radius=8)
         sv = self.font_small.render(
-            i18n.t("Sauvegarder la configuration", "Save configuration"), True, theme.TEXT)
+            i18n.t("Sauvegarder la configuration", "Save configuration"), True, theme.BTN_TEXT)
         surface.blit(sv, sv.get_rect(center=self.save_rect.center))
         if self.message:
             msg = self.font_small.render(self.message, True, self.message_color)
             surface.blit(msg, (x, self.save_rect.top - theme.s(24)))
 
-        pygame.draw.rect(surface, (54, 120, 90), self.replay_rect, border_radius=8)
+        pygame.draw.rect(surface, theme.BTN_BLUE, self.replay_rect, border_radius=8)
         pygame.draw.rect(surface, theme.BOARD_BORDER, self.replay_rect, width=1, border_radius=8)
-        r = self.font.render(i18n.t("Retour au menu", "Back to menu"), True, theme.TEXT)
+        r = self.font.render(i18n.t("Retour au menu", "Back to menu"), True, theme.BTN_TEXT)
         surface.blit(r, r.get_rect(center=self.replay_rect.center))
 
         pygame.draw.rect(surface, theme.SLOT_BG, self.quit_rect, border_radius=8)
