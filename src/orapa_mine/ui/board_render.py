@@ -110,16 +110,31 @@ def draw_palette_slot(
     pygame.draw.rect(surface, border, rect, width=2 if selected else 1, border_radius=6)
     _draw_slot_icon(surface, rect, piece, faded=used, font=font)
     if piece.quantity > 1 and not used:
-        badge = font.render(f"x{piece.quantity - placed}", True, theme.TEXT)
-        surface.blit(badge, (rect.left + theme.s(6), rect.bottom - theme.s(38)))  # au-dessus du nom
+        # Pastille de quantité dans le coin haut-gauche (hors de l'icône et du
+        # nom), sur un fond contrasté pour rester lisible, y compris sur le trou
+        # de ver noir (#66).
+        text = font.render(f"×{piece.quantity - placed}", True, theme.TEXT)
+        pad = theme.s(3)
+        pill = pygame.Rect(
+            rect.left + theme.s(4), rect.top + theme.s(4),
+            text.get_width() + 2 * pad, text.get_height() + pad,
+        )
+        pygame.draw.rect(surface, theme.SLOT_USED, pill, border_radius=theme.s(5))
+        surface.blit(text, (pill.x + pad, pill.y + pad // 2))
 
 
 def _draw_slot_icon(
     surface: pygame.Surface, rect: pygame.Rect, piece: Piece, faded: bool, font: pygame.font.Font
 ) -> None:
+    # Bande réservée au nom, sous l'icône, dimensionnée au texte réel pour que
+    # l'icône ne déborde jamais sur le libellé — quelle que soit la langue (#66).
+    top_pad = theme.s(8)
+    label_h = font.get_height() + theme.s(8)
+    icon_w = rect.width - theme.s(16)
+    icon_h = rect.height - top_pad - label_h
     if piece.kind is GemKind.WORMHOLE:
-        size = min(rect.width, rect.height) - theme.s(22)
-        center = (rect.centerx, rect.top + theme.s(8) + size / 2)
+        size = min(icon_w, icon_h)
+        center = (rect.centerx, rect.top + top_pad + size / 2)
         square = (72, 72, 82) if faded else theme.GEM_FILL[GemKind.BLACK_BODY]
         spiral = theme.TEXT_DIM if faded else theme.WORMHOLE_RING
         draw_wormhole(surface, center, size, square_color=square, spiral_color=spiral)
@@ -127,10 +142,9 @@ def _draw_slot_icon(
         cells = piece.cells
         rows = max(p.row for p, _ in cells) + 1
         cols = max(p.col for p, _ in cells) + 1
-        area = rect.inflate(theme.s(-16), theme.s(-22))
-        cell_size = min(area.width / cols, area.height / rows)
+        cell_size = min(icon_w / cols, icon_h / rows)
         ox = rect.centerx - cols * cell_size / 2
-        oy = rect.top + theme.s(8)
+        oy = rect.top + top_pad
         base = faded_piece_color(piece) if faded else piece_color(piece)
         if piece.kind is GemKind.FILTER:  # icône translucide
             overlay = pygame.Surface(rect.size, pygame.SRCALPHA)
