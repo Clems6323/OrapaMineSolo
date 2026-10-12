@@ -45,11 +45,9 @@ class ConfigScreen:
         self.wormhole_rect = pygame.Rect(s(170), s(304), s(26), s(26))
         self.filter_rect = pygame.Rect(s(170), s(342), s(26), s(26))
         # Zone cliquable de chaque ligne (case + libellé) : on peut cocher en
-        # cliquant la case OU le texte (#35).
-        self.diamant_row = self.diamant_rect.union(pygame.Rect(s(170), s(228), s(360), s(26)))
-        self.corps_row = self.corps_rect.union(pygame.Rect(s(170), s(266), s(360), s(26)))
-        self.wormhole_row = self.wormhole_rect.union(pygame.Rect(s(170), s(304), s(360), s(26)))
-        self.filter_row = self.filter_rect.union(pygame.Rect(s(170), s(342), s(360), s(26)))
+        # cliquant la case OU le texte (#35). Largeur ajustée au texte réel pour
+        # ne pas offrir une zone de clic démesurée (#65).
+        self._build_ext_rows()
         bw, gap = s(180), s(20)
         total = 3 * bw + 2 * gap
         start_x = (self.size[0] - total) // 2
@@ -83,6 +81,7 @@ class ConfigScreen:
             theme_toggle.toggle()
             return
         if lang_toggle.handle_click(p, self.size[0]):  # drapeaux FR / UK
+            self._build_ext_rows()  # le texte change de langue → recalc des zones (#65)
             return
         if self.timer.handle_click(p):  # − / + / case du minuteur
             return
@@ -159,14 +158,11 @@ class ConfigScreen:
         surface.blit(base, (s(100), s(158)))
 
         surface.blit(self.font.render(i18n.t("Extensions", "Extensions"), True, theme.TEXT), (s(100), s(196)))
-        self._checkbox(surface, self.diamant_rect, self.diamant,
-                       i18n.t("Diamant (dévie sans teinter)", "Diamond (deviates without tinting)"))
-        self._checkbox(surface, self.corps_rect, self.corps_noir,
-                       i18n.t("Corps noir (absorbe le rayon)", "Black body (absorbs the beam)"))
-        self._checkbox(surface, self.wormhole_rect, self.wormhole,
-                       i18n.t("Trou de ver ×2 (téléporte le rayon)", "Wormhole ×2 (teleports the beam)"))
-        self._checkbox(surface, self.filter_rect, self.filter,
-                       i18n.t("Filtre (remet le rayon transparent)", "Filter (resets the beam to transparent)"))
+        d_txt, c_txt, w_txt, f_txt = self._ext_label_texts()
+        self._checkbox(surface, self.diamant_rect, self.diamant, d_txt)
+        self._checkbox(surface, self.corps_rect, self.corps_noir, c_txt)
+        self._checkbox(surface, self.wormhole_rect, self.wormhole, w_txt)
+        self._checkbox(surface, self.filter_rect, self.filter, f_txt)
 
         surface.blit(self.font.render(i18n.t("Taille de la grille", "Grid size"), True, theme.TEXT), (s(100), s(382)))
         for i, rect in enumerate(self.size_rects):
@@ -205,6 +201,26 @@ class ConfigScreen:
         pygame.draw.rect(surface, theme.BOARD_BORDER, rect, width=1, border_radius=10)
         label = self.font.render(text, True, text_color or theme.TEXT)
         surface.blit(label, label.get_rect(center=rect.center))
+
+    def _ext_label_texts(self) -> list[str]:
+        """Libellés des extensions (source unique pour le rendu et les zones cliquables)."""
+        return [
+            i18n.t("Diamant (dévie sans teinter)", "Diamond (deviates without tinting)"),
+            i18n.t("Corps noir (absorbe le rayon)", "Black body (absorbs the beam)"),
+            i18n.t("Trou de ver ×2 (téléporte le rayon)", "Wormhole ×2 (teleports the beam)"),
+            i18n.t("Filtre (remet le rayon transparent)", "Filter (resets the beam to transparent)"),
+        ]
+
+    def _build_ext_rows(self) -> None:
+        """Zones cliquables des extensions, ajustées à la largeur du texte (#65)."""
+        s = theme.s
+        gap, pad = s(14), s(12)  # écart case→texte (cf. _checkbox) + marge droite
+        boxes = [self.diamant_rect, self.corps_rect, self.wormhole_rect, self.filter_rect]
+        rows = [
+            pygame.Rect(cb.x, cb.y, cb.width + gap + self.font.size(text)[0] + pad, cb.height)
+            for cb, text in zip(boxes, self._ext_label_texts())
+        ]
+        self.diamant_row, self.corps_row, self.wormhole_row, self.filter_row = rows
 
     def _checkbox(self, surface: pygame.Surface, rect: pygame.Rect, on: bool, text: str) -> None:
         pygame.draw.rect(surface, theme.INPUT_BG, rect, border_radius=4)

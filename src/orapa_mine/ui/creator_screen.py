@@ -165,13 +165,9 @@ class CreatorScreen:
         self.corps_rect = pygame.Rect(inner, top + s(150), s(20), s(20))
         self.wormhole_rect = pygame.Rect(inner, top + s(174), s(20), s(20))
         self.filter_rect = pygame.Rect(inner, top + s(198), s(20), s(20))
-        # Ligne cliquable (case + libellé). Largeur bornée avant la colonne de
-        # droite (minuteur) pour ne pas empiéter dessus (#35).
-        ext_row_w = s(168)
-        self.diamant_row = pygame.Rect(inner, top + s(124), ext_row_w, s(24))
-        self.corps_row = pygame.Rect(inner, top + s(148), ext_row_w, s(24))
-        self.wormhole_row = pygame.Rect(inner, top + s(172), ext_row_w, s(24))
-        self.filter_row = pygame.Rect(inner, top + s(196), ext_row_w, s(24))
+        # Ligne cliquable (case + libellé) : largeur ajustée au texte réel pour
+        # ne pas offrir une zone de clic démesurée (#65).
+        self._build_ext_rows()
         # Minuteur : colonne de droite (aligné sur les extensions) pour ne pas
         # allonger le panneau. Label + stepper − valeur + (éditable au clavier).
         rx = inner + s(176)
@@ -211,6 +207,7 @@ class CreatorScreen:
             theme_toggle.toggle()
             return
         if lang_toggle.handle_click(pos, self.size[0]):  # drapeaux FR / UK
+            self._build_ext_rows()  # le texte change de langue → recalc des zones (#65)
             return
         if self.timer.handle_click(pos):  # − / + / case du minuteur (valide la saisie)
             return
@@ -476,10 +473,11 @@ class CreatorScreen:
 
         # Réglages : extensions.
         surface.blit(self.font_small.render(i18n.t("Extensions", "Extensions"), True, theme.TEXT), (x, self.ext_label_y))
-        self._checkbox(surface, self.diamant_rect, self.diamant, i18n.t("Diamant", "Diamond"))
-        self._checkbox(surface, self.corps_rect, self.corps_noir, i18n.t("Corps noir", "Black body"))
-        self._checkbox(surface, self.wormhole_rect, self.wormhole, i18n.t("Trou de ver (×2)", "Wormhole (×2)"))
-        self._checkbox(surface, self.filter_rect, self.filter, i18n.t("Filtre", "Filter"))
+        d_txt, c_txt, w_txt, f_txt = self._ext_label_texts()
+        self._checkbox(surface, self.diamant_rect, self.diamant, d_txt)
+        self._checkbox(surface, self.corps_rect, self.corps_noir, c_txt)
+        self._checkbox(surface, self.wormhole_rect, self.wormhole, w_txt)
+        self._checkbox(surface, self.filter_rect, self.filter, f_txt)
 
         # Minuteur (optionnel), colonne de droite.
         surface.blit(self.font_small.render(i18n.t("Minuteur", "Timer"), True, theme.TEXT),
@@ -529,6 +527,26 @@ class CreatorScreen:
         color = text_color or (theme.TEXT_DIM if dim else theme.TEXT)
         label = self.font_small.render(text, True, color)
         surface.blit(label, label.get_rect(center=rect.center))
+
+    def _ext_label_texts(self) -> list[str]:
+        """Libellés des extensions (source unique pour le rendu et les zones cliquables)."""
+        return [
+            i18n.t("Diamant", "Diamond"),
+            i18n.t("Corps noir", "Black body"),
+            i18n.t("Trou de ver (×2)", "Wormhole (×2)"),
+            i18n.t("Filtre", "Filter"),
+        ]
+
+    def _build_ext_rows(self) -> None:
+        """Zones cliquables des extensions, ajustées à la largeur du texte (#65)."""
+        s = theme.s
+        gap, pad = s(10), s(10)  # écart case→texte (cf. _checkbox) + marge droite
+        boxes = [self.diamant_rect, self.corps_rect, self.wormhole_rect, self.filter_rect]
+        rows = [
+            pygame.Rect(cb.x, cb.y - s(2), cb.width + gap + self.font_small.size(text)[0] + pad, s(24))
+            for cb, text in zip(boxes, self._ext_label_texts())
+        ]
+        self.diamant_row, self.corps_row, self.wormhole_row, self.filter_row = rows
 
     def _checkbox(self, surface: pygame.Surface, rect: pygame.Rect, on: bool, text: str) -> None:
         pygame.draw.rect(surface, theme.INPUT_BG, rect, border_radius=4)
