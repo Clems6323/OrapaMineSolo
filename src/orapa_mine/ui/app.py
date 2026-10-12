@@ -8,8 +8,10 @@ attributs simples (`result`, `finished`, `restart`, `quit`).
 
 from __future__ import annotations
 
+import ctypes
 import random
 import sys
+from pathlib import Path
 
 import pygame
 
@@ -30,6 +32,9 @@ FPS = 60
 # la surface fenêtre — net si celle-ci a un backing Retina, sinon sans régression.
 _MAC_SUPERSAMPLE = sys.platform == "darwin" and theme.UI_SCALE > 1
 
+# Icône de la fenêtre / barre des tâches (logo du jeu, livré dans le paquet).
+_ICON_PATH = Path(__file__).resolve().parent.parent / "assets" / "icon.png"
+
 
 class OrapaMineApp:
     """Point d'entrée de l'application graphique (boucle Pygame)."""
@@ -38,12 +43,27 @@ class OrapaMineApp:
         self.seed = seed
         pygame.init()
         pygame.display.set_caption("Orapa Mine — solo")
+        self._set_window_icon()  # avant le premier set_mode (requis sous Windows)
         self.clock = pygame.time.Clock()
         self.screen: pygame.Surface | None = None
         self.canvas: pygame.Surface | None = None  # cible de rendu (pixels physiques)
         self.current: object = ConfigScreen()
         self._resize(self.current.size)  # type: ignore[attr-defined]
         self.running = False
+
+    def _set_window_icon(self) -> None:
+        """Icône de la fenêtre et de la barre des tâches (logo du jeu)."""
+        if sys.platform == "win32":
+            # Sans ça, la barre des tâches Windows affiche l'icône de python.exe
+            # au lieu de celle de la fenêtre.
+            try:
+                ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("orapa.mine.solo")
+            except Exception:
+                pass
+        try:
+            pygame.display.set_icon(pygame.image.load(str(_ICON_PATH)))
+        except (pygame.error, OSError):
+            pass  # icône absente : on garde celle par défaut de pygame
 
     def _resize(self, size: tuple[int, int]) -> None:
         """`size` est en pixels physiques (déjà mis à l'échelle DPI)."""
