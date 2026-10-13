@@ -117,9 +117,14 @@ def fire_beam(grid: Grid, entry: Position, direction: Direction) -> BeamResult:
     segment_colors: list[str | None] = []
     last_inside = entry
 
-    def collect(gem) -> None:
+    def collect(gem, cell: Position) -> None:
         if gem.kind is GemKind.FILTER:
             colors.clear()  # le filtre remet le rayon à transparent
+        elif gem.kind is GemKind.RAINBOW:
+            # Couleur de la case précise touchée par le rayon (carré multicolore).
+            cell_color = gem.color_at(cell)
+            if cell_color is not None:
+                colors.add(cell_color)
         elif gem.kind is not GemKind.DIAMOND and gem.color is not None:
             colors.add(gem.color)
 
@@ -193,7 +198,7 @@ def fire_beam(grid: Grid, entry: Position, direction: Direction) -> BeamResult:
             return result(None, absorbed=True)
 
         before = mix_colors(frozenset(colors))
-        collect(gem)
+        collect(gem, nxt)
         after = mix_colors(frozenset(colors))
         new_heading = half.reflect(heading)
 
@@ -217,7 +222,7 @@ def fire_beam(grid: Grid, entry: Position, direction: Direction) -> BeamResult:
         # avait dévié), il doit y redévier au lieu de la traverser.
         pos_half = grid.surface.get(pos)
         if pos_half is not None:
-            collect(grid.owner[pos])
+            collect(grid.owner[pos], pos)
             heading = pos_half.reflect(heading)
             add_vertex(pos.row, pos.col, after)  # segment de retour déjà teinté
 

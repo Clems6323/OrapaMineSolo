@@ -172,6 +172,15 @@ les diagrammes du livret :
   blanche. Dans la palette, un
   seul emplacement « ×2 » (puis « ×1 » après la première pose, grisé une fois les
   deux posés).
+- **Arc-en-ciel** (extension ajoutée, non officielle) : carré plein **2×2** dont
+  chaque case porte une **couleur différente** (en orientation canonique : blanc
+  haut-gauche, bleu haut-droit, jaune bas-gauche, rouge bas-droit). Toutes ses
+  faces étant plates, le rayon **rebondit à 180°** et prend la **couleur de la
+  case qu'il a touchée** (une seule, celle de la face d'entrée). Les couleurs
+  étant positionnelles, ses **4 rotations** donnent des configurations
+  distinctes ; **pas de retournement** (le dos d'un carreau coloré n'a pas de
+  couleur). Une question « qu'y a-t-il en X ? » sur une de ses cases révèle la
+  **couleur de cette case**. Compte pour **une pièce** à deviner.
 
 ## Variantes solo (spécifiques à cette implémentation) ✅
 

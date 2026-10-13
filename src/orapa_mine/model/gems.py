@@ -37,6 +37,9 @@ class GemKind(Enum):
     - BLACK_BODY : extension. Absorbe le rayon (aucune sortie).
     - WORMHOLE : extension. Va par paires : un rayon qui entre dans un trou
       ressort de l'autre dans la **même direction** (téléportation, sans teinter).
+    - RAINBOW : extension. Carré plein 2×2 dont chaque case porte une couleur
+      différente (blanc, bleu, jaune, rouge). Toutes ses faces sont plates : le
+      rayon rebondit à 180° et prend la couleur de la **case qu'il a touchée**.
     """
 
     NORMAL = "normal"
@@ -44,6 +47,7 @@ class GemKind(Enum):
     FILTER = "filter"
     BLACK_BODY = "black_body"
     WORMHOLE = "wormhole"
+    RAINBOW = "rainbow"
 
 
 @dataclass(frozen=True)
@@ -200,33 +204,64 @@ class Piece:
     kind: GemKind
     cells: frozenset[tuple[Position, HalfCell]]
     quantity: int = 1  # nombre d'exemplaires à placer (2 pour le trou de ver)
+    # Couleur par case (offsets -> couleur), pour une pièce multicolore comme
+    # l'arc-en-ciel. Vide pour une pièce monochrome (la couleur est alors `color`).
+    cell_colors: frozenset[tuple[Position, GemColor]] = frozenset()
+    # Retournement (symétrie) autorisé ? Faux pour une pièce colorée par case :
+    # un carreau coloré retourné montrerait son dos.
+    allow_flip: bool = True
+
+    def oriented_variants(
+        self,
+    ) -> list[tuple[frozenset[tuple[Position, HalfCell]], frozenset[tuple[Position, GemColor]]]]:
+        """Variantes distinctes (empreinte + couleurs par case) par rotations et,
+        si `allow_flip`, retournements.
+
+        Pour une pièce monochrome les couleurs par case sont vides et le
+        dédoublonnage se fait sur la seule géométrie (comportement historique :
+        seul le parallélogramme rouge gagne des orientations par retournement).
+        Pour l'arc-en-ciel, deux rotations de **même** empreinte 2×2 mais de
+        couleurs différentes sont bien distinctes, et les retournements sont
+        exclus (`allow_flip=False`). Liste ordonnée, déterministe : son index
+        sert de clé de sérialisation.
+        """
+        variants: list[tuple[frozenset, frozenset]] = []
+        bases = [(set(self.cells), dict(self.cell_colors))]
+        if self.allow_flip:
+            bases.append((_mirror_h(self.cells), _mirror_colors_h(self.cell_colors, self.cells)))
+        for base_cells, base_colors in bases:
+            cells = base_cells
+            colors = base_colors
+            for _ in range(4):
+                variant = _normalize_variant(cells, colors)
+                if variant not in variants:
+                    variants.append(variant)
+                max_row = max(p.row for p, _ in cells)
+                cells = {(Position(p.col, max_row - p.row), hc.rotated_cw()) for p, hc in cells}
+                colors = {Position(p.col, max_row - p.row): c for p, c in colors.items()}
+        return variants
 
     def orientations(self) -> list[frozenset[tuple[Position, HalfCell]]]:
-        """Empreintes distinctes obtenues par rotations **et retournements**.
+        """Empreintes géométriques distinctes (voir `oriented_variants`)."""
+        return [footprint for footprint, _ in self.oriented_variants()]
 
-        Le retournement (symétrie) est autorisé (confirmé par l'utilisateur) :
-        seul le parallélogramme rouge y gagne de nouvelles orientations, les
-        autres pièces étant symétriques. Groupe diédral -> jusqu'à 8 empreintes,
-        dédoublonnées.
-        """
-        result: list[frozenset[tuple[Position, HalfCell]]] = []
-        for base in (set(self.cells), _mirror_h(self.cells)):
-            current = base
-            for _ in range(4):
-                normalized = _normalize(current)
-                if normalized not in result:
-                    result.append(normalized)
-                current = {
-                    (_rotate_cell_cw(p, current), hc.rotated_cw()) for p, hc in current
-                }
-        return result
+    def variant_index(self, gem: PlacedGem) -> int:
+        """Index (dans `oriented_variants`) de l'orientation de `gem` (géométrie
+        **et** couleurs), pour la sérialisation."""
+        target = (gem.orientation, gem.cell_colors)
+        for index, variant in enumerate(self.oriented_variants()):
+            if variant == target:
+                return index
+        return 0
 
     def at(self, anchor: Position, orientation_index: int = 0) -> PlacedGem:
         """Fabrique une `PlacedGem` ancrée en `anchor` dans une orientation."""
+        footprint, colors = self.oriented_variants()[orientation_index]
         return PlacedGem(
             piece=self,
             anchor=anchor,
-            orientation=self.orientations()[orientation_index],
+            orientation=footprint,
+            cell_colors=colors,
         )
 
 
@@ -250,12 +285,37 @@ def _normalize(
     )
 
 
+def _normalize_variant(
+    cells: set[tuple[Position, HalfCell]],
+    colors: dict[Position, GemColor],
+) -> tuple[frozenset[tuple[Position, HalfCell]], frozenset[tuple[Position, GemColor]]]:
+    """Recolle empreinte **et** couleurs par case contre l'origine (même décalage)."""
+    min_row = min(p.row for p, _ in cells)
+    min_col = min(p.col for p, _ in cells)
+    footprint = frozenset(
+        (Position(p.row - min_row, p.col - min_col), hc) for p, hc in cells
+    )
+    shifted_colors = frozenset(
+        (Position(p.row - min_row, p.col - min_col), c) for p, c in colors.items()
+    )
+    return footprint, shifted_colors
+
+
 def _mirror_h(cells: frozenset[tuple[Position, HalfCell]]) -> set[tuple[Position, HalfCell]]:
     """Symétrie horizontale (miroir gauche/droite) d'une empreinte."""
     max_col = max(p.col for p, _ in cells)
     return {
         (Position(p.row, max_col - p.col), hc.mirrored_h()) for p, hc in cells
     }
+
+
+def _mirror_colors_h(
+    cell_colors: frozenset[tuple[Position, GemColor]],
+    cells: frozenset[tuple[Position, HalfCell]],
+) -> dict[Position, GemColor]:
+    """Symétrie horizontale des couleurs par case (même axe que `_mirror_h`)."""
+    max_col = max(p.col for p, _ in cells)
+    return {Position(p.row, max_col - p.col): c for p, c in dict(cell_colors).items()}
 
 
 @dataclass(frozen=True)
@@ -265,6 +325,9 @@ class PlacedGem:
     piece: Piece
     anchor: Position
     orientation: frozenset[tuple[Position, HalfCell]]
+    # Couleur par case dans l'orientation posée (offsets -> couleur) ; vide pour
+    # une pièce monochrome. Fixé par `Piece.at` et tourne avec l'empreinte.
+    cell_colors: frozenset[tuple[Position, GemColor]] = frozenset()
 
     @property
     def color(self) -> GemColor | None:
@@ -280,3 +343,14 @@ class PlacedGem:
             Position(self.anchor.row + p.row, self.anchor.col + p.col): hc
             for p, hc in self.orientation
         }
+
+    def absolute_colors(self) -> dict[Position, GemColor]:
+        """Couleur de chaque case, en coordonnées absolues (pièce multicolore)."""
+        return {
+            Position(self.anchor.row + p.row, self.anchor.col + p.col): c
+            for p, c in self.cell_colors
+        }
+
+    def color_at(self, position: Position) -> GemColor | None:
+        """Couleur de la case absolue `position`, ou None (hors pièce / monochrome)."""
+        return self.absolute_colors().get(position)

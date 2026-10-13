@@ -15,7 +15,7 @@ from orapa_mine.model.serialization import LoadedGame
 from orapa_mine.ui import dialogs, i18n, lang_toggle, theme, theme_toggle
 from orapa_mine.ui.timer_field import TimerField
 
-SIZE = (760, 758)  # taille logique ; mise à l'échelle DPI dans __init__
+SIZE = (760, 798)  # taille logique ; mise à l'échelle DPI dans __init__
 
 
 class ConfigScreen:
@@ -27,6 +27,7 @@ class ConfigScreen:
         self.corps_noir = False
         self.wormhole = False
         self.filter = False
+        self.rainbow = False
         self.sizes = [("Petit", 8, 6), ("Standard", 10, 8), ("Grand", 12, 10)]
         self.size_index = 1
         self.timer = TimerField()  # minuteur optionnel (0 = désactivé)
@@ -44,6 +45,7 @@ class ConfigScreen:
         self.corps_rect = pygame.Rect(s(170), s(266), s(26), s(26))
         self.wormhole_rect = pygame.Rect(s(170), s(304), s(26), s(26))
         self.filter_rect = pygame.Rect(s(170), s(342), s(26), s(26))
+        self.rainbow_rect = pygame.Rect(s(170), s(380), s(26), s(26))
         # Zone cliquable de chaque ligne (case + libellé) : on peut cocher en
         # cliquant la case OU le texte (#35). Largeur ajustée au texte réel pour
         # ne pas offrir une zone de clic démesurée (#65).
@@ -52,21 +54,21 @@ class ConfigScreen:
         total = 3 * bw + 2 * gap
         start_x = (self.size[0] - total) // 2
         self.size_rects = [
-            pygame.Rect(start_x + i * (bw + gap), s(422), bw, s(60)) for i in range(3)
+            pygame.Rect(start_x + i * (bw + gap), s(462), bw, s(60)) for i in range(3)
         ]
         # Minuteur (stepper − valeur + éditable), centré sous le total de gemmes.
         self.timer.set_rects(
-            pygame.Rect(s(271), s(580), s(44), s(40)),
-            pygame.Rect(s(325), s(580), s(110), s(40)),
-            pygame.Rect(s(445), s(580), s(44), s(40)),
+            pygame.Rect(s(271), s(620), s(44), s(40)),
+            pygame.Rect(s(325), s(620), s(110), s(40)),
+            pygame.Rect(s(445), s(620), s(44), s(40)),
         )
 
         bw2, gap2 = s(224), s(16)
         total2 = 3 * bw2 + 2 * gap2
         bx = (self.size[0] - total2) // 2
-        self.start_rect = pygame.Rect(bx, s(652), bw2, s(58))
-        self.creator_rect = pygame.Rect(bx + bw2 + gap2, s(652), bw2, s(58))
-        self.load_rect = pygame.Rect(bx + 2 * (bw2 + gap2), s(652), bw2, s(58))
+        self.start_rect = pygame.Rect(bx, s(692), bw2, s(58))
+        self.creator_rect = pygame.Rect(bx + bw2 + gap2, s(692), bw2, s(58))
+        self.load_rect = pygame.Rect(bx + 2 * (bw2 + gap2), s(692), bw2, s(58))
 
     # --- Événements --------------------------------------------------------
 
@@ -93,6 +95,8 @@ class ConfigScreen:
             self.wormhole = not self.wormhole
         elif self.filter_row.collidepoint(p):
             self.filter = not self.filter
+        elif self.rainbow_row.collidepoint(p):
+            self.rainbow = not self.rainbow
         elif self.start_rect.collidepoint(p):
             self._begin()
         elif self.creator_rect.collidepoint(p):
@@ -124,6 +128,8 @@ class ConfigScreen:
             pieces.append(cat.BLACK_BODY)
         if self.wormhole:
             pieces.append(cat.WORMHOLE)
+        if self.rainbow:
+            pieces.append(cat.RAINBOW)
         name, width, height = self.sizes[self.size_index]
         return Difficulty(
             pieces=pieces, width=width, height=height, name=name.lower(),
@@ -158,13 +164,14 @@ class ConfigScreen:
         surface.blit(base, (s(100), s(158)))
 
         surface.blit(self.font.render(i18n.t("Extensions", "Extensions"), True, theme.TEXT), (s(100), s(196)))
-        d_txt, c_txt, w_txt, f_txt = self._ext_label_texts()
+        d_txt, c_txt, w_txt, f_txt, r_txt = self._ext_label_texts()
         self._checkbox(surface, self.diamant_rect, self.diamant, d_txt)
         self._checkbox(surface, self.corps_rect, self.corps_noir, c_txt)
         self._checkbox(surface, self.wormhole_rect, self.wormhole, w_txt)
         self._checkbox(surface, self.filter_rect, self.filter, f_txt)
+        self._checkbox(surface, self.rainbow_rect, self.rainbow, r_txt)
 
-        surface.blit(self.font.render(i18n.t("Taille de la grille", "Grid size"), True, theme.TEXT), (s(100), s(382)))
+        surface.blit(self.font.render(i18n.t("Taille de la grille", "Grid size"), True, theme.TEXT), (s(100), s(422)))
         for i, rect in enumerate(self.size_rects):
             selected = i == self.size_index
             bg = theme.SLOT_SELECTED if selected else theme.SLOT_BG
@@ -178,14 +185,15 @@ class ConfigScreen:
             surface.blit(d, d.get_rect(centerx=rect.centerx, y=rect.y + s(34)))
 
         total = (5 + (1 if self.diamant else 0) + (1 if self.filter else 0)
-                 + (1 if self.corps_noir else 0) + (2 if self.wormhole else 0))
+                 + (1 if self.corps_noir else 0) + (2 if self.wormhole else 0)
+                 + (1 if self.rainbow else 0))
         count = self.font_small.render(
             i18n.t(f"Total : {total} gemmes à trouver", f"Total: {total} gems to find"), True, theme.TEXT_DIM)
-        surface.blit(count, count.get_rect(centerx=cx, y=s(524)))
+        surface.blit(count, count.get_rect(centerx=cx, y=s(564)))
 
         # Minuteur (optionnel) : label + stepper − valeur + (éditable au clavier).
         timer_label = self.font.render(i18n.t("Minuteur", "Timer"), True, theme.TEXT)
-        surface.blit(timer_label, timer_label.get_rect(centerx=cx, y=s(550)))
+        surface.blit(timer_label, timer_label.get_rect(centerx=cx, y=s(590)))
         self.timer.draw(surface, self.font, i18n.t("Désactivé", "Off"))
 
         self._button(surface, self.start_rect, theme.BTN_GREEN, i18n.t("Commencer", "Start"), theme.BTN_TEXT)
@@ -194,7 +202,7 @@ class ConfigScreen:
 
         if self.error:
             err = self.font_small.render(self.error, True, theme.LOSE_COLOR)
-            surface.blit(err, err.get_rect(centerx=cx, y=s(722)))
+            surface.blit(err, err.get_rect(centerx=cx, y=s(762)))
 
     def _button(self, surface: pygame.Surface, rect: pygame.Rect, bg, text: str, text_color=None) -> None:
         pygame.draw.rect(surface, bg, rect, border_radius=10)
@@ -209,18 +217,23 @@ class ConfigScreen:
             i18n.t("Corps noir (absorbe le rayon)", "Black body (absorbs the beam)"),
             i18n.t("Trou de ver ×2 (téléporte le rayon)", "Wormhole ×2 (teleports the beam)"),
             i18n.t("Filtre (remet le rayon transparent)", "Filter (resets the beam to transparent)"),
+            i18n.t("Arc-en-ciel (carré 4 couleurs)", "Rainbow (4-color square)"),
         ]
 
     def _build_ext_rows(self) -> None:
         """Zones cliquables des extensions, ajustées à la largeur du texte (#65)."""
         s = theme.s
         gap, pad = s(14), s(12)  # écart case→texte (cf. _checkbox) + marge droite
-        boxes = [self.diamant_rect, self.corps_rect, self.wormhole_rect, self.filter_rect]
+        boxes = [
+            self.diamant_rect, self.corps_rect, self.wormhole_rect,
+            self.filter_rect, self.rainbow_rect,
+        ]
         rows = [
             pygame.Rect(cb.x, cb.y, cb.width + gap + self.font.size(text)[0] + pad, cb.height)
             for cb, text in zip(boxes, self._ext_label_texts())
         ]
-        self.diamant_row, self.corps_row, self.wormhole_row, self.filter_row = rows
+        (self.diamant_row, self.corps_row, self.wormhole_row,
+         self.filter_row, self.rainbow_row) = rows
 
     def _checkbox(self, surface: pygame.Surface, rect: pygame.Rect, on: bool, text: str) -> None:
         pygame.draw.rect(surface, theme.INPUT_BG, rect, border_radius=4)

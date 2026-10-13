@@ -10,7 +10,7 @@ import math
 
 import pygame
 
-from orapa_mine.model.gems import GemKind, Piece
+from orapa_mine.model.gems import GemKind, HalfCell, Piece
 from orapa_mine.model.grid import Grid
 from orapa_mine.ui import i18n, theme
 
@@ -31,7 +31,12 @@ def faded_piece_color(piece: Piece) -> tuple[int, int, int]:
     """
     if piece.kind is GemKind.BLACK_BODY:
         return (72, 72, 82)
-    r, g, b = piece_color(piece)
+    return faded_color(piece_color(piece))
+
+
+def faded_color(rgb: tuple[int, int, int]) -> tuple[int, int, int]:
+    """Version « désactivée » d'une couleur : désaturée vers le gris puis assombrie."""
+    r, g, b = rgb
     lum = int(0.299 * r + 0.587 * g + 0.114 * b)
     mix = 0.78  # part de gris (désaturation)
     grey = (
@@ -156,14 +161,24 @@ def _draw_slot_icon(
         cell_size = min(icon_w / cols, icon_h / rows)
         ox = rect.centerx - cols * cell_size / 2
         oy = rect.top + top_pad
-        base = faded_piece_color(piece) if faded else piece_color(piece)
-        if piece.kind is GemKind.FILTER:  # icône translucide
+        if piece.kind is GemKind.RAINBOW:  # une couleur par case du carré 2×2
+            col_map = dict(piece.cell_colors)
+            for pos, half in cells:
+                cell_base = theme.GEM_FILL[col_map[pos]]
+                if faded:
+                    cell_base = faded_color(cell_base)
+                poly = theme.half_cell_polygon_at(pos, half, ox, oy, cell_size)
+                pygame.draw.polygon(surface, cell_base, poly)
+                pygame.draw.polygon(surface, darken(cell_base, 0.4), poly, width=1)
+        elif piece.kind is GemKind.FILTER:  # icône translucide
+            base = faded_piece_color(piece) if faded else piece_color(piece)
             overlay = pygame.Surface(rect.size, pygame.SRCALPHA)
             for pos, half in cells:
                 poly = theme.half_cell_polygon_at(pos, half, ox - rect.x, oy - rect.y, cell_size)
                 pygame.draw.polygon(overlay, (*base, theme.FILTER_ALPHA), poly)
             surface.blit(overlay, rect.topleft)
         else:
+            base = faded_piece_color(piece) if faded else piece_color(piece)
             for pos, half in cells:
                 pygame.draw.polygon(surface, base, theme.half_cell_polygon_at(pos, half, ox, oy, cell_size))
     label = i18n.piece(piece.color.value if piece.color else piece.name)
@@ -176,6 +191,46 @@ def _draw_slot_icon(
     surface.blit(name, name.get_rect(centerx=rect.centerx, bottom=rect.bottom - theme.s(4)))
 
 
+def draw_ghost(surface: pygame.Surface, gem, ok: bool, is_inside) -> None:
+    """Aperçu translucide d'une pièce en cours de pose.
+
+    Cas général : la pièce entière est teintée en vert (pose légale) ou rouge
+    (avertissement). Pour l'arc-en-ciel, on dessine les **vraies couleurs** de
+    chaque case — sinon l'orientation (quelle couleur où) serait illisible — et
+    on cerne le carré d'un liseré vert/rouge pour signaler la légalité (#72).
+    """
+    edge = theme.GHOST_OK if ok else theme.GHOST_BAD
+    overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
+    if gem.kind is GemKind.RAINBOW:
+        colors = gem.absolute_colors()
+        for pos, half in gem.absolute_cells().items():
+            if is_inside(pos):
+                base = theme.GEM_FILL[colors[pos]]
+                poly = theme.half_cell_polygon(pos, half)
+                pygame.draw.polygon(overlay, (*base, 170), poly)
+                pygame.draw.polygon(overlay, (*darken(base, 0.4), 170), poly, width=1)
+        surface.blit(overlay, (0, 0))
+        _outline_footprint(surface, gem, edge, is_inside)
+        return
+    for pos, half in gem.absolute_cells().items():
+        if is_inside(pos):
+            pygame.draw.polygon(overlay, (*edge, 120), theme.half_cell_polygon(pos, half))
+    surface.blit(overlay, (0, 0))
+
+
+def _outline_footprint(surface: pygame.Surface, gem, color, is_inside) -> None:
+    """Liseré englobant les cases visibles d'une pièce (légalité de l'aperçu)."""
+    cells = [pos for pos in gem.absolute_cells() if is_inside(pos)]
+    if not cells:
+        return
+    left = theme.BOARD_X + min(p.col for p in cells) * theme.CELL
+    top = theme.BOARD_Y + min(p.row for p in cells) * theme.CELL
+    right = theme.BOARD_X + (max(p.col for p in cells) + 1) * theme.CELL
+    bottom = theme.BOARD_Y + (max(p.row for p in cells) + 1) * theme.CELL
+    box = pygame.Rect(left, top, right - left, bottom - top)
+    pygame.draw.rect(surface, color, box, width=max(2, theme.s(3)), border_radius=theme.s(4))
+
+
 def draw_gems(surface: pygame.Surface, grid: Grid) -> None:
     """Dessine les gemmes pleines de `grid` (couleur + arêtes visibles)."""
     for gem in grid.gems:
@@ -185,6 +240,14 @@ def draw_gems(surface: pygame.Surface, grid: Grid) -> None:
             continue
         if gem.kind is GemKind.FILTER:  # couleur du diamant, translucide
             _draw_translucent(surface, gem.absolute_cells(), piece_color(gem.piece), theme.FILTER_ALPHA)
+            continue
+        if gem.kind is GemKind.RAINBOW:  # carré 2×2, une couleur par case
+            colors = gem.absolute_colors()
+            for pos, half in gem.absolute_cells().items():
+                cell_base = theme.GEM_FILL[colors[pos]]
+                poly = theme.half_cell_polygon(pos, half)
+                pygame.draw.polygon(surface, cell_base, poly)
+                pygame.draw.polygon(surface, darken(cell_base, 0.4), poly, width=1)
             continue
         base = piece_color(gem.piece)
         for pos, half in gem.absolute_cells().items():

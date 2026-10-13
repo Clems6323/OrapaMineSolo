@@ -40,6 +40,15 @@ subsiste, notamment sur les points `TODO-VALIDATION`).
   teinter. Géré dans `beam.fire_beam` avant les autres interactions ; le
   segment de liaison est marqué `TELEPORT_SEGMENT` (non dessiné). `Piece.quantity
   = 2` : la pièce se pose en deux exemplaires.
+- **Arc-en-ciel (extension)** : carré plein 2×2, **une couleur par case**
+  (blanc haut-gauche, bleu haut-droit, jaune bas-gauche, rouge bas-droit en
+  orientation canonique). Toutes ses faces sont plates (cases `FULL`) : le rayon
+  **rebondit à 180°** et prend la couleur de la **case touchée** (`gem.color_at`
+  dans `beam.collect`). Couleurs positionnelles → **4 rotations distinctes**,
+  **pas de retournement** (`allow_flip=False`). Les couleurs par case vivent
+  dans `Piece.cell_colors` / `PlacedGem.cell_colors` et tournent avec
+  l'empreinte (`Piece.oriented_variants`). Une question de case révèle la
+  couleur de cette case précise.
 
 ## Couleur du rayon
 
