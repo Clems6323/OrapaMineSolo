@@ -530,12 +530,7 @@ class GameScreen:
             return
         gem = self.selected.at(self.hovered_cell, self.orientation_index)
         ok = placement_is_legal(self.hypothesis, gem)
-        color = theme.GHOST_OK if ok else theme.GHOST_BAD
-        overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
-        for pos, half in gem.absolute_cells().items():
-            if self.grid.is_inside(pos):
-                pygame.draw.polygon(overlay, (*color, 120), theme.half_cell_polygon(pos, half))
-        surface.blit(overlay, (0, 0))
+        board_render.draw_ghost(surface, gem, ok, self.grid.is_inside)
 
     def _draw_hovered_coord(self, surface: pygame.Surface) -> None:
         """Badge « A1 » sur la case survolée (pour savoir quelle case interroger)."""

@@ -191,6 +191,46 @@ def _draw_slot_icon(
     surface.blit(name, name.get_rect(centerx=rect.centerx, bottom=rect.bottom - theme.s(4)))
 
 
+def draw_ghost(surface: pygame.Surface, gem, ok: bool, is_inside) -> None:
+    """Aperçu translucide d'une pièce en cours de pose.
+
+    Cas général : la pièce entière est teintée en vert (pose légale) ou rouge
+    (avertissement). Pour l'arc-en-ciel, on dessine les **vraies couleurs** de
+    chaque case — sinon l'orientation (quelle couleur où) serait illisible — et
+    on cerne le carré d'un liseré vert/rouge pour signaler la légalité (#72).
+    """
+    edge = theme.GHOST_OK if ok else theme.GHOST_BAD
+    overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
+    if gem.kind is GemKind.RAINBOW:
+        colors = gem.absolute_colors()
+        for pos, half in gem.absolute_cells().items():
+            if is_inside(pos):
+                base = theme.GEM_FILL[colors[pos]]
+                poly = theme.half_cell_polygon(pos, half)
+                pygame.draw.polygon(overlay, (*base, 170), poly)
+                pygame.draw.polygon(overlay, (*darken(base, 0.4), 170), poly, width=1)
+        surface.blit(overlay, (0, 0))
+        _outline_footprint(surface, gem, edge, is_inside)
+        return
+    for pos, half in gem.absolute_cells().items():
+        if is_inside(pos):
+            pygame.draw.polygon(overlay, (*edge, 120), theme.half_cell_polygon(pos, half))
+    surface.blit(overlay, (0, 0))
+
+
+def _outline_footprint(surface: pygame.Surface, gem, color, is_inside) -> None:
+    """Liseré englobant les cases visibles d'une pièce (légalité de l'aperçu)."""
+    cells = [pos for pos in gem.absolute_cells() if is_inside(pos)]
+    if not cells:
+        return
+    left = theme.BOARD_X + min(p.col for p in cells) * theme.CELL
+    top = theme.BOARD_Y + min(p.row for p in cells) * theme.CELL
+    right = theme.BOARD_X + (max(p.col for p in cells) + 1) * theme.CELL
+    bottom = theme.BOARD_Y + (max(p.row for p in cells) + 1) * theme.CELL
+    box = pygame.Rect(left, top, right - left, bottom - top)
+    pygame.draw.rect(surface, color, box, width=max(2, theme.s(3)), border_radius=theme.s(4))
+
+
 def draw_gems(surface: pygame.Surface, grid: Grid) -> None:
     """Dessine les gemmes pleines de `grid` (couleur + arêtes visibles)."""
     for gem in grid.gems:
