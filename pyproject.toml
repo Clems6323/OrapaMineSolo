@@ -3,12 +3,14 @@ name = "orapa-mine-solo"
 version = "0.1.0"
 description = "Orapa Mine en solo contre l'ordinateur, en Python/Pygame"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.14"
 authors = [{ name = "Clément Linarès" }]
 keywords = ["jeu", "puzzle", "déduction", "pygame", "orapa-mine"]
 classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Games/Entertainment :: Puzzle Games",
     "Intended Audience :: End Users/Desktop",
     "Operating System :: OS Independent",
