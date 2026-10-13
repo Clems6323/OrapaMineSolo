@@ -25,7 +25,7 @@ def _gem_to_dict(gem: PlacedGem) -> dict:
     return {
         "piece": gem.piece.name,
         "anchor": [gem.anchor.row, gem.anchor.col],
-        "orient": gem.piece.orientations().index(gem.orientation),
+        "orient": gem.piece.variant_index(gem),
     }
 
 

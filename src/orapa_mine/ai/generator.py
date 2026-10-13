@@ -101,12 +101,15 @@ def _random_valid_placement(
     """Choisit au hasard un placement valide de `piece`, ou None si aucun."""
     occupied = set(grid.surface)
     candidates: list[PlacedGem] = []
-    for orientation in piece.orientations():
+    for orientation, colors in piece.oriented_variants():
         max_row = max(p.row for p, _ in orientation)
         max_col = max(p.col for p, _ in orientation)
         for row in range(grid.height - max_row):
             for col in range(grid.width - max_col):
-                gem = PlacedGem(piece=piece, anchor=Position(row, col), orientation=orientation)
+                gem = PlacedGem(
+                    piece=piece, anchor=Position(row, col),
+                    orientation=orientation, cell_colors=colors,
+                )
                 if grid.can_place(gem) and not _touches_orthogonally(gem, occupied):
                     candidates.append(gem)
     if not candidates:

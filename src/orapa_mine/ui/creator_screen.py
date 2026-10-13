@@ -16,7 +16,7 @@ from __future__ import annotations
 import pygame
 
 from orapa_mine.ai.generator import configuration_problems, placement_is_legal
-from orapa_mine.model.gems import GemKind, Piece, PlacedGem, Position
+from orapa_mine.model.gems import GemKind, Piece, Position
 from orapa_mine.model import gems_catalog as cat
 from orapa_mine.model import serialization
 from orapa_mine.model.grid import Grid
@@ -48,6 +48,7 @@ class CreatorScreen:
         corps_noir: bool = False,
         wormhole: bool = False,
         filter: bool = False,
+        rainbow: bool = False,
         timer_minutes: int = 0,
     ) -> None:
         self.size_index = size_index
@@ -55,6 +56,7 @@ class CreatorScreen:
         self.corps_noir = corps_noir
         self.wormhole = wormhole
         self.filter = filter
+        self.rainbow = rainbow
         self.timer = TimerField(timer_minutes)  # minuteur optionnel (0 = désactivé)
 
         # Sélection / pose de pièces (même interaction que l'écran de jeu).
@@ -96,6 +98,8 @@ class CreatorScreen:
             pieces.append(cat.BLACK_BODY)
         if self.wormhole:
             pieces.append(cat.WORMHOLE)
+        if self.rainbow:
+            pieces.append(cat.RAINBOW)
         return pieces
 
     def _rebuild(self, clear_gems: bool) -> None:
@@ -165,6 +169,7 @@ class CreatorScreen:
         self.corps_rect = pygame.Rect(inner, top + s(150), s(20), s(20))
         self.wormhole_rect = pygame.Rect(inner, top + s(174), s(20), s(20))
         self.filter_rect = pygame.Rect(inner, top + s(198), s(20), s(20))
+        self.rainbow_rect = pygame.Rect(inner, top + s(222), s(20), s(20))
         # Ligne cliquable (case + libellé) : largeur ajustée au texte réel pour
         # ne pas offrir une zone de clic démesurée (#65).
         self._build_ext_rows()
@@ -178,7 +183,7 @@ class CreatorScreen:
             pygame.Rect(rx + s(30), top + s(126), s(68), s(26)),
             pygame.Rect(rx + s(102), top + s(126), s(26), s(26)),
         )
-        self.status_y = top + s(226)
+        self.status_y = top + s(250)
 
         # Actions (bas du panneau).
         self.save_rect = pygame.Rect(inner, self.panel.bottom - s(152), bw, s(40))
@@ -236,6 +241,10 @@ class CreatorScreen:
             self.filter = not self.filter
             self._rebuild(clear_gems=False)
             return
+        if self.rainbow_row.collidepoint(pos):
+            self.rainbow = not self.rainbow
+            self._rebuild(clear_gems=False)
+            return
         for i, rect in enumerate(self.size_rects):
             if rect.collidepoint(pos):
                 if i != self.size_index:
@@ -281,8 +290,7 @@ class CreatorScreen:
         if self.selected is None:
             self._pick_up(cell)
             return
-        orientation = self.selected.orientations()[self.orientation_index]
-        gem = PlacedGem(piece=self.selected, anchor=cell, orientation=orientation)
+        gem = self.selected.at(cell, self.orientation_index)
         # Blocage DUR uniquement sur bornes/chevauchement ; une gemme côte à côte
         # reste posable mais signalée en rouge (aperçu) et bloque Sauver/Jouer.
         if self.grid.can_place(gem):
@@ -303,10 +311,7 @@ class CreatorScreen:
         self.grid.remove_gem(gem)
         self.placed_counts[gem.piece.name] = max(0, self.placed_counts.get(gem.piece.name, 0) - 1)
         self.selected = gem.piece
-        try:
-            self.orientation_index = gem.piece.orientations().index(gem.orientation)
-        except ValueError:
-            self.orientation_index = 0
+        self.orientation_index = gem.piece.variant_index(gem)
         self.message = None
 
     def _remove_at(self, cell: Position | None) -> None:
@@ -427,8 +432,7 @@ class CreatorScreen:
     def _draw_ghost(self, surface: pygame.Surface) -> None:
         if self.selected is None or self.hovered_cell is None:
             return
-        orientation = self.selected.orientations()[self.orientation_index]
-        gem = PlacedGem(piece=self.selected, anchor=self.hovered_cell, orientation=orientation)
+        gem = self.selected.at(self.hovered_cell, self.orientation_index)
         ok = placement_is_legal(self.grid, gem)
         color = theme.GHOST_OK if ok else theme.GHOST_BAD
         overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
@@ -473,11 +477,12 @@ class CreatorScreen:
 
         # Réglages : extensions.
         surface.blit(self.font_small.render(i18n.t("Extensions", "Extensions"), True, theme.TEXT), (x, self.ext_label_y))
-        d_txt, c_txt, w_txt, f_txt = self._ext_label_texts()
+        d_txt, c_txt, w_txt, f_txt, r_txt = self._ext_label_texts()
         self._checkbox(surface, self.diamant_rect, self.diamant, d_txt)
         self._checkbox(surface, self.corps_rect, self.corps_noir, c_txt)
         self._checkbox(surface, self.wormhole_rect, self.wormhole, w_txt)
         self._checkbox(surface, self.filter_rect, self.filter, f_txt)
+        self._checkbox(surface, self.rainbow_rect, self.rainbow, r_txt)
 
         # Minuteur (optionnel), colonne de droite.
         surface.blit(self.font_small.render(i18n.t("Minuteur", "Timer"), True, theme.TEXT),
@@ -535,18 +540,23 @@ class CreatorScreen:
             i18n.t("Corps noir", "Black body"),
             i18n.t("Trou de ver (×2)", "Wormhole (×2)"),
             i18n.t("Filtre", "Filter"),
+            i18n.t("Arc-en-ciel", "Rainbow"),
         ]
 
     def _build_ext_rows(self) -> None:
         """Zones cliquables des extensions, ajustées à la largeur du texte (#65)."""
         s = theme.s
         gap, pad = s(10), s(10)  # écart case→texte (cf. _checkbox) + marge droite
-        boxes = [self.diamant_rect, self.corps_rect, self.wormhole_rect, self.filter_rect]
+        boxes = [
+            self.diamant_rect, self.corps_rect, self.wormhole_rect,
+            self.filter_rect, self.rainbow_rect,
+        ]
         rows = [
             pygame.Rect(cb.x, cb.y - s(2), cb.width + gap + self.font_small.size(text)[0] + pad, s(24))
             for cb, text in zip(boxes, self._ext_label_texts())
         ]
-        self.diamant_row, self.corps_row, self.wormhole_row, self.filter_row = rows
+        (self.diamant_row, self.corps_row, self.wormhole_row,
+         self.filter_row, self.rainbow_row) = rows
 
     def _checkbox(self, surface: pygame.Surface, rect: pygame.Rect, on: bool, text: str) -> None:
         pygame.draw.rect(surface, theme.INPUT_BG, rect, border_radius=4)

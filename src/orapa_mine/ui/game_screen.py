@@ -25,7 +25,7 @@ import pygame
 from orapa_mine.ai.generator import placement_is_legal
 from orapa_mine.model.beam import mix_colors
 from orapa_mine.model.game import CellContent, CellQuery, GameState, RayShot
-from orapa_mine.model.gems import GemColor, GemKind, Piece, PlacedGem, Position
+from orapa_mine.model.gems import GemColor, GemKind, Piece, Position
 from orapa_mine.model import serialization
 from orapa_mine.model.grid import Grid
 from orapa_mine.ui import board_render, dialogs, i18n, lang_toggle, theme, theme_toggle
@@ -301,8 +301,7 @@ class GameScreen:
         if self.selected is None:
             self._pick_up(cell)
             return
-        orientation = self.selected.orientations()[self.orientation_index]
-        gem = PlacedGem(piece=self.selected, anchor=cell, orientation=orientation)
+        gem = self.selected.at(cell, self.orientation_index)
         # Blocage DUR uniquement sur bornes/chevauchement (pose impossible) ; une
         # gemme posée côte à côte d'une autre reste autorisée mais signalée en
         # rouge par l'aperçu (avertissement, voir `_draw_ghost`).
@@ -324,10 +323,7 @@ class GameScreen:
         self.hypothesis.remove_gem(gem)
         self.placed_counts[gem.piece.name] = max(0, self.placed_counts.get(gem.piece.name, 0) - 1)
         self.selected = gem.piece
-        try:
-            self.orientation_index = gem.piece.orientations().index(gem.orientation)
-        except ValueError:
-            self.orientation_index = 0
+        self.orientation_index = gem.piece.variant_index(gem)
 
     def _remove_at(self, cell: Position | None) -> None:
         if cell is None:
@@ -532,8 +528,7 @@ class GameScreen:
     def _draw_ghost(self, surface: pygame.Surface) -> None:
         if self.selected is None or self.hovered_cell is None:
             return
-        orientation = self.selected.orientations()[self.orientation_index]
-        gem = PlacedGem(piece=self.selected, anchor=self.hovered_cell, orientation=orientation)
+        gem = self.selected.at(self.hovered_cell, self.orientation_index)
         ok = placement_is_legal(self.hypothesis, gem)
         color = theme.GHOST_OK if ok else theme.GHOST_BAD
         overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)

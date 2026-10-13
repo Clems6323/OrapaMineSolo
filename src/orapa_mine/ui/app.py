@@ -167,6 +167,7 @@ class OrapaMineApp:
             corps_noir=cat.BLACK_BODY in difficulty.pieces,
             wormhole=cat.WORMHOLE in difficulty.pieces,
             filter=cat.FILTER in difficulty.pieces,
+            rainbow=cat.RAINBOW in difficulty.pieces,
             timer_minutes=difficulty.timer_minutes,
         )
         self._resize(self.current.size)

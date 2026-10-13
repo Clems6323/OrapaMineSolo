@@ -32,6 +32,18 @@ from orapa_mine.model.gems import (
     Position,
 )
 
+# Disposition des couleurs de l'arc-en-ciel (carré 2×2), en offsets (ligne, col).
+# Confirmé (issue #72) : blanc haut-gauche, bleu haut-droit, jaune bas-gauche,
+# rouge bas-droit. Les 4 rotations sont jouables ; pas de retournement.
+_RAINBOW_COLORS = frozenset(
+    {
+        (Position(0, 0), GemColor.WHITE),
+        (Position(0, 1), GemColor.BLUE),
+        (Position(1, 0), GemColor.YELLOW),
+        (Position(1, 1), GemColor.RED),
+    }
+)
+
 # Coin manquant (quand 3 coins sur 4 sont dans la pièce) -> coin de l'angle
 # droit du triangle plein (le coin diagonalement opposé au coin vide).
 _OPPOSITE_CORNER = {"NW": "SE", "SE": "NW", "NE": "SW", "SW": "NE"}
@@ -129,6 +141,17 @@ WORMHOLE = Piece(
     cells=_rasterize([(0, 0), (1, 0), (1, 1), (0, 1)]),
     quantity=2,
 )
+# Arc-en-ciel (extension) : carré plein 2×2, une couleur par case. Toutes ses
+# faces sont plates -> le rayon rebondit à 180° et prend la couleur de la case
+# touchée. Couleurs positionnelles -> 4 rotations distinctes, pas de retournement.
+RAINBOW = Piece(
+    name="arc-en-ciel",
+    color=None,
+    kind=GemKind.RAINBOW,
+    cells=_rasterize([(0, 0), (2, 0), (2, 2), (0, 2)]),
+    cell_colors=_RAINBOW_COLORS,
+    allow_flip=False,
+)
 
 
 def base_set() -> list[Piece]:
@@ -143,5 +166,8 @@ def full_set() -> list[Piece]:
 
 ALL_PIECES: dict[str, Piece] = {
     p.name: p
-    for p in (RED, BLUE, WHITE_BIG, YELLOW, WHITE_SMALL, DIAMOND, FILTER, BLACK_BODY, WORMHOLE)
+    for p in (
+        RED, BLUE, WHITE_BIG, YELLOW, WHITE_SMALL,
+        DIAMOND, FILTER, BLACK_BODY, WORMHOLE, RAINBOW,
+    )
 }
