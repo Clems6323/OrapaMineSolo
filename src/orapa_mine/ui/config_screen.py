@@ -27,7 +27,7 @@ class ConfigScreen:
 
     # Attributs des extensions, dans l'ordre d'affichage (sert à compter et à
     # rogner les extensions au-delà du maximum autorisé — #75).
-    _EXT_ATTRS = ("diamant", "corps_noir", "wormhole", "filter", "rainbow")
+    _EXT_ATTRS = ("diamant", "corps_noir", "wormhole", "filter", "mystery")
 
     def __init__(self) -> None:
         self.size = (theme.s(SIZE[0]), theme.s(SIZE[1]))
@@ -35,7 +35,7 @@ class ConfigScreen:
         self.corps_noir = False
         self.wormhole = False
         self.filter = False
-        self.rainbow = False
+        self.mystery = False
         self.sizes = [("Petit", 8, 6), ("Standard", 10, 8), ("Grand", 12, 10)]
         self.size_index = 1
         self.timer = TimerField()  # minuteur optionnel (0 = désactivé)
@@ -53,7 +53,7 @@ class ConfigScreen:
         self.corps_rect = pygame.Rect(s(170), s(266), s(26), s(26))
         self.wormhole_rect = pygame.Rect(s(170), s(304), s(26), s(26))
         self.filter_rect = pygame.Rect(s(170), s(342), s(26), s(26))
-        self.rainbow_rect = pygame.Rect(s(170), s(380), s(26), s(26))
+        self.mystery_rect = pygame.Rect(s(170), s(380), s(26), s(26))
         # Zone cliquable de chaque ligne (case + libellé) : on peut cocher en
         # cliquant la case OU le texte (#35). Largeur ajustée au texte réel pour
         # ne pas offrir une zone de clic démesurée (#65).
@@ -103,8 +103,8 @@ class ConfigScreen:
             self._toggle_ext("wormhole")
         elif self.filter_row.collidepoint(p):
             self._toggle_ext("filter")
-        elif self.rainbow_row.collidepoint(p):
-            self._toggle_ext("rainbow")
+        elif self.mystery_row.collidepoint(p):
+            self._toggle_ext("mystery")
         elif self.start_rect.collidepoint(p):
             self._begin()
         elif self.creator_rect.collidepoint(p):
@@ -179,8 +179,8 @@ class ConfigScreen:
             pieces.append(cat.BLACK_BODY)
         if self.wormhole:
             pieces.append(cat.WORMHOLE)
-        if self.rainbow:
-            pieces.append(cat.RAINBOW)
+        if self.mystery:
+            pieces.append(cat.MYSTERY)
         name, width, height = self.sizes[self.size_index]
         return Difficulty(
             pieces=pieces, width=width, height=height, name=name.lower(),
@@ -222,7 +222,7 @@ class ConfigScreen:
         self._checkbox(surface, self.corps_rect, self.corps_noir, c_txt, disabled=self._ext_disabled("corps_noir"))
         self._checkbox(surface, self.wormhole_rect, self.wormhole, w_txt, disabled=self._ext_disabled("wormhole"))
         self._checkbox(surface, self.filter_rect, self.filter, f_txt, disabled=self._ext_disabled("filter"))
-        self._checkbox(surface, self.rainbow_rect, self.rainbow, r_txt, disabled=self._ext_disabled("rainbow"))
+        self._checkbox(surface, self.mystery_rect, self.mystery, r_txt, disabled=self._ext_disabled("mystery"))
 
         surface.blit(self.font.render(i18n.t("Taille de la grille", "Grid size"), True, theme.TEXT), (s(100), s(422)))
         for i, rect in enumerate(self.size_rects):
@@ -239,7 +239,7 @@ class ConfigScreen:
 
         total = (5 + (1 if self.diamant else 0) + (1 if self.filter else 0)
                  + (1 if self.corps_noir else 0) + (2 if self.wormhole else 0)
-                 + (1 if self.rainbow else 0))
+                 + (1 if self.mystery else 0))
         count = self.font_small.render(
             i18n.t(f"Total : {total} gemmes à trouver", f"Total: {total} gems to find"), True, theme.TEXT_DIM)
         surface.blit(count, count.get_rect(centerx=cx, y=s(564)))
@@ -270,7 +270,7 @@ class ConfigScreen:
             i18n.t("Corps noir (absorbe le rayon)", "Black body (absorbs the beam)"),
             i18n.t("Trou de ver ×2 (téléporte le rayon)", "Wormhole ×2 (teleports the beam)"),
             i18n.t("Filtre (remet le rayon transparent)", "Filter (resets the beam to transparent)"),
-            i18n.t("Arc-en-ciel (carré 4 couleurs)", "Rainbow (4-color square)"),
+            i18n.t("Mystère (couleur cachée)", "Mystery (hidden color)"),
         ]
 
     def _build_ext_rows(self) -> None:
@@ -279,14 +279,14 @@ class ConfigScreen:
         gap, pad = s(14), s(12)  # écart case→texte (cf. _checkbox) + marge droite
         boxes = [
             self.diamant_rect, self.corps_rect, self.wormhole_rect,
-            self.filter_rect, self.rainbow_rect,
+            self.filter_rect, self.mystery_rect,
         ]
         rows = [
             pygame.Rect(cb.x, cb.y, cb.width + gap + self.font.size(text)[0] + pad, cb.height)
             for cb, text in zip(boxes, self._ext_label_texts())
         ]
         (self.diamant_row, self.corps_row, self.wormhole_row,
-         self.filter_row, self.rainbow_row) = rows
+         self.filter_row, self.mystery_row) = rows
 
     def _checkbox(self, surface: pygame.Surface, rect: pygame.Rect, on: bool, text: str, disabled: bool = False) -> None:
         pygame.draw.rect(surface, theme.INPUT_BG, rect, border_radius=4)

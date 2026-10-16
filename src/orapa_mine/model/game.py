@@ -78,10 +78,9 @@ class GameState:
             content = CellContent(occupied=False)
         elif gem.kind is GemKind.BLACK_BODY:
             content = CellContent(occupied=True, kind=GemKind.BLACK_BODY, absorbed=True)
-        elif gem.kind is GemKind.RAINBOW:
-            # Carré multicolore : on révèle la couleur de la case interrogée.
-            content = CellContent(occupied=True, color=gem.color_at(position), kind=gem.kind)
         else:
+            # Gemme colorée ou mystère : on révèle sa vraie couleur (la gemme
+            # mystère annonce sa couleur cachée, pas son nom — issue #77).
             content = CellContent(occupied=True, color=gem.color, kind=gem.kind)
         query = CellQuery(position=position, content=content)
         self.history.append(query)

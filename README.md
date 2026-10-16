@@ -17,9 +17,9 @@ la peinture (rouge + jaune = orange, jaune + bleu = vert…), le blanc
 éclaircissant la teinte. Cinq extensions : le **diamant** (dévie sans teinter),
 le **filtre** (dévie et remet le rayon transparent), le **corps noir** (absorbe
 le rayon), le **trou de ver** (deux cases jumelles : le rayon entré dans l'une
-ressort de l'autre dans la même direction) et l'**arc-en-ciel** (carré 2×2 à
-quatre couleurs : le rayon rebondit à 180° et prend la couleur de la case
-touchée).
+ressort de l'autre dans la même direction) et la **gemme mystère** (de la taille
+du diamant mais d'une couleur cachée, révélée seulement à la fin : à toi de la
+déduire et de la proposer avec la touche **[C]**).
 
 La fenêtre s'adapte à l'écran : la taille des cases est choisie automatiquement
 pour que le plateau tienne sur ton moniteur, et la palette des pièces est à

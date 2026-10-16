@@ -10,7 +10,7 @@ import math
 
 import pygame
 
-from orapa_mine.model.gems import GemKind, HalfCell, Piece
+from orapa_mine.model.gems import GemKind, Piece
 from orapa_mine.model.grid import Grid
 from orapa_mine.ui import i18n, theme
 
@@ -53,6 +53,49 @@ def lighten(color: tuple[int, int, int], amount: float) -> tuple[int, int, int]:
 
 def darken(color: tuple[int, int, int], amount: float) -> tuple[int, int, int]:
     return tuple(max(0, int(c * (1 - amount))) for c in color)  # type: ignore[return-value]
+
+
+def _eye_params(polys: list) -> tuple[tuple[float, float], float, bool]:
+    """Centre, taille et orientation de l'œil à partir des polygones de la gemme.
+
+    L'œil suit l'orientation de la pièce : il est **vertical** quand l'empreinte
+    est plus haute que large (triangle pointant à gauche/droite), horizontal
+    sinon. Sa taille est bornée par la plus petite dimension pour rester à
+    l'intérieur quelle que soit la rotation (#77 suivi).
+    """
+    pts = [pt for poly in polys for pt in poly]
+    xs = [x for x, _ in pts]
+    ys = [y for _, y in pts]
+    cx = sum(xs) / len(xs)
+    cy = sum(ys) / len(ys)
+    span_x, span_y = max(xs) - min(xs), max(ys) - min(ys)
+    short = min(span_x, span_y)
+    return (cx, cy), short, span_y > span_x
+
+
+def draw_eye(
+    surface: pygame.Surface, center: tuple[float, float], extent: float,
+    *, vertical: bool = False, faded: bool = False,
+) -> None:
+    """Dessine un petit œil (symbole de la gemme mystère) centré sur `center`.
+
+    `extent` = plus petite dimension de la gemme ; l'œil (plus petit qu'avant)
+    s'inscrit dedans et pivote de 90° quand `vertical` est vrai.
+    """
+    cx, cy = int(center[0]), int(center[1])
+    length = max(6, int(extent * 0.78))   # grand axe (un peu plus petit qu'avant)
+    thick = max(4, int(extent * 0.46))    # petit axe
+    w, h = (thick, length) if vertical else (length, thick)
+    white = (208, 210, 220) if faded else (240, 242, 248)
+    dark = (72, 74, 84) if faded else (26, 28, 36)
+    rect = pygame.Rect(0, 0, w, h)
+    rect.center = (cx, cy)
+    pygame.draw.ellipse(surface, white, rect)
+    pygame.draw.ellipse(surface, dark, rect, width=max(1, int(min(w, h) * 0.12)))
+    pupil = max(2, int(thick * 0.4))
+    pygame.draw.circle(surface, dark, (cx, cy), pupil)
+    glint = max(1, int(pupil * 0.4))
+    pygame.draw.circle(surface, white, (cx - glint, cy - glint), glint)
 
 
 def draw_board(surface: pygame.Surface, grid: Grid) -> None:
@@ -112,19 +155,21 @@ def draw_palette_slot(
     selected: bool,
     placed: int,
     font: pygame.font.Font,
+    override_color=None,
 ) -> None:
     """Dessine une case de palette (fond, bordure, icône, badge de quantité).
 
     `placed` = nombre d'exemplaires déjà posés ; la case est grisée quand tous
     le sont, et un badge « ×N » affiche le reste à poser (pièces en plusieurs
-    exemplaires, p. ex. le trou de ver).
+    exemplaires, p. ex. le trou de ver). `override_color` ne sert qu'à la gemme
+    mystère : il teinte son icône de la couleur en cours de sélection ([C]).
     """
     used = placed >= piece.quantity
     bg = theme.SLOT_USED if used else theme.SLOT_BG
     pygame.draw.rect(surface, bg, rect, border_radius=6)
     border = theme.SLOT_SELECTED if selected else theme.BOARD_BORDER
     pygame.draw.rect(surface, border, rect, width=2 if selected else 1, border_radius=6)
-    _draw_slot_icon(surface, rect, piece, faded=used, font=font)
+    _draw_slot_icon(surface, rect, piece, faded=used, font=font, override_color=override_color)
     if piece.quantity > 1 and not used:
         # Pastille de quantité dans le coin haut-gauche (hors de l'icône et du
         # nom), sur un fond contrasté pour rester lisible, y compris sur le trou
@@ -140,7 +185,8 @@ def draw_palette_slot(
 
 
 def _draw_slot_icon(
-    surface: pygame.Surface, rect: pygame.Rect, piece: Piece, faded: bool, font: pygame.font.Font
+    surface: pygame.Surface, rect: pygame.Rect, piece: Piece, faded: bool,
+    font: pygame.font.Font, override_color=None,
 ) -> None:
     # Bande réservée au nom, sous l'icône, dimensionnée au texte réel pour que
     # l'icône ne déborde jamais sur le libellé — quelle que soit la langue (#66).
@@ -161,15 +207,16 @@ def _draw_slot_icon(
         cell_size = min(icon_w / cols, icon_h / rows)
         ox = rect.centerx - cols * cell_size / 2
         oy = rect.top + top_pad
-        if piece.kind is GemKind.RAINBOW:  # une couleur par case du carré 2×2
-            col_map = dict(piece.cell_colors)
-            for pos, half in cells:
-                cell_base = theme.GEM_FILL[col_map[pos]]
-                if faded:
-                    cell_base = faded_color(cell_base)
-                poly = theme.half_cell_polygon_at(pos, half, ox, oy, cell_size)
-                pygame.draw.polygon(surface, cell_base, poly)
-                pygame.draw.polygon(surface, darken(cell_base, 0.4), poly, width=1)
+        if piece.kind is GemKind.MYSTERY:  # gemme grise + œil, teintée par la couleur choisie
+            base = theme.GEM_FILL[override_color] if override_color is not None else theme.GEM_FILL[GemKind.MYSTERY]
+            if faded:
+                base = faded_color(base)
+            polys = [theme.half_cell_polygon_at(pos, half, ox, oy, cell_size) for pos, half in cells]
+            for poly in polys:
+                pygame.draw.polygon(surface, base, poly)
+                pygame.draw.polygon(surface, darken(base, 0.4), poly, width=1)
+            eye_center, eye_extent, eye_vert = _eye_params(polys)
+            draw_eye(surface, eye_center, eye_extent, vertical=eye_vert, faded=faded)
         elif piece.kind is GemKind.FILTER:  # icône translucide
             base = faded_piece_color(piece) if faded else piece_color(piece)
             overlay = pygame.Surface(rect.size, pygame.SRCALPHA)
@@ -195,21 +242,25 @@ def draw_ghost(surface: pygame.Surface, gem, ok: bool, is_inside) -> None:
     """Aperçu translucide d'une pièce en cours de pose.
 
     Cas général : la pièce entière est teintée en vert (pose légale) ou rouge
-    (avertissement). Pour l'arc-en-ciel, on dessine les **vraies couleurs** de
-    chaque case — sinon l'orientation (quelle couleur où) serait illisible — et
-    on cerne le carré d'un liseré vert/rouge pour signaler la légalité (#72).
+    (avertissement). Pour la gemme mystère, on dessine sa **couleur choisie** +
+    l'œil — sinon on ne saurait pas quelle couleur on pose — et on la cerne d'un
+    liseré vert/rouge pour signaler la légalité (#77).
     """
     edge = theme.GHOST_OK if ok else theme.GHOST_BAD
     overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
-    if gem.kind is GemKind.RAINBOW:
-        colors = gem.absolute_colors()
+    if gem.kind is GemKind.MYSTERY:
+        base = theme.GEM_FILL[gem.color] if gem.color is not None else theme.GEM_FILL[GemKind.MYSTERY]
+        polys = []
         for pos, half in gem.absolute_cells().items():
             if is_inside(pos):
-                base = theme.GEM_FILL[colors[pos]]
                 poly = theme.half_cell_polygon(pos, half)
+                polys.append(poly)
                 pygame.draw.polygon(overlay, (*base, 170), poly)
                 pygame.draw.polygon(overlay, (*darken(base, 0.4), 170), poly, width=1)
         surface.blit(overlay, (0, 0))
+        if polys:
+            eye_center, eye_extent, eye_vert = _eye_params(polys)
+            draw_eye(surface, eye_center, eye_extent, vertical=eye_vert)
         _outline_footprint(surface, gem, edge, is_inside)
         return
     for pos, half in gem.absolute_cells().items():
@@ -241,13 +292,16 @@ def draw_gems(surface: pygame.Surface, grid: Grid) -> None:
         if gem.kind is GemKind.FILTER:  # couleur du diamant, translucide
             _draw_translucent(surface, gem.absolute_cells(), piece_color(gem.piece), theme.FILTER_ALPHA)
             continue
-        if gem.kind is GemKind.RAINBOW:  # carré 2×2, une couleur par case
-            colors = gem.absolute_colors()
+        if gem.kind is GemKind.MYSTERY:  # gemme grise + œil, teintée par sa couleur (cachée)
+            base = theme.GEM_FILL[gem.color] if gem.color is not None else theme.GEM_FILL[GemKind.MYSTERY]
+            polys = []
             for pos, half in gem.absolute_cells().items():
-                cell_base = theme.GEM_FILL[colors[pos]]
                 poly = theme.half_cell_polygon(pos, half)
-                pygame.draw.polygon(surface, cell_base, poly)
-                pygame.draw.polygon(surface, darken(cell_base, 0.4), poly, width=1)
+                polys.append(poly)
+                pygame.draw.polygon(surface, base, poly)
+                pygame.draw.polygon(surface, darken(base, 0.4), poly, width=1)
+            eye_center, eye_extent, eye_vert = _eye_params(polys)
+            draw_eye(surface, eye_center, eye_extent, vertical=eye_vert)
             continue
         base = piece_color(gem.piece)
         for pos, half in gem.absolute_cells().items():

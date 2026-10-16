@@ -42,7 +42,7 @@ _COLORS_EN = {
 _PIECES_EN = {
     "rouge": "red", "jaune": "yellow", "bleu": "blue", "blanc": "white",
     "diamant": "diamond", "filtre": "filter", "corps-noir": "black body",
-    "trou-de-ver": "wormhole", "arc-en-ciel": "rainbow",
+    "trou-de-ver": "wormhole", "mystère": "mystery",
 }
 
 _SIZES_EN = {"Petit": "Small", "Standard": "Standard", "Grand": "Large"}

@@ -41,6 +41,11 @@ _KIND_PIECE_NAME: dict[GemKind, str] = {
     GemKind.BLACK_BODY: "corps-noir",
     GemKind.WORMHOLE: "trou-de-ver",
 }
+# La gemme mystère est volontairement absente : une question de case révèle sa
+# vraie COULEUR (et non son nom), comme une gemme normale (issue #77).
+
+# Ordre de défilement de la couleur de la gemme mystère (touche [C]).
+_MYSTERY_CYCLE = (GemColor.BLUE, GemColor.RED, GemColor.YELLOW, GemColor.WHITE)
 
 
 @dataclass
@@ -74,6 +79,10 @@ class GameScreen:
         self.orientation_index = 0
         self.placed_counts: dict[str, int] = {}  # nom de pièce -> nb d'exemplaires posés
         self.hovered_cell: Position | None = None
+        # Couleur « devinée » de la gemme mystère (choisie au clavier [C]) ;
+        # elle teinte l'aperçu, la pièce posée et le rayon de test.
+        self.mystery_color = GemColor.BLUE
+        self._has_mystery = any(p.kind is GemKind.MYSTERY for p in palette_pieces)
 
         # Zone de proposition (texte) et résultat de soumission.
         self.input_text = ""
@@ -270,6 +279,8 @@ class GameScreen:
         elif event.key == pygame.K_r and self.selected is not None:
             count = len(self.selected.orientations())
             self.orientation_index = (self.orientation_index + 1) % count
+        elif event.key == pygame.K_c and self._has_mystery:
+            self._cycle_mystery_color()
         elif event.key == pygame.K_ESCAPE:
             self.selected = None
 
@@ -284,6 +295,11 @@ class GameScreen:
             self.input_text += event.unicode.upper()
 
     # --- Actions -----------------------------------------------------------
+
+    def _cycle_mystery_color(self) -> None:
+        """Fait défiler la couleur devinée de la gemme mystère ([C])."""
+        i = _MYSTERY_CYCLE.index(self.mystery_color)
+        self.mystery_color = _MYSTERY_CYCLE[(i + 1) % len(_MYSTERY_CYCLE)]
 
     def _select_slot(self, index: int) -> None:
         piece = self.slots[index].piece
@@ -301,7 +317,8 @@ class GameScreen:
         if self.selected is None:
             self._pick_up(cell)
             return
-        gem = self.selected.at(cell, self.orientation_index)
+        color = self.mystery_color if self.selected.kind is GemKind.MYSTERY else None
+        gem = self.selected.at(cell, self.orientation_index, color=color)
         # Blocage DUR uniquement sur bornes/chevauchement (pose impossible) ; une
         # gemme posée côte à côte d'une autre reste autorisée mais signalée en
         # rouge par l'aperçu (avertissement, voir `_draw_ghost`).
@@ -324,6 +341,8 @@ class GameScreen:
         self.placed_counts[gem.piece.name] = max(0, self.placed_counts.get(gem.piece.name, 0) - 1)
         self.selected = gem.piece
         self.orientation_index = gem.piece.variant_index(gem)
+        if gem.kind is GemKind.MYSTERY and gem.color is not None:
+            self.mystery_color = gem.color  # on reprend la couleur devinée
 
     def _remove_at(self, cell: Position | None) -> None:
         if cell is None:
@@ -528,7 +547,8 @@ class GameScreen:
     def _draw_ghost(self, surface: pygame.Surface) -> None:
         if self.selected is None or self.hovered_cell is None:
             return
-        gem = self.selected.at(self.hovered_cell, self.orientation_index)
+        color = self.mystery_color if self.selected.kind is GemKind.MYSTERY else None
+        gem = self.selected.at(self.hovered_cell, self.orientation_index, color=color)
         ok = placement_is_legal(self.hypothesis, gem)
         board_render.draw_ghost(surface, gem, ok, self.grid.is_inside)
 
@@ -569,11 +589,13 @@ class GameScreen:
             head = self.font_small.render(i18n.t("Extensions", "Extensions"), True, theme.TEXT_DIM)
             surface.blit(head, (ext_slots[0].rect.x + theme.s(1), theme.PALETTE.y - theme.s(22)))
         for slot in self.slots:
+            override = self.mystery_color if slot.piece.kind is GemKind.MYSTERY else None
             board_render.draw_palette_slot(
                 surface, slot.rect, slot.piece,
                 selected=slot.piece is self.selected,
                 placed=self.placed_counts.get(slot.piece.name, 0),
                 font=self.font_small,
+                override_color=override,
             )
 
     def _draw_panel(self, surface: pygame.Surface) -> None:
@@ -648,8 +670,8 @@ class GameScreen:
             surface.blit(msg, (x, self.input_rect.bottom + s(10)))
 
         hint = i18n.t(
-            "clic=choisir/poser, clic sur une pièce=reprendre, [R] tourner, clic droit=retirer, [H] aide, [Maj+D] debug",
-            "click=select/place, click a piece=pick up, [R] rotate, right-click=remove, [H] help, [Shift+D] debug",
+            "clic=choisir/poser, clic sur une pièce=reprendre, [R] tourner, [C] couleur mystère, clic droit=retirer, [H] aide, [Maj+D] debug",
+            "click=select/place, click a piece=pick up, [R] rotate, [C] mystery color, right-click=remove, [H] help, [Shift+D] debug",
         )
         surface.blit(
             self.font_small.render(hint, True, theme.TEXT_DIM),
@@ -907,6 +929,15 @@ _HELP: list[tuple[str, str, str, str]] = [
         "answer (empty, a color, or an extension name) is added to the History.",
     ),
     (
+        "Gemme mystère", "Mystery gem",
+        "La gemme mystère a la taille du diamant mais une couleur cachée. "
+        "Déduis-la (rayons, question de case) puis, en la posant, appuie sur [C] "
+        "pour choisir la couleur que tu proposes. La vraie couleur est révélée à la fin.",
+        "The mystery gem is diamond-sized but its color is hidden. Deduce it "
+        "(beams, cell query) then, when placing it, press [C] to pick the color "
+        "you guess. The true color is revealed at the end.",
+    ),
+    (
         "Déduire", "Deduce",
         "Rejoue les mêmes points sur tes hypothèses jusqu'à retrouver les vraies "
         "sorties et couleurs listées dans l'Historique.",
@@ -937,10 +968,10 @@ _HELP: list[tuple[str, str, str, str]] = [
     ),
     (
         "Raccourcis", "Shortcuts",
-        "[H] aide, [S] sauvegarder, [Maj+D] debug. [R] tourne/retourne la pièce ; clic sur une "
-        "pièce posée = la reprendre pour la déplacer ; clic droit = la retirer.",
-        "[H] help, [S] save, [Shift+D] debug. [R] rotates/flips the piece; click a placed piece "
-        "to pick it up and move it; right-click removes it.",
+        "[H] aide, [S] sauvegarder, [Maj+D] debug. [R] tourne/retourne la pièce ; [C] change la "
+        "couleur de la gemme mystère ; clic sur une pièce posée = la reprendre ; clic droit = la retirer.",
+        "[H] help, [S] save, [Shift+D] debug. [R] rotates/flips the piece; [C] changes the mystery "
+        "gem color; click a placed piece to pick it up; right-click removes it.",
     ),
 ]
 
