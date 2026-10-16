@@ -10,7 +10,7 @@ import math
 
 import pygame
 
-from orapa_mine.model.gems import GemKind, HalfCell, Piece
+from orapa_mine.model.gems import GemKind, Piece
 from orapa_mine.model.grid import Grid
 from orapa_mine.ui import i18n, theme
 
