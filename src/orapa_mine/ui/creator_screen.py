@@ -15,7 +15,11 @@ from __future__ import annotations
 
 import pygame
 
-from orapa_mine.ai.generator import configuration_problems, placement_is_legal
+from orapa_mine.ai.generator import (
+    MAX_EXTENSIONS_BY_SIZE,
+    configuration_problems,
+    placement_is_legal,
+)
 from orapa_mine.model.gems import GemKind, Piece, Position
 from orapa_mine.model import gems_catalog as cat
 from orapa_mine.model import serialization
@@ -40,6 +44,8 @@ class CreatorScreen:
     """
 
     _SIZES = [("Petit", 8, 6), ("Standard", 10, 8), ("Grand", 12, 10)]
+    # Extensions dans l'ordre d'affichage (compte + rognage au plafond — #75).
+    _EXT_ATTRS = ("diamant", "corps_noir", "wormhole", "filter", "rainbow")
 
     def __init__(
         self,
@@ -77,6 +83,7 @@ class CreatorScreen:
         self.font_small = theme.font(15)
         self.font_big = theme.font(26, bold=True)
 
+        self._enforce_ext_limit()  # borne les extensions reçues au plafond de la taille (#75)
         self.grid = Grid(width=10, height=8)  # remplacé par _rebuild
         self._rebuild(clear_gems=True)
         self.pending_resize = False  # la taille initiale est posée par l'app
@@ -226,29 +233,25 @@ class CreatorScreen:
             self.back = True
             return
         if self.diamant_row.collidepoint(pos):
-            self.diamant = not self.diamant
-            self._rebuild(clear_gems=False)
+            self._toggle_ext("diamant")
             return
         if self.corps_row.collidepoint(pos):
-            self.corps_noir = not self.corps_noir
-            self._rebuild(clear_gems=False)
+            self._toggle_ext("corps_noir")
             return
         if self.wormhole_row.collidepoint(pos):
-            self.wormhole = not self.wormhole
-            self._rebuild(clear_gems=False)
+            self._toggle_ext("wormhole")
             return
         if self.filter_row.collidepoint(pos):
-            self.filter = not self.filter
-            self._rebuild(clear_gems=False)
+            self._toggle_ext("filter")
             return
         if self.rainbow_row.collidepoint(pos):
-            self.rainbow = not self.rainbow
-            self._rebuild(clear_gems=False)
+            self._toggle_ext("rainbow")
             return
         for i, rect in enumerate(self.size_rects):
             if rect.collidepoint(pos):
                 if i != self.size_index:
                     self.size_index = i
+                    self._enforce_ext_limit()  # une grille plus petite plafonne moins d'extensions (#75)
                     self._rebuild(clear_gems=True)
                     self.message = None
                 return
@@ -272,6 +275,33 @@ class CreatorScreen:
             self.orientation_index = (self.orientation_index + 1) % count
         elif event.key == pygame.K_ESCAPE:
             self.selected = None
+
+    # --- Extensions : plafond par taille de grille (#75) -------------------
+
+    def _max_ext(self) -> int:
+        """Nombre maximum d'extensions activables pour la taille courante."""
+        return MAX_EXTENSIONS_BY_SIZE[self.size_index]
+
+    def _ext_count(self) -> int:
+        """Nombre d'extensions actuellement cochées."""
+        return sum(getattr(self, attr) for attr in self._EXT_ATTRS)
+
+    def _toggle_ext(self, attr: str) -> None:
+        """(Dé)coche une extension (refus au plafond) puis reconstruit la palette."""
+        if not getattr(self, attr) and self._ext_count() >= self._max_ext():
+            return  # plafond atteint : on n'active pas d'extension supplémentaire
+        setattr(self, attr, not getattr(self, attr))
+        self._rebuild(clear_gems=False)
+
+    def _enforce_ext_limit(self) -> None:
+        """Décoche les extensions au-delà du plafond (après passage à une plus petite grille)."""
+        limit = self._max_ext()
+        kept = 0
+        for attr in self._EXT_ATTRS:
+            if getattr(self, attr):
+                kept += 1
+                if kept > limit:
+                    setattr(self, attr, False)
 
     # --- Actions -----------------------------------------------------------
 
@@ -470,14 +500,16 @@ class CreatorScreen:
             label = self.font_small.render(f"{i18n.size_name(name)} {w}×{h}", True, fg)
             surface.blit(label, label.get_rect(center=rect.center))
 
-        # Réglages : extensions.
-        surface.blit(self.font_small.render(i18n.t("Extensions", "Extensions"), True, theme.TEXT), (x, self.ext_label_y))
+        # Réglages : extensions (plafonnées selon la taille de grille — #75).
+        ext_header = i18n.t("Extensions", "Extensions") + f"  ({self._ext_count()}/{self._max_ext()})"
+        surface.blit(self.font_small.render(ext_header, True, theme.TEXT), (x, self.ext_label_y))
         d_txt, c_txt, w_txt, f_txt, r_txt = self._ext_label_texts()
-        self._checkbox(surface, self.diamant_rect, self.diamant, d_txt)
-        self._checkbox(surface, self.corps_rect, self.corps_noir, c_txt)
-        self._checkbox(surface, self.wormhole_rect, self.wormhole, w_txt)
-        self._checkbox(surface, self.filter_rect, self.filter, f_txt)
-        self._checkbox(surface, self.rainbow_rect, self.rainbow, r_txt)
+        locked = self._ext_count() >= self._max_ext()  # plafond atteint → cases décochées grisées
+        self._checkbox(surface, self.diamant_rect, self.diamant, d_txt, disabled=locked and not self.diamant)
+        self._checkbox(surface, self.corps_rect, self.corps_noir, c_txt, disabled=locked and not self.corps_noir)
+        self._checkbox(surface, self.wormhole_rect, self.wormhole, w_txt, disabled=locked and not self.wormhole)
+        self._checkbox(surface, self.filter_rect, self.filter, f_txt, disabled=locked and not self.filter)
+        self._checkbox(surface, self.rainbow_rect, self.rainbow, r_txt, disabled=locked and not self.rainbow)
 
         # Minuteur (optionnel), colonne de droite.
         surface.blit(self.font_small.render(i18n.t("Minuteur", "Timer"), True, theme.TEXT),
@@ -553,12 +585,12 @@ class CreatorScreen:
         (self.diamant_row, self.corps_row, self.wormhole_row,
          self.filter_row, self.rainbow_row) = rows
 
-    def _checkbox(self, surface: pygame.Surface, rect: pygame.Rect, on: bool, text: str) -> None:
+    def _checkbox(self, surface: pygame.Surface, rect: pygame.Rect, on: bool, text: str, disabled: bool = False) -> None:
         pygame.draw.rect(surface, theme.INPUT_BG, rect, border_radius=4)
         pygame.draw.rect(surface, theme.BOARD_BORDER, rect, width=1, border_radius=4)
         if on:
             pygame.draw.rect(surface, theme.SLOT_SELECTED, rect.inflate(theme.s(-8), theme.s(-8)), border_radius=2)
-        label = self.font_small.render(text, True, theme.TEXT)
+        label = self.font_small.render(text, True, theme.TEXT_DIM if disabled else theme.TEXT)
         surface.blit(label, (rect.right + theme.s(10), rect.y + theme.s(2)))
 
 

@@ -28,6 +28,12 @@ from orapa_mine.model import gems_catalog as cat
 _MAX_ATTEMPTS = 5000
 _DIRECTIONS = (Direction.UP, Direction.DOWN, Direction.LEFT, Direction.RIGHT)
 
+# Nombre maximum d'extensions activables selon la taille de grille (#75).
+# Au-delà, aucune configuration valide n'existe en pratique (les contraintes de
+# non-adjacence et de visibilité ne laissent plus de place), si bien que la
+# génération échouait. Indexé comme les tailles de l'UI : Petit, Standard, Grand.
+MAX_EXTENSIONS_BY_SIZE = (2, 4, 5)
+
 
 @dataclass
 class Difficulty:
