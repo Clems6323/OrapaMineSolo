@@ -8,7 +8,11 @@ from __future__ import annotations
 
 import pygame
 
-from orapa_mine.ai.generator import Difficulty
+from orapa_mine.ai.generator import (
+    DISALLOWED_EXTENSIONS_BY_SIZE,
+    MAX_EXTENSIONS_BY_SIZE,
+    Difficulty,
+)
 from orapa_mine.model import gems_catalog as cat
 from orapa_mine.model import serialization
 from orapa_mine.model.serialization import LoadedGame
@@ -20,6 +24,10 @@ SIZE = (760, 798)  # taille logique ; mise à l'échelle DPI dans __init__
 
 class ConfigScreen:
     """Menu de configuration cliquable (rectangles + cases à cocher)."""
+
+    # Attributs des extensions, dans l'ordre d'affichage (sert à compter et à
+    # rogner les extensions au-delà du maximum autorisé — #75).
+    _EXT_ATTRS = ("diamant", "corps_noir", "wormhole", "filter", "rainbow")
 
     def __init__(self) -> None:
         self.size = (theme.s(SIZE[0]), theme.s(SIZE[1]))
@@ -88,15 +96,15 @@ class ConfigScreen:
         if self.timer.handle_click(p):  # − / + / case du minuteur
             return
         if self.diamant_row.collidepoint(p):
-            self.diamant = not self.diamant
+            self._toggle_ext("diamant")
         elif self.corps_row.collidepoint(p):
-            self.corps_noir = not self.corps_noir
+            self._toggle_ext("corps_noir")
         elif self.wormhole_row.collidepoint(p):
-            self.wormhole = not self.wormhole
+            self._toggle_ext("wormhole")
         elif self.filter_row.collidepoint(p):
-            self.filter = not self.filter
+            self._toggle_ext("filter")
         elif self.rainbow_row.collidepoint(p):
-            self.rainbow = not self.rainbow
+            self._toggle_ext("rainbow")
         elif self.start_rect.collidepoint(p):
             self._begin()
         elif self.creator_rect.collidepoint(p):
@@ -107,6 +115,49 @@ class ConfigScreen:
             for i, rect in enumerate(self.size_rects):
                 if rect.collidepoint(p):
                     self.size_index = i
+                    self._enforce_ext_rules()  # une grille plus petite restreint les extensions (#75)
+
+    # --- Extensions : plafond par taille de grille (#75) -------------------
+
+    def _max_ext(self) -> int:
+        """Nombre maximum d'extensions activables pour la taille courante."""
+        return MAX_EXTENSIONS_BY_SIZE[self.size_index]
+
+    def _ext_count(self) -> int:
+        """Nombre d'extensions actuellement cochées."""
+        return sum(getattr(self, attr) for attr in self._EXT_ATTRS)
+
+    def _ext_allowed(self, attr: str) -> bool:
+        """Cette extension est-elle disponible pour la taille de grille courante ? (#75)"""
+        return attr not in DISALLOWED_EXTENSIONS_BY_SIZE[self.size_index]
+
+    def _ext_disabled(self, attr: str) -> bool:
+        """Case non cliquable : extension interdite, ou plafond atteint et non cochée."""
+        if not self._ext_allowed(attr):
+            return True
+        return self._ext_count() >= self._max_ext() and not getattr(self, attr)
+
+    def _toggle_ext(self, attr: str) -> None:
+        """(Dé)coche une extension ; refuse si interdite ou si le plafond est atteint."""
+        if not getattr(self, attr) and self._ext_disabled(attr):
+            return
+        setattr(self, attr, not getattr(self, attr))
+
+    def _enforce_ext_rules(self) -> None:
+        """Rétablit des extensions valides pour la taille courante (après resize) : #75.
+
+        Décoche d'abord les extensions interdites, puis rogne l'excédent au-delà
+        du plafond (en conservant les premières dans l'ordre d'affichage).
+        """
+        for attr in DISALLOWED_EXTENSIONS_BY_SIZE[self.size_index]:
+            setattr(self, attr, False)
+        limit = self._max_ext()
+        kept = 0
+        for attr in self._EXT_ATTRS:
+            if getattr(self, attr):
+                kept += 1
+                if kept > limit:
+                    setattr(self, attr, False)
 
     def _load(self) -> None:
         path = dialogs.ask_open_path()
@@ -163,13 +214,15 @@ class ConfigScreen:
         )
         surface.blit(base, (s(100), s(158)))
 
-        surface.blit(self.font.render(i18n.t("Extensions", "Extensions"), True, theme.TEXT), (s(100), s(196)))
+        ext_header = i18n.t("Extensions", "Extensions") + f"  ({self._ext_count()}/{self._max_ext()})"
+        surface.blit(self.font.render(ext_header, True, theme.TEXT), (s(100), s(196)))
         d_txt, c_txt, w_txt, f_txt, r_txt = self._ext_label_texts()
-        self._checkbox(surface, self.diamant_rect, self.diamant, d_txt)
-        self._checkbox(surface, self.corps_rect, self.corps_noir, c_txt)
-        self._checkbox(surface, self.wormhole_rect, self.wormhole, w_txt)
-        self._checkbox(surface, self.filter_rect, self.filter, f_txt)
-        self._checkbox(surface, self.rainbow_rect, self.rainbow, r_txt)
+        # Cases grisées : extension interdite pour la taille, ou plafond atteint (#75).
+        self._checkbox(surface, self.diamant_rect, self.diamant, d_txt, disabled=self._ext_disabled("diamant"))
+        self._checkbox(surface, self.corps_rect, self.corps_noir, c_txt, disabled=self._ext_disabled("corps_noir"))
+        self._checkbox(surface, self.wormhole_rect, self.wormhole, w_txt, disabled=self._ext_disabled("wormhole"))
+        self._checkbox(surface, self.filter_rect, self.filter, f_txt, disabled=self._ext_disabled("filter"))
+        self._checkbox(surface, self.rainbow_rect, self.rainbow, r_txt, disabled=self._ext_disabled("rainbow"))
 
         surface.blit(self.font.render(i18n.t("Taille de la grille", "Grid size"), True, theme.TEXT), (s(100), s(422)))
         for i, rect in enumerate(self.size_rects):
@@ -235,11 +288,11 @@ class ConfigScreen:
         (self.diamant_row, self.corps_row, self.wormhole_row,
          self.filter_row, self.rainbow_row) = rows
 
-    def _checkbox(self, surface: pygame.Surface, rect: pygame.Rect, on: bool, text: str) -> None:
+    def _checkbox(self, surface: pygame.Surface, rect: pygame.Rect, on: bool, text: str, disabled: bool = False) -> None:
         pygame.draw.rect(surface, theme.INPUT_BG, rect, border_radius=4)
         pygame.draw.rect(surface, theme.BOARD_BORDER, rect, width=1, border_radius=4)
         if on:
             inner = rect.inflate(theme.s(-8), theme.s(-8))
             pygame.draw.rect(surface, theme.SLOT_SELECTED, inner, border_radius=3)
-        label = self.font.render(text, True, theme.TEXT)
+        label = self.font.render(text, True, theme.TEXT_DIM if disabled else theme.TEXT)
         surface.blit(label, (rect.right + theme.s(14), rect.y + theme.s(2)))

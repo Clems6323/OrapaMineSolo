@@ -28,6 +28,21 @@ from orapa_mine.model import gems_catalog as cat
 _MAX_ATTEMPTS = 5000
 _DIRECTIONS = (Direction.UP, Direction.DOWN, Direction.LEFT, Direction.RIGHT)
 
+# Nombre maximum d'extensions activables selon la taille de grille (#75).
+# Au-delà, aucune configuration valide n'existe en pratique (les contraintes de
+# non-adjacence et de visibilité ne laissent plus de place), si bien que la
+# génération échouait. Indexé comme les tailles de l'UI : Petit, Standard, Grand.
+MAX_EXTENSIONS_BY_SIZE = (2, 4, 5)
+
+# Extensions indisponibles selon la taille de grille (#75) : l'arc-en-ciel est
+# un carré **2×2** qui, avec les contraintes de placement, ne tient pas sur la
+# petite grille. Clés = attributs d'extension de l'UI ; indexé comme les tailles.
+DISALLOWED_EXTENSIONS_BY_SIZE: tuple[frozenset[str], ...] = (
+    frozenset({"rainbow"}),  # Petit  (8×6)
+    frozenset(),             # Standard (10×8)
+    frozenset(),             # Grand  (12×10)
+)
+
 
 @dataclass
 class Difficulty:

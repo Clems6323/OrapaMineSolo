@@ -189,6 +189,14 @@ les diagrammes du livret :
   questions « qu'y a-t-il en X ? ») utilisés — moins il y en a, mieux c'est.
 - **Difficulté** : contrôle du nombre de gemmes (5 base / 7 complet), de la
   taille de grille, et de l'activation des extensions.
+- **Plafond d'extensions par taille de grille** (#75) : au-delà d'un certain
+  nombre d'extensions, les contraintes de placement (non-adjacence, visibilité)
+  ne laissent plus de configuration valide et la génération échouait. On borne
+  donc le nombre d'extensions activables : **Petit → 2, Standard → 4,
+  Grand → 5** (`MAX_EXTENSIONS_BY_SIZE` dans `ai/generator.py`), aussi bien à la
+  configuration qu'en mode créateur. De plus, l'**arc-en-ciel** (carré 2×2) est
+  **indisponible sur la petite grille** — il n'y tient pas avec les contraintes
+  de placement (`DISALLOWED_EXTENSIONS_BY_SIZE`).
 - **Minuteur** (optionnel, 0 = désactivé) : réglable sur l'écran de
   configuration et en mode créateur, soit au stepper − / +, soit en tapant un
   nombre dans la case (max 60 min). Sauvegardé avec la configuration. En jeu,
