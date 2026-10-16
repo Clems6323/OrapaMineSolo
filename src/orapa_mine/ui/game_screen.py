@@ -474,6 +474,7 @@ class GameScreen:
             game=self.game,
             hypothesis_grid=self.hypothesis,
             timer_minutes=self.timer_minutes,
+            max_proposals=self.game.max_proposals,
             elapsed_seconds=self.elapsed,
         )
         try:
@@ -549,9 +550,17 @@ class GameScreen:
         won = self.game.submit_guess(list(self.hypothesis.gems))
         if won:
             self.finished = ("win", self.game.request_score)
-        else:
+            return
+        if self.game.proposals_exhausted:  # plus d'essais : fin de partie (#45)
+            self.finished = ("lost", self.game.request_score)
+            return
+        rem = self.game.remaining_proposals
+        if rem is None:
             self.message = i18n.t("Proposition incorrecte, réessaie.", "Incorrect guess, try again.")
-            self.message_color = theme.LOSE_COLOR
+        else:
+            self.message = i18n.t(f"Proposition incorrecte. Essais restants : {rem}.",
+                                  f"Incorrect guess. Attempts left: {rem}.")
+        self.message_color = theme.LOSE_COLOR
 
     # --- Détection de zones ------------------------------------------------
 
@@ -680,10 +689,17 @@ class GameScreen:
             self.font_small.render(test_hint, True, theme.TEXT_DIM),
             (x, self.panel.top + s(54)),
         )
-        # Boutons Proposer / Abandonner.
+        # Boutons Proposer / Abandonner. Le libellé indique les essais restants
+        # quand le nombre de propositions est limité (#45).
         pygame.draw.rect(surface, theme.BTN_GREEN, self.submit_rect, border_radius=6)
         pygame.draw.rect(surface, theme.BOARD_BORDER, self.submit_rect, width=1, border_radius=6)
-        btn = self.font_small.render(i18n.t("Proposer la solution", "Submit solution"), True, theme.BTN_TEXT)
+        rem = self.game.remaining_proposals
+        if rem is None:
+            submit_text = i18n.t("Proposer la solution", "Submit solution")
+        else:
+            submit_text = i18n.t(f"Proposer ({rem} essai{'s' if rem != 1 else ''})",
+                                 f"Submit ({rem} left)")
+        btn = self.font_small.render(submit_text, True, theme.BTN_TEXT)
         surface.blit(btn, btn.get_rect(center=self.submit_rect.center))
         pygame.draw.rect(surface, theme.BTN_RED, self.abandon_rect, border_radius=6)
         pygame.draw.rect(surface, theme.BOARD_BORDER, self.abandon_rect, width=1, border_radius=6)
@@ -1020,10 +1036,12 @@ _HELP: list[tuple[str, str, str, str]] = [
         "Gagner", "Win",
         "Quand tu es sûr de toi, clique « Proposer la solution ». Deux scores "
         "(plus bas = mieux) : le score de requêtes (tir = 1, question de case = 3, "
-        "proposition ratée = 5) et, en fin de partie, la distance à la vérité.",
+        "proposition ratée = 5) et, en fin de partie, la distance à la vérité. "
+        "Le nombre de propositions peut être limité (bouton « Proposer (N essais) »).",
         "When you're confident, click “Submit solution”. Two scores (lower is "
         "better): the request score (beam = 1, cell query = 3, wrong guess = 5) "
-        "and, at the end, the distance to the truth.",
+        "and, at the end, the distance to the truth. The number of guesses can be "
+        "limited (the “Submit (N left)” button).",
     ),
     (
         "Sauvegarder / charger", "Save / load",

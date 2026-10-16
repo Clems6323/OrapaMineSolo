@@ -74,6 +74,7 @@ class GameState:
     history: list[RayShot | CellQuery] = field(default_factory=list)
     won: bool = False
     invalid_submissions: int = 0  # propositions incorrectes (pénalité au score)
+    max_proposals: int = 0  # nb max de propositions (#45) ; 0 = illimité
 
     def play_shot(self, entry: Position, direction: Direction) -> RayShot:
         """Envoie un rayon, enregistre le tir dans l'historique, le retourne."""
@@ -125,6 +126,22 @@ class GameState:
         for action in self.history:
             total += CELL_QUERY_COST if isinstance(action, CellQuery) else SHOT_COST
         return total
+
+    @property
+    def remaining_proposals(self) -> int | None:
+        """Propositions restantes, ou None si illimité (`max_proposals == 0`)."""
+        if self.max_proposals <= 0:
+            return None
+        return max(0, self.max_proposals - self.invalid_submissions)
+
+    @property
+    def proposals_exhausted(self) -> bool:
+        """Vrai si le joueur a épuisé ses propositions sans trouver (#45)."""
+        return (
+            self.max_proposals > 0
+            and not self.won
+            and self.invalid_submissions >= self.max_proposals
+        )
 
     @property
     def shots(self) -> list[RayShot]:

@@ -129,7 +129,9 @@ class OrapaMineApp:
         elif isinstance(screen, ConfigScreen) and screen.result is not None:
             self._start_game(screen.result)
         elif isinstance(screen, CreatorScreen) and screen.play is not None:
-            self._start_from_grid(screen.play, screen.palette_pieces, screen.timer_minutes)
+            self._start_from_grid(
+                screen.play, screen.palette_pieces, screen.timer_minutes, screen.max_proposals
+            )
         elif isinstance(screen, CreatorScreen) and screen.back:
             self.current = ConfigScreen()
             self._resize(self.current.size)
@@ -147,6 +149,7 @@ class OrapaMineApp:
                 outcome == "win", score, screen.game.hidden_grid, screen.palette_pieces,
                 elapsed_seconds=screen.elapsed, timed_out=(outcome == "timeout"),
                 timer_minutes=screen.timer_minutes, distance=distance,
+                lost=(outcome == "lost"),
             )
         elif isinstance(screen, EndScreen):
             if screen.restart:
@@ -158,7 +161,7 @@ class OrapaMineApp:
     def _start_game(self, difficulty: Difficulty) -> None:
         rng = random.Random(self.seed)
         grid = generate_hidden_grid(difficulty=difficulty, rng=rng)
-        game = GameState(hidden_grid=grid)
+        game = GameState(hidden_grid=grid, max_proposals=difficulty.max_proposals)
         self.current = GameScreen(
             game, palette_pieces=difficulty.pieces, timer_minutes=difficulty.timer_minutes
         )
@@ -180,11 +183,14 @@ class OrapaMineApp:
             filter=cat.FILTER in difficulty.pieces,
             mystery=cat.MYSTERY in difficulty.pieces,
             timer_minutes=difficulty.timer_minutes,
+            max_proposals=difficulty.max_proposals,
         )
         self._resize(self.current.size)
 
-    def _start_from_grid(self, grid, palette_pieces, timer_minutes: int = 0) -> None:
-        game = GameState(hidden_grid=grid)
+    def _start_from_grid(
+        self, grid, palette_pieces, timer_minutes: int = 0, max_proposals: int = 0
+    ) -> None:
+        game = GameState(hidden_grid=grid, max_proposals=max_proposals)
         self.current = GameScreen(game, palette_pieces=palette_pieces, timer_minutes=timer_minutes)
         self._resize(self.current.size)
 
@@ -204,11 +210,11 @@ class OrapaMineApp:
     def _show_end(
         self, won: bool, score: int, hidden_grid, palette_pieces,
         elapsed_seconds: float = 0.0, timed_out: bool = False, timer_minutes: int = 0,
-        distance=None,
+        distance=None, lost: bool = False,
     ) -> None:
         self.current = EndScreen(
             won=won, score=score, hidden_grid=hidden_grid, palette_pieces=palette_pieces,
             elapsed_seconds=elapsed_seconds, timed_out=timed_out, timer_minutes=timer_minutes,
-            distance=distance,
+            distance=distance, lost=lost,
         )
         self._resize(self.current.size)

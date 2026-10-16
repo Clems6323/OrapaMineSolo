@@ -75,7 +75,8 @@ uv run pytest                 # lance les tests
 5. **Propose la solution** quand tu es sûr. Deux scores (plus bas = mieux) : le
    **score de requêtes** (tir de rayon = 1, question de case = 3, proposition
    ratée = 5) et, à l'écran de fin, la **distance à la vérité** (Earth Mover,
-   en cases ; 0 = parfait).
+   en cases ; 0 = parfait). Le **nombre de propositions** peut être limité
+   (réglage **Propositions**, 0 = illimité ; mets 1 pour n'avoir qu'une chance).
 
 **Sauvegarder / charger** : le bouton **Sauvegarder** enregistre la partie dans
 un fichier `.json` ; coche **Progression** pour y inclure aussi l'historique et

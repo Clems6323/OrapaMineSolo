@@ -30,8 +30,10 @@ class EndScreen:
         timed_out: bool = False,
         timer_minutes: int = 0,
         distance=None,
+        lost: bool = False,
     ) -> None:
         self.won = won
+        self.lost = lost  # propositions épuisées sans trouver (#45)
         self.score = score
         self.distance = distance  # Score (model.distance) : proximité à la vérité (#45)
         self.grid = hidden_grid
@@ -143,6 +145,8 @@ class EndScreen:
             banner, color = i18n.t("Gagné !", "You win!"), theme.WIN_COLOR
         elif self.timed_out:
             banner, color = i18n.t("Temps écoulé !", "Time's up!"), theme.LOSE_COLOR
+        elif self.lost:
+            banner, color = i18n.t("Plus d'essais !", "Out of attempts!"), theme.LOSE_COLOR
         else:
             banner, color = i18n.t("Partie abandonnée", "Game abandoned"), theme.LOSE_COLOR
         title = self.font_big.render(banner, True, color)

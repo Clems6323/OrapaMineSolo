@@ -68,6 +68,7 @@ class Difficulty:
     height: int = 8
     name: str = "base"
     timer_minutes: int = 0  # minuteur optionnel (0 = désactivé)
+    max_proposals: int = 0  # nb max de propositions (#45) ; 0 = illimité
 
     @staticmethod
     def base() -> Difficulty:

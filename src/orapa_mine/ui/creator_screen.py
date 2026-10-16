@@ -27,7 +27,9 @@ from orapa_mine.model import serialization
 from orapa_mine.model.grid import Grid
 from orapa_mine.ui import board_render, dialogs, i18n, lang_toggle, theme, theme_toggle
 from orapa_mine.ui.beam_test import RayTester
+from orapa_mine.ui.config_screen import MAX_PROPOSALS, _proposals_text
 from orapa_mine.ui.game_screen import Slot
+from orapa_mine.ui.stepper_field import StepperField
 from orapa_mine.ui.timer_field import TimerField
 
 _BASE_PIECES = [cat.RED, cat.YELLOW, cat.BLUE, cat.WHITE_BIG, cat.WHITE_SMALL]
@@ -59,6 +61,7 @@ class CreatorScreen:
         filter: bool = False,
         mystery: bool = False,
         timer_minutes: int = 0,
+        max_proposals: int = 0,
     ) -> None:
         self.size_index = size_index
         self.diamant = diamant
@@ -69,6 +72,7 @@ class CreatorScreen:
         # Couleur choisie de la gemme mystère (touche [C]).
         self.mystery_color = GemColor.BLUE
         self.timer = TimerField(timer_minutes)  # minuteur optionnel (0 = désactivé)
+        self.proposals = StepperField(max_proposals, max_value=MAX_PROPOSALS)  # 0 = illimité
 
         # Sélection / pose de pièces (même interaction que l'écran de jeu).
         self.selected: Piece | None = None
@@ -97,6 +101,11 @@ class CreatorScreen:
     def timer_minutes(self) -> int:
         """Minutes du minuteur (lu par l'app pour lancer/sauvegarder la partie)."""
         return self.timer.minutes
+
+    @property
+    def max_proposals(self) -> int:
+        """Nombre max de propositions choisi (0 = illimité) — lu par l'app (#45)."""
+        return self.proposals.value
 
     # --- Construction ------------------------------------------------------
 
@@ -195,6 +204,13 @@ class CreatorScreen:
             pygame.Rect(rx + s(30), top + s(126), s(68), s(26)),
             pygame.Rect(rx + s(102), top + s(126), s(26), s(26)),
         )
+        # Propositions max (droite, sous le minuteur). 0 = illimité (#45).
+        self.proposals_label_y = top + s(160)
+        self.proposals.set_rects(
+            pygame.Rect(rx, top + s(182), s(26), s(26)),
+            pygame.Rect(rx + s(30), top + s(182), s(68), s(26)),
+            pygame.Rect(rx + s(102), top + s(182), s(26), s(26)),
+        )
         self.status_y = top + s(250)
 
         # Actions (bas du panneau).
@@ -227,6 +243,8 @@ class CreatorScreen:
             self._build_ext_rows()  # le texte change de langue → recalc des zones (#65)
             return
         if self.timer.handle_click(pos):  # − / + / case du minuteur (valide la saisie)
+            return
+        if self.proposals.handle_click(pos):  # − / + propositions max
             return
         if self.save_rect.collidepoint(pos):
             self._save()
@@ -429,6 +447,7 @@ class CreatorScreen:
             game=None,
             hypothesis_grid=None,
             timer_minutes=self.timer_minutes,
+            max_proposals=self.max_proposals,
         )
         try:
             dialogs.write_json(path, data)
@@ -545,6 +564,9 @@ class CreatorScreen:
         surface.blit(self.font_small.render(i18n.t("Minuteur", "Timer"), True, theme.TEXT),
                      (self.timer_label_x, self.timer_label_y))
         self.timer.draw(surface, self.font_small, i18n.t("Désactivé", "Off"))
+        surface.blit(self.font_small.render(i18n.t("Propositions", "Proposals"), True, theme.TEXT),
+                     (self.timer_label_x, self.proposals_label_y))
+        self.proposals.draw(surface, self.font_small, _proposals_text(self.proposals.value))
 
         # État de validité en direct.
         placed = len(self.grid.gems)

@@ -199,6 +199,11 @@ les diagrammes du livret :
     progression ; l'écran de fin affiche donc plutôt `placed_total` (somme finie
     sur les gemmes **posées**) et le compte `missing` — p. ex. « 2.40 cases,
     3/5 gemmes posées ». Calculée à l'écran de fin.
+- **Propositions limitées** (#45) : réglage `max_proposals` (0 = illimité, par
+  défaut). Chaque **proposition incorrecte** consomme un essai ; à 0 essai
+  restant sans avoir trouvé, la partie est **perdue** (« Plus d'essais », la
+  solution est révélée). Réglable à la configuration **et** en mode créateur,
+  sauvegardé avec la partie. Mettre 1 ne laisse qu'**une seule chance**.
 - **Difficulté** : contrôle du nombre de gemmes (5 base / 7 complet), de la
   taille de grille, et de l'activation des extensions.
 - **Plafond d'extensions par taille de grille** (#75) : au-delà d'un certain
