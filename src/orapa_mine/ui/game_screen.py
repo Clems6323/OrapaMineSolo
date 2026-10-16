@@ -103,6 +103,8 @@ class GameScreen:
         # Défilement de l'historique (offset en pixels depuis le haut).
         self.history_scroll = 0.0
         self.history_stick_bottom = True
+        self._dragging_scroll = False  # glissement de la barre de défilement (#79)
+        self._drag_grab_dy = 0.0       # décalage clic→haut du pouce pendant le glissement
 
         self.font = theme.font(20)
         self.font_small = theme.font(15)
@@ -133,6 +135,10 @@ class GameScreen:
     def _layout_panel(self) -> None:
         s = theme.s
         self.panel = theme.PANEL.copy()
+        # Le panneau n'est aussi haut que le plateau : on l'étire dans l'espace
+        # libre sous lui (côté droit, sans points d'entrée) pour agrandir
+        # l'historique (#79). On garde une marge pour la ligne d'indices du bas.
+        self.panel.height = max(self.panel.height, self.size[1] - self.panel.top - s(34))
         px = self.panel.x
         self.panel_x = px
         inner = px + s(18)
@@ -148,10 +154,11 @@ class GameScreen:
         self.save_rect = pygame.Rect(inner + s(150), top + s(132), s(132), s(28))
         # Bouton « Retour au menu » (ouvre le popup de sauvegarde avant de quitter).
         self.menu_rect = pygame.Rect(inner, top + s(170), bw, s(30))
-        self.input_rect = pygame.Rect(inner, self.panel.bottom - s(92), bw, s(32))
+        # Zone de saisie ancrée en bas du panneau (laisse la place au message dessous).
+        self.input_rect = pygame.Rect(inner, self.panel.bottom - s(62), bw, s(32))
 
         # Zone d'historique : s'étire entre l'en-tête et la zone de saisie,
-        # donc s'adapte à la hauteur du panneau.
+        # donc profite de toute la hauteur gagnée par le panneau agrandi.
         self.history_header_y = top + s(208)
         content_top = self.history_header_y + s(24)
         content_bottom = self.input_rect.top - s(28)  # laisse la place au libellé
@@ -163,10 +170,16 @@ class GameScreen:
 
     def handle_event(self, event: pygame.event.Event) -> None:
         if event.type == pygame.MOUSEMOTION:
+            if self._dragging_scroll:  # glissement de la barre de défilement (#79)
+                self._drag_scroll_to(event.pos[1])
+                return
             self.ray.hover(event.pos)
             self.hovered_cell = self._cell_at(event.pos)
         elif event.type == pygame.MOUSEBUTTONDOWN:
             self._on_click(event)
+        elif event.type == pygame.MOUSEBUTTONUP:
+            if event.button == 1:
+                self._dragging_scroll = False
         elif event.type == pygame.MOUSEWHEEL:
             if not self.show_help and self.history_rect.collidepoint(pygame.mouse.get_pos()):
                 self._scroll_history(event.y)
@@ -180,6 +193,56 @@ class GameScreen:
             return
         # Molette vers le haut (dy > 0) -> remonter dans l'historique.
         self.history_scroll = min(max_scroll, max(0.0, self.history_scroll - dy * _HISTORY_ROW_H * 2))
+        self.history_stick_bottom = self.history_scroll >= max_scroll - 1
+
+    # --- Barre de défilement de l'historique (cliquable/glissable, #79) ------
+
+    def _history_scrollbar(self):
+        """Géométrie de la barre : (gouttière, pouce, hauteur du pouce, scroll max).
+
+        Renvoie None si l'historique tient entièrement (pas de barre).
+        """
+        rect = self.history_rect
+        content_h = len(self.game.history) * _HISTORY_ROW_H + theme.s(8)
+        max_scroll = max(0.0, content_h - rect.height)
+        if max_scroll <= 0:
+            return None
+        thumb_h = max(theme.s(24), rect.height * rect.height / content_h)
+        scroll = min(max(0.0, self.history_scroll), max_scroll)
+        thumb_y = rect.y + (scroll / max_scroll) * (rect.height - thumb_h)
+        track = pygame.Rect(rect.right - theme.s(9), rect.y, theme.s(9), rect.height)
+        thumb = pygame.Rect(rect.right - theme.s(8), int(thumb_y), theme.s(7), int(thumb_h))
+        return track, thumb, thumb_h, max_scroll
+
+    def _start_scroll_drag(self, pos: tuple[int, int]) -> bool:
+        """Début d'un glissement : sur le pouce (avec décalage) ou dans la gouttière (saut)."""
+        sb = self._history_scrollbar()
+        if sb is None:
+            return False
+        track, thumb, thumb_h, _ = sb
+        if thumb.collidepoint(pos):
+            self._dragging_scroll = True
+            self._drag_grab_dy = pos[1] - thumb.y
+            return True
+        if track.collidepoint(pos):  # clic dans la gouttière : on centre le pouce puis on glisse
+            self._dragging_scroll = True
+            self._drag_grab_dy = thumb_h / 2
+            self._drag_scroll_to(pos[1])
+            return True
+        return False
+
+    def _drag_scroll_to(self, y: int) -> None:
+        """Place le défilement selon la position verticale `y` du curseur (glissement)."""
+        sb = self._history_scrollbar()
+        if sb is None:
+            return
+        _, _, thumb_h, max_scroll = sb
+        rect = self.history_rect
+        travel = rect.height - thumb_h
+        if travel <= 0:
+            return
+        thumb_top = min(rect.bottom - thumb_h, max(float(rect.y), y - self._drag_grab_dy))
+        self.history_scroll = ((thumb_top - rect.y) / travel) * max_scroll
         self.history_stick_bottom = self.history_scroll >= max_scroll - 1
 
     def _on_click(self, event: pygame.event.Event) -> None:
@@ -217,6 +280,8 @@ class GameScreen:
         if self.help_rect.collidepoint(pos):
             self.show_help = True
             self.help_page = 0
+            return
+        if self._start_scroll_drag(pos):  # saisir/cliquer la barre de défilement (#79)
             return
         # Zone de saisie ?
         if self.input_rect.collidepoint(pos):
@@ -843,12 +908,19 @@ class GameScreen:
                 self._draw_history_row(surface, rect.x + s(8), int(ry), action)
         surface.set_clip(previous_clip)
 
-        # Barre de défilement (si le contenu déborde).
-        if max_scroll > 0:
-            thumb_h = max(s(24), rect.height * rect.height / content_h)
-            thumb_y = rect.y + (self.history_scroll / max_scroll) * (rect.height - thumb_h)
-            thumb = pygame.Rect(rect.right - s(7), int(thumb_y), s(4), int(thumb_h))
-            pygame.draw.rect(surface, theme.BOARD_BORDER, thumb, border_radius=2)
+        # Barre de défilement cliquable/glissable (si le contenu déborde, #79).
+        sb = self._history_scrollbar()
+        if sb is not None:
+            track, thumb, _, _ = sb
+            pygame.draw.rect(surface, theme.SLOT_BG, track, border_radius=s(3))  # gouttière
+            over = thumb.collidepoint(pygame.mouse.get_pos())
+            if self._dragging_scroll:
+                color = theme.SLOT_SELECTED
+            elif over:
+                color = theme.TEXT_DIM
+            else:
+                color = theme.BOARD_BORDER
+            pygame.draw.rect(surface, color, thumb, border_radius=s(3))
 
     def _draw_history_row(
         self, surface: pygame.Surface, x: int, y: int, action: RayShot | CellQuery
