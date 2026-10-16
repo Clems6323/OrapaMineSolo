@@ -21,7 +21,14 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass, field
 
-from orapa_mine.model.gems import Direction, Piece, PlacedGem, Position
+from orapa_mine.model.gems import (
+    Direction,
+    GemColor,
+    GemKind,
+    Piece,
+    PlacedGem,
+    Position,
+)
 from orapa_mine.model.grid import Grid
 from orapa_mine.model import gems_catalog as cat
 
@@ -34,14 +41,18 @@ _DIRECTIONS = (Direction.UP, Direction.DOWN, Direction.LEFT, Direction.RIGHT)
 # génération échouait. Indexé comme les tailles de l'UI : Petit, Standard, Grand.
 MAX_EXTENSIONS_BY_SIZE = (2, 4, 5)
 
-# Extensions indisponibles selon la taille de grille (#75) : l'arc-en-ciel est
-# un carré **2×2** qui, avec les contraintes de placement, ne tient pas sur la
-# petite grille. Clés = attributs d'extension de l'UI ; indexé comme les tailles.
+# Extensions indisponibles selon la taille de grille (#75) : clés = attributs
+# d'extension de l'UI ; indexé comme les tailles. Toutes les extensions
+# actuelles tiennent sur toutes les tailles (la gemme mystère a la taille du
+# diamant), d'où des ensembles vides ; le mécanisme reste pour le futur.
 DISALLOWED_EXTENSIONS_BY_SIZE: tuple[frozenset[str], ...] = (
-    frozenset({"rainbow"}),  # Petit  (8×6)
-    frozenset(),             # Standard (10×8)
-    frozenset(),             # Grand  (12×10)
+    frozenset(),  # Petit  (8×6)
+    frozenset(),  # Standard (10×8)
+    frozenset(),  # Grand  (12×10)
 )
+
+# Couleurs possibles de la gemme mystère (tirées au hasard à la génération).
+_MYSTERY_COLORS = (GemColor.RED, GemColor.YELLOW, GemColor.BLUE, GemColor.WHITE)
 
 
 @dataclass
@@ -115,15 +126,17 @@ def _random_valid_placement(
 ) -> PlacedGem | None:
     """Choisit au hasard un placement valide de `piece`, ou None si aucun."""
     occupied = set(grid.surface)
+    # Gemme mystère : couleur cachée tirée au hasard (sinon None -> couleur de la pièce).
+    color = rng.choice(_MYSTERY_COLORS) if piece.kind is GemKind.MYSTERY else None
     candidates: list[PlacedGem] = []
-    for orientation, colors in piece.oriented_variants():
+    for orientation in piece.orientations():
         max_row = max(p.row for p, _ in orientation)
         max_col = max(p.col for p, _ in orientation)
         for row in range(grid.height - max_row):
             for col in range(grid.width - max_col):
                 gem = PlacedGem(
                     piece=piece, anchor=Position(row, col),
-                    orientation=orientation, cell_colors=colors,
+                    orientation=orientation, override_color=color,
                 )
                 if grid.can_place(gem) and not _touches_orthogonally(gem, occupied):
                     candidates.append(gem)

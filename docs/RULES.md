@@ -172,15 +172,17 @@ les diagrammes du livret :
   blanche. Dans la palette, un
   seul emplacement « ×2 » (puis « ×1 » après la première pose, grisé une fois les
   deux posés).
-- **Arc-en-ciel** (extension ajoutée, non officielle) : carré plein **2×2** dont
-  chaque case porte une **couleur différente** (en orientation canonique : blanc
-  haut-gauche, bleu haut-droit, jaune bas-gauche, rouge bas-droit). Toutes ses
-  faces étant plates, le rayon **rebondit à 180°** et prend la **couleur de la
-  case qu'il a touchée** (une seule, celle de la face d'entrée). Les couleurs
-  étant positionnelles, ses **4 rotations** donnent des configurations
-  distinctes ; **pas de retournement** (le dos d'un carreau coloré n'a pas de
-  couleur). Une question « qu'y a-t-il en X ? » sur une de ses cases révèle la
-  **couleur de cette case**. Compte pour **une pièce** à deviner.
+- **Mystère** (extension ajoutée, non officielle) : **même forme que le diamant**
+  (petit triangle, aire 1), mais d'une **couleur cachée**. La couleur est tirée
+  au hasard parmi les quatre couleurs de base (rouge, jaune, bleu, blanc) à la
+  génération — ou **choisie en mode créateur**. Elle dévie le rayon comme le
+  diamant mais, contrairement à lui, **le teinte de sa couleur** (comme une
+  gemme normale). La couleur n'est **révélée qu'à l'écran de fin** ; pendant la
+  partie la gemme s'affiche en **gris marqué d'un œil**. Une question
+  « qu'y a-t-il en X ? » sur sa case renvoie sa **vraie couleur** (et non le nom
+  « mystère »). Le joueur choisit la couleur de son hypothèse avec la touche
+  **[C]** ; pour gagner, il doit proposer la **bonne couleur**. Compte pour
+  **une pièce** à deviner.
 
 ## Variantes solo (spécifiques à cette implémentation) ✅
 
@@ -194,9 +196,10 @@ les diagrammes du livret :
   ne laissent plus de configuration valide et la génération échouait. On borne
   donc le nombre d'extensions activables : **Petit → 2, Standard → 4,
   Grand → 5** (`MAX_EXTENSIONS_BY_SIZE` dans `ai/generator.py`), aussi bien à la
-  configuration qu'en mode créateur. De plus, l'**arc-en-ciel** (carré 2×2) est
-  **indisponible sur la petite grille** — il n'y tient pas avec les contraintes
-  de placement (`DISALLOWED_EXTENSIONS_BY_SIZE`).
+  configuration qu'en mode créateur. Le mécanisme
+  `DISALLOWED_EXTENSIONS_BY_SIZE` permet d'interdire une extension précise sur
+  une taille donnée (aucune ne l'est actuellement : la gemme mystère a la taille
+  du diamant et tient partout).
 - **Minuteur** (optionnel, 0 = désactivé) : réglable sur l'écran de
   configuration et en mode créateur, soit au stepper − / +, soit en tapant un
   nombre dans la case (max 60 min). Sauvegardé avec la configuration. En jeu,

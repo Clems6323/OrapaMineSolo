@@ -13,6 +13,8 @@ et l'échange dans docs/RULES.md) :
 - Blanc #2  : carré tourné à 45° (losange, boîte 2×2), aire 2 ; 4 arêtes à
               45°, aucune face plate.
 - Diamant   : petit triangle base 2 / hauteur 1, aire 1 (dévie sans teinter).
+- Mystère   : même forme que le diamant, mais teinte le rayon d'une couleur
+              **cachée** (tirée au hasard / choisie en créateur).
 - Corps noir: rectangle plein 1×2, aire 2 (absorbe le rayon).
 
 Chaque pièce est donnée par le **polygone de son contour** (sommets sur les
@@ -30,18 +32,6 @@ from orapa_mine.model.gems import (
     HalfCell,
     Piece,
     Position,
-)
-
-# Disposition des couleurs de l'arc-en-ciel (carré 2×2), en offsets (ligne, col).
-# Confirmé (issue #72) : blanc haut-gauche, bleu haut-droit, jaune bas-gauche,
-# rouge bas-droit. Les 4 rotations sont jouables ; pas de retournement.
-_RAINBOW_COLORS = frozenset(
-    {
-        (Position(0, 0), GemColor.WHITE),
-        (Position(0, 1), GemColor.BLUE),
-        (Position(1, 0), GemColor.YELLOW),
-        (Position(1, 1), GemColor.RED),
-    }
 )
 
 # Coin manquant (quand 3 coins sur 4 sont dans la pièce) -> coin de l'angle
@@ -126,6 +116,10 @@ WHITE_SMALL = _piece(
     "blanc-petit", GemColor.WHITE, GemKind.NORMAL, [(0, 1), (1, 2), (2, 1), (1, 0)]
 )
 DIAMOND = _piece("diamant", None, GemKind.DIAMOND, [(0, 1), (2, 1), (1, 0)])
+# Mystère (extension) : même forme que le diamant, mais teinte le rayon d'une
+# couleur **cachée** (fixée par `PlacedGem.override_color` : aléatoire à la
+# génération, choisie au clavier [C] en jeu/créateur). Révélée à la fin.
+MYSTERY = _piece("mystère", None, GemKind.MYSTERY, [(0, 1), (2, 1), (1, 0)])
 # Filtre : même forme que le petit losange blanc (boîte 2×2, 4 arêtes à 45°).
 # Dévie le rayon et remet sa couleur à transparent (efface les couleurs).
 FILTER = _piece("filtre", None, GemKind.FILTER, [(0, 1), (1, 2), (2, 1), (1, 0)])
@@ -141,19 +135,6 @@ WORMHOLE = Piece(
     cells=_rasterize([(0, 0), (1, 0), (1, 1), (0, 1)]),
     quantity=2,
 )
-# Arc-en-ciel (extension) : carré plein 2×2, une couleur par case. Toutes ses
-# faces sont plates -> le rayon rebondit à 180° et prend la couleur de la case
-# touchée. Couleurs positionnelles -> 4 rotations distinctes, pas de retournement.
-RAINBOW = Piece(
-    name="arc-en-ciel",
-    color=None,
-    kind=GemKind.RAINBOW,
-    cells=_rasterize([(0, 0), (2, 0), (2, 2), (0, 2)]),
-    cell_colors=_RAINBOW_COLORS,
-    allow_flip=False,
-)
-
-
 def base_set() -> list[Piece]:
     """Les 5 pièces de la version de base : 1 R, 1 J, 1 B, 2 blanches."""
     return [RED, YELLOW, BLUE, WHITE_BIG, WHITE_SMALL]
@@ -168,6 +149,6 @@ ALL_PIECES: dict[str, Piece] = {
     p.name: p
     for p in (
         RED, BLUE, WHITE_BIG, YELLOW, WHITE_SMALL,
-        DIAMOND, FILTER, BLACK_BODY, WORMHOLE, RAINBOW,
+        DIAMOND, FILTER, BLACK_BODY, WORMHOLE, MYSTERY,
     )
 }

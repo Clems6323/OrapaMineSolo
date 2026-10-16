@@ -14,7 +14,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from orapa_mine.model.game import CellQuery, GameState, RayShot
-from orapa_mine.model.gems import Direction, Piece, PlacedGem, Position
+from orapa_mine.model.gems import Direction, GemColor, Piece, PlacedGem, Position
 from orapa_mine.model.grid import Grid
 from orapa_mine.model import gems_catalog as cat
 
@@ -22,17 +22,21 @@ SAVE_VERSION = 1
 
 
 def _gem_to_dict(gem: PlacedGem) -> dict:
-    return {
+    data = {
         "piece": gem.piece.name,
         "anchor": [gem.anchor.row, gem.anchor.col],
         "orient": gem.piece.variant_index(gem),
     }
+    if gem.override_color is not None:  # couleur choisie (gemme mystère)
+        data["color"] = gem.override_color.name
+    return data
 
 
 def _gem_from_dict(data: dict) -> PlacedGem:
     piece = cat.ALL_PIECES[data["piece"]]
     row, col = data["anchor"]
-    return piece.at(Position(row, col), data["orient"])
+    color = GemColor[data["color"]] if "color" in data else None
+    return piece.at(Position(row, col), data["orient"], color=color)
 
 
 def _history_to_list(game: GameState) -> list[dict]:

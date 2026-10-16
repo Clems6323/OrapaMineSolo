@@ -21,7 +21,7 @@ from orapa_mine.ai.generator import (
     configuration_problems,
     placement_is_legal,
 )
-from orapa_mine.model.gems import GemKind, Piece, Position
+from orapa_mine.model.gems import GemColor, GemKind, Piece, Position
 from orapa_mine.model import gems_catalog as cat
 from orapa_mine.model import serialization
 from orapa_mine.model.grid import Grid
@@ -46,7 +46,9 @@ class CreatorScreen:
 
     _SIZES = [("Petit", 8, 6), ("Standard", 10, 8), ("Grand", 12, 10)]
     # Extensions dans l'ordre d'affichage (compte + rognage au plafond — #75).
-    _EXT_ATTRS = ("diamant", "corps_noir", "wormhole", "filter", "rainbow")
+    _EXT_ATTRS = ("diamant", "corps_noir", "wormhole", "filter", "mystery")
+    # Ordre de défilement de la couleur de la gemme mystère (touche [C]).
+    _MYSTERY_CYCLE = (GemColor.BLUE, GemColor.RED, GemColor.YELLOW, GemColor.WHITE)
 
     def __init__(
         self,
@@ -55,7 +57,7 @@ class CreatorScreen:
         corps_noir: bool = False,
         wormhole: bool = False,
         filter: bool = False,
-        rainbow: bool = False,
+        mystery: bool = False,
         timer_minutes: int = 0,
     ) -> None:
         self.size_index = size_index
@@ -63,7 +65,9 @@ class CreatorScreen:
         self.corps_noir = corps_noir
         self.wormhole = wormhole
         self.filter = filter
-        self.rainbow = rainbow
+        self.mystery = mystery
+        # Couleur choisie de la gemme mystère (touche [C]).
+        self.mystery_color = GemColor.BLUE
         self.timer = TimerField(timer_minutes)  # minuteur optionnel (0 = désactivé)
 
         # Sélection / pose de pièces (même interaction que l'écran de jeu).
@@ -106,8 +110,8 @@ class CreatorScreen:
             pieces.append(cat.BLACK_BODY)
         if self.wormhole:
             pieces.append(cat.WORMHOLE)
-        if self.rainbow:
-            pieces.append(cat.RAINBOW)
+        if self.mystery:
+            pieces.append(cat.MYSTERY)
         return pieces
 
     def _rebuild(self, clear_gems: bool) -> None:
@@ -177,7 +181,7 @@ class CreatorScreen:
         self.corps_rect = pygame.Rect(inner, top + s(150), s(20), s(20))
         self.wormhole_rect = pygame.Rect(inner, top + s(174), s(20), s(20))
         self.filter_rect = pygame.Rect(inner, top + s(198), s(20), s(20))
-        self.rainbow_rect = pygame.Rect(inner, top + s(222), s(20), s(20))
+        self.mystery_rect = pygame.Rect(inner, top + s(222), s(20), s(20))
         # Ligne cliquable (case + libellé) : largeur ajustée au texte réel pour
         # ne pas offrir une zone de clic démesurée (#65).
         self._build_ext_rows()
@@ -245,8 +249,8 @@ class CreatorScreen:
         if self.filter_row.collidepoint(pos):
             self._toggle_ext("filter")
             return
-        if self.rainbow_row.collidepoint(pos):
-            self._toggle_ext("rainbow")
+        if self.mystery_row.collidepoint(pos):
+            self._toggle_ext("mystery")
             return
         for i, rect in enumerate(self.size_rects):
             if rect.collidepoint(pos):
@@ -274,6 +278,9 @@ class CreatorScreen:
         if event.key == pygame.K_r and self.selected is not None:
             count = len(self.selected.orientations())
             self.orientation_index = (self.orientation_index + 1) % count
+        elif event.key == pygame.K_c and self.mystery:
+            i = self._MYSTERY_CYCLE.index(self.mystery_color)
+            self.mystery_color = self._MYSTERY_CYCLE[(i + 1) % len(self._MYSTERY_CYCLE)]
         elif event.key == pygame.K_ESCAPE:
             self.selected = None
 
@@ -337,7 +344,8 @@ class CreatorScreen:
         if self.selected is None:
             self._pick_up(cell)
             return
-        gem = self.selected.at(cell, self.orientation_index)
+        color = self.mystery_color if self.selected.kind is GemKind.MYSTERY else None
+        gem = self.selected.at(cell, self.orientation_index, color=color)
         # Blocage DUR uniquement sur bornes/chevauchement ; une gemme côte à côte
         # reste posable mais signalée en rouge (aperçu) et bloque Sauver/Jouer.
         if self.grid.can_place(gem):
@@ -359,6 +367,8 @@ class CreatorScreen:
         self.placed_counts[gem.piece.name] = max(0, self.placed_counts.get(gem.piece.name, 0) - 1)
         self.selected = gem.piece
         self.orientation_index = gem.piece.variant_index(gem)
+        if gem.kind is GemKind.MYSTERY and gem.color is not None:
+            self.mystery_color = gem.color
         self.message = None
 
     def _remove_at(self, cell: Position | None) -> None:
@@ -468,8 +478,8 @@ class CreatorScreen:
         self._draw_palette(surface)
         self._draw_panel(surface)
         hint = i18n.t(
-            "clic=choisir/poser, clic sur une pièce=reprendre, [R] tourner, clic droit=retirer, point d'entrée=tester le rayon, [Échap] désélectionner",
-            "click=select/place, click a piece=pick up, [R] rotate, right-click=remove, entry point=test the beam, [Esc] deselect",
+            "clic=choisir/poser, clic sur une pièce=reprendre, [R] tourner, [C] couleur mystère, clic droit=retirer, point d'entrée=tester le rayon, [Échap] désélectionner",
+            "click=select/place, click a piece=pick up, [R] rotate, [C] mystery color, right-click=remove, entry point=test the beam, [Esc] deselect",
         )
         surface.blit(
             self.font_small.render(hint, True, theme.TEXT_DIM),
@@ -479,7 +489,8 @@ class CreatorScreen:
     def _draw_ghost(self, surface: pygame.Surface) -> None:
         if self.selected is None or self.hovered_cell is None:
             return
-        gem = self.selected.at(self.hovered_cell, self.orientation_index)
+        color = self.mystery_color if self.selected.kind is GemKind.MYSTERY else None
+        gem = self.selected.at(self.hovered_cell, self.orientation_index, color=color)
         ok = placement_is_legal(self.grid, gem)
         board_render.draw_ghost(surface, gem, ok, self.grid.is_inside)
 
@@ -491,11 +502,13 @@ class CreatorScreen:
             head = self.font_small.render(i18n.t("Extensions", "Extensions"), True, theme.TEXT_DIM)
             surface.blit(head, (ext_slots[0].rect.x + theme.s(1), theme.PALETTE.y - theme.s(22)))
         for slot in self.slots:
+            override = self.mystery_color if slot.piece.kind is GemKind.MYSTERY else None
             board_render.draw_palette_slot(
                 surface, slot.rect, slot.piece,
                 selected=slot.piece is self.selected,
                 placed=self.placed_counts.get(slot.piece.name, 0),
                 font=self.font_small,
+                override_color=override,
             )
 
     def _draw_panel(self, surface: pygame.Surface) -> None:
@@ -526,7 +539,7 @@ class CreatorScreen:
         self._checkbox(surface, self.corps_rect, self.corps_noir, c_txt, disabled=self._ext_disabled("corps_noir"))
         self._checkbox(surface, self.wormhole_rect, self.wormhole, w_txt, disabled=self._ext_disabled("wormhole"))
         self._checkbox(surface, self.filter_rect, self.filter, f_txt, disabled=self._ext_disabled("filter"))
-        self._checkbox(surface, self.rainbow_rect, self.rainbow, r_txt, disabled=self._ext_disabled("rainbow"))
+        self._checkbox(surface, self.mystery_rect, self.mystery, r_txt, disabled=self._ext_disabled("mystery"))
 
         # Minuteur (optionnel), colonne de droite.
         surface.blit(self.font_small.render(i18n.t("Minuteur", "Timer"), True, theme.TEXT),
@@ -584,7 +597,7 @@ class CreatorScreen:
             i18n.t("Corps noir", "Black body"),
             i18n.t("Trou de ver (×2)", "Wormhole (×2)"),
             i18n.t("Filtre", "Filter"),
-            i18n.t("Arc-en-ciel", "Rainbow"),
+            i18n.t("Mystère", "Mystery"),
         ]
 
     def _build_ext_rows(self) -> None:
@@ -593,14 +606,14 @@ class CreatorScreen:
         gap, pad = s(10), s(10)  # écart case→texte (cf. _checkbox) + marge droite
         boxes = [
             self.diamant_rect, self.corps_rect, self.wormhole_rect,
-            self.filter_rect, self.rainbow_rect,
+            self.filter_rect, self.mystery_rect,
         ]
         rows = [
             pygame.Rect(cb.x, cb.y - s(2), cb.width + gap + self.font_small.size(text)[0] + pad, s(24))
             for cb, text in zip(boxes, self._ext_label_texts())
         ]
         (self.diamant_row, self.corps_row, self.wormhole_row,
-         self.filter_row, self.rainbow_row) = rows
+         self.filter_row, self.mystery_row) = rows
 
     def _checkbox(self, surface: pygame.Surface, rect: pygame.Rect, on: bool, text: str, disabled: bool = False) -> None:
         pygame.draw.rect(surface, theme.INPUT_BG, rect, border_radius=4)

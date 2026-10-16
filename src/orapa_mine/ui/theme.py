@@ -313,6 +313,7 @@ _DARK = {
         GemKind.FILTER: (150, 205, 220),  # couleur du diamant, dessinée translucide
         GemKind.BLACK_BODY: (8, 8, 12),
         GemKind.WORMHOLE: (14, 14, 22),
+        GemKind.MYSTERY: (120, 124, 140),  # gris « inconnu » (teinté par la couleur choisie)
     },
     "RAY_COLORS": {
         "rouge": (224, 74, 74), "bleu": (74, 130, 224), "jaune": (238, 206, 82),
@@ -353,6 +354,7 @@ _LIGHT = {
         GemKind.FILTER: (96, 170, 196),     # couleur du diamant, dessinée translucide
         GemKind.BLACK_BODY: (22, 22, 30),   # reste « noir »
         GemKind.WORMHOLE: (22, 22, 30),
+        GemKind.MYSTERY: (120, 124, 140),   # gris « inconnu » (teinté par la couleur choisie)
     },
     # Couleurs du rayon identiques au mode sombre (demande utilisateur : garder
     # exactement les mêmes teintes de laser, notamment le blanc et le transparent).
