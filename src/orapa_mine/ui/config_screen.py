@@ -27,7 +27,11 @@ def _proposals_text(value: int) -> str:
     """Texte de la case « propositions max » : « ∞ » pour 0 (illimité)."""
     return "∞" if value <= 0 else str(value)
 
-SIZE = (760, 798)  # taille logique ; mise à l'échelle DPI dans __init__
+
+MAX_TESTS = 40    # plafond du réglage « tests de rayon » du Coup Unique (#81)
+DEFAULT_TESTS = 15
+
+SIZE = (760, 846)  # taille logique ; mise à l'échelle DPI dans __init__
 
 
 class ConfigScreen:
@@ -48,6 +52,8 @@ class ConfigScreen:
         self.size_index = 1
         self.timer = TimerField()  # minuteur optionnel (0 = désactivé)
         self.proposals = StepperField(max_value=MAX_PROPOSALS)  # 0 = propositions illimitées
+        self.one_shot = False  # mode Coup Unique (#81)
+        self.tests = StepperField(DEFAULT_TESTS, min_value=1, max_value=MAX_TESTS)  # nb de tirs donnés
         self.result: Difficulty | None = None
         self.loaded: LoadedGame | None = None
         self.creator: Difficulty | None = None  # lancer le mode créateur
@@ -73,27 +79,39 @@ class ConfigScreen:
         self.size_rects = [
             pygame.Rect(start_x + i * (bw + gap), s(462), bw, s(60)) for i in range(3)
         ]
-        # Deux réglages côte à côte sous le total de gemmes : Minuteur (gauche,
-        # éditable) et Propositions max (droite, stepper). Même ligne (y=620).
+        # Sélecteur de mode (Normal / Coup Unique), centré sous le total de gemmes.
+        mbw, mgap = s(170), s(20)
+        mstart = (self.size[0] - (2 * mbw + mgap)) // 2
+        self.normal_rect = pygame.Rect(mstart, s(586), mbw, s(36))
+        self.oneshot_rect = pygame.Rect(mstart + mbw + mgap, s(586), mbw, s(36))
+
+        # Réglages (ligne y=664) : en Normal, Minuteur (gauche) + Propositions
+        # (droite) ; en Coup Unique, « Tests de rayon » (centré). Libellés y=640.
         self.timer.set_rects(
-            pygame.Rect(s(144), s(620), s(34), s(40)),
-            pygame.Rect(s(186), s(620), s(104), s(40)),
-            pygame.Rect(s(298), s(620), s(34), s(40)),
+            pygame.Rect(s(144), s(664), s(34), s(40)),
+            pygame.Rect(s(186), s(664), s(104), s(40)),
+            pygame.Rect(s(298), s(664), s(34), s(40)),
         )
         self.proposals.set_rects(
-            pygame.Rect(s(428), s(620), s(34), s(40)),
-            pygame.Rect(s(470), s(620), s(104), s(40)),
-            pygame.Rect(s(582), s(620), s(34), s(40)),
+            pygame.Rect(s(428), s(664), s(34), s(40)),
+            pygame.Rect(s(470), s(664), s(104), s(40)),
+            pygame.Rect(s(582), s(664), s(34), s(40)),
+        )
+        self.tests.set_rects(
+            pygame.Rect(s(286), s(664), s(34), s(40)),
+            pygame.Rect(s(328), s(664), s(104), s(40)),
+            pygame.Rect(s(440), s(664), s(34), s(40)),
         )
         self._timer_cx = s(238)       # centre du bloc Minuteur (label aligné)
         self._proposals_cx = s(522)   # centre du bloc Propositions
+        self._settings_cx = self.size[0] // 2  # centre (Coup Unique : Tests)
 
         bw2, gap2 = s(224), s(16)
         total2 = 3 * bw2 + 2 * gap2
         bx = (self.size[0] - total2) // 2
-        self.start_rect = pygame.Rect(bx, s(692), bw2, s(58))
-        self.creator_rect = pygame.Rect(bx + bw2 + gap2, s(692), bw2, s(58))
-        self.load_rect = pygame.Rect(bx + 2 * (bw2 + gap2), s(692), bw2, s(58))
+        self.start_rect = pygame.Rect(bx, s(744), bw2, s(58))
+        self.creator_rect = pygame.Rect(bx + bw2 + gap2, s(744), bw2, s(58))
+        self.load_rect = pygame.Rect(bx + 2 * (bw2 + gap2), s(744), bw2, s(58))
 
     # --- Événements --------------------------------------------------------
 
@@ -110,10 +128,20 @@ class ConfigScreen:
         if lang_toggle.handle_click(p, self.size[0]):  # drapeaux FR / UK
             self._build_ext_rows()  # le texte change de langue → recalc des zones (#65)
             return
-        if self.timer.handle_click(p):  # − / + / case du minuteur
+        if self.normal_rect.collidepoint(p):  # bascule de mode (#81)
+            self.one_shot = False
             return
-        if self.proposals.handle_click(p):  # − / + propositions max
+        if self.oneshot_rect.collidepoint(p):
+            self.one_shot = True
             return
+        if self.one_shot:
+            if self.tests.handle_click(p):  # − / + tests de rayon
+                return
+        else:
+            if self.timer.handle_click(p):  # − / + / case du minuteur
+                return
+            if self.proposals.handle_click(p):  # − / + propositions max
+                return
         if self.diamant_row.collidepoint(p):
             self._toggle_ext("diamant")
         elif self.corps_row.collidepoint(p):
@@ -203,7 +231,9 @@ class ConfigScreen:
         name, width, height = self.sizes[self.size_index]
         return Difficulty(
             pieces=pieces, width=width, height=height, name=name.lower(),
-            timer_minutes=self.timer.minutes, max_proposals=self.proposals.value,
+            timer_minutes=0 if self.one_shot else self.timer.minutes,
+            max_proposals=1 if self.one_shot else self.proposals.value,
+            one_shot=self.one_shot, num_tests=self.tests.value,
         )
 
     def _begin(self) -> None:
@@ -261,15 +291,25 @@ class ConfigScreen:
                  + (1 if self.mystery else 0))
         count = self.font_small.render(
             i18n.t(f"Total : {total} gemmes à trouver", f"Total: {total} gems to find"), True, theme.TEXT_DIM)
-        surface.blit(count, count.get_rect(centerx=cx, y=s(564)))
+        surface.blit(count, count.get_rect(centerx=cx, y=s(556)))
 
-        # Minuteur (gauche) + Propositions max (droite), même ligne.
-        timer_label = self.font.render(i18n.t("Minuteur", "Timer"), True, theme.TEXT)
-        surface.blit(timer_label, timer_label.get_rect(centerx=self._timer_cx, y=s(590)))
-        self.timer.draw(surface, self.font, i18n.t("Désactivé", "Off"))
-        prop_label = self.font.render(i18n.t("Propositions", "Proposals"), True, theme.TEXT)
-        surface.blit(prop_label, prop_label.get_rect(centerx=self._proposals_cx, y=s(590)))
-        self.proposals.draw(surface, self.font, _proposals_text(self.proposals.value))
+        # Sélecteur de mode : Normal / Coup Unique (#81).
+        self._mode_button(surface, self.normal_rect, i18n.t("Normal", "Normal"), selected=not self.one_shot)
+        self._mode_button(surface, self.oneshot_rect, i18n.t("Coup Unique", "One Shot"), selected=self.one_shot)
+
+        if self.one_shot:
+            # Coup Unique : un seul réglage, le nombre de tirs donnés d'avance.
+            tests_label = self.font.render(i18n.t("Tests de rayon", "Beam tests"), True, theme.TEXT)
+            surface.blit(tests_label, tests_label.get_rect(centerx=self._settings_cx, y=s(640)))
+            self.tests.draw(surface, self.font, str(self.tests.value))
+        else:
+            # Minuteur (gauche) + Propositions max (droite), même ligne.
+            timer_label = self.font.render(i18n.t("Minuteur", "Timer"), True, theme.TEXT)
+            surface.blit(timer_label, timer_label.get_rect(centerx=self._timer_cx, y=s(640)))
+            self.timer.draw(surface, self.font, i18n.t("Désactivé", "Off"))
+            prop_label = self.font.render(i18n.t("Propositions", "Proposals"), True, theme.TEXT)
+            surface.blit(prop_label, prop_label.get_rect(centerx=self._proposals_cx, y=s(640)))
+            self.proposals.draw(surface, self.font, _proposals_text(self.proposals.value))
 
         self._button(surface, self.start_rect, theme.BTN_GREEN, i18n.t("Commencer", "Start"), theme.BTN_TEXT)
         self._button(surface, self.creator_rect, theme.BTN_BLUE, i18n.t("Mode créateur", "Creator mode"), theme.BTN_TEXT)
@@ -277,12 +317,20 @@ class ConfigScreen:
 
         if self.error:
             err = self.font_small.render(self.error, True, theme.LOSE_COLOR)
-            surface.blit(err, err.get_rect(centerx=cx, y=s(762)))
+            surface.blit(err, err.get_rect(centerx=cx, y=s(810)))
 
     def _button(self, surface: pygame.Surface, rect: pygame.Rect, bg, text: str, text_color=None) -> None:
         pygame.draw.rect(surface, bg, rect, border_radius=10)
         pygame.draw.rect(surface, theme.BOARD_BORDER, rect, width=1, border_radius=10)
         label = self.font.render(text, True, text_color or theme.TEXT)
+        surface.blit(label, label.get_rect(center=rect.center))
+
+    def _mode_button(self, surface: pygame.Surface, rect: pygame.Rect, text: str, selected: bool) -> None:
+        bg = theme.SLOT_SELECTED if selected else theme.SLOT_BG
+        pygame.draw.rect(surface, bg, rect, border_radius=8)
+        pygame.draw.rect(surface, theme.BOARD_BORDER, rect, width=2 if selected else 1, border_radius=8)
+        fg = theme.ON_ACCENT if selected else theme.TEXT
+        label = self.font.render(text, True, fg)
         surface.blit(label, label.get_rect(center=rect.center))
 
     def _ext_label_texts(self) -> list[str]:

@@ -68,6 +68,8 @@ def to_dict(
     hypothesis_grid: Grid | None = None,
     timer_minutes: int = 0,
     max_proposals: int = 0,
+    one_shot: bool = False,
+    given_shots: list[tuple[Position, Direction]] | None = None,
     elapsed_seconds: float = 0.0,
 ) -> dict:
     """Sérialise une partie en dict. `include_progress` ajoute historique + board.
@@ -87,7 +89,12 @@ def to_dict(
         "progress": bool(include_progress),
         "timer": int(timer_minutes),
         "max_proposals": int(max_proposals),
+        "one_shot": bool(one_shot),
     }
+    if one_shot:  # tirs donnés d'avance : font partie du puzzle (toujours sauvés)
+        data["given_shots"] = [
+            {"entry": [e.row, e.col], "dir": d.name} for e, d in (given_shots or [])
+        ]
     if include_progress:
         data["history"] = _history_to_list(game)
         data["hypothesis"] = [_gem_to_dict(g) for g in hypothesis_grid.gems]
@@ -107,6 +114,7 @@ class LoadedGame:
     hypothesis: Grid
     timer_minutes: int = 0
     max_proposals: int = 0
+    one_shot: bool = False
     elapsed_seconds: float = 0.0
 
 
@@ -123,7 +131,10 @@ def from_dict(data: dict) -> LoadedGame:
         hidden.place_gem(_gem_from_dict(gem_data))
 
     max_proposals = int(data.get("max_proposals", 0))
-    game = GameState(hidden_grid=hidden, max_proposals=max_proposals)
+    one_shot = bool(data.get("one_shot"))
+    game = GameState(hidden_grid=hidden, max_proposals=max_proposals, one_shot=one_shot)
+    for sh in data.get("given_shots", []):  # indices donnés du Coup Unique (#81)
+        game.add_given_shot(Position(*sh["entry"]), Direction[sh["dir"]])
     hypothesis = Grid(width=width, height=height)
     if data.get("progress"):
         for action in data.get("history", []):
@@ -137,5 +148,5 @@ def from_dict(data: dict) -> LoadedGame:
 
     return LoadedGame(
         width, height, palette, game, hypothesis,
-        int(data.get("timer", 0)), max_proposals, float(data.get("elapsed", 0.0)),
+        int(data.get("timer", 0)), max_proposals, one_shot, float(data.get("elapsed", 0.0)),
     )

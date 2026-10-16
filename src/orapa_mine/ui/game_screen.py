@@ -63,6 +63,7 @@ class GameScreen:
         self, game: GameState, palette_pieces: list[Piece], timer_minutes: int = 0
     ) -> None:
         self.game = game
+        self.one_shot = game.one_shot  # Coup Unique (#81) : indices figés, pas de requêtes
         self.grid = game.hidden_grid  # cachée (debug uniquement)
         self.palette_pieces = palette_pieces
         self.hypothesis = Grid(width=self.grid.width, height=self.grid.height)
@@ -187,7 +188,7 @@ class GameScreen:
             self._on_key(event)
 
     def _scroll_history(self, dy: int) -> None:
-        content_h = len(self.game.history) * _HISTORY_ROW_H + 8
+        content_h = len(self.game.clues) * _HISTORY_ROW_H + 8
         max_scroll = max(0.0, content_h - self.history_rect.height)
         if max_scroll <= 0:
             return
@@ -203,7 +204,7 @@ class GameScreen:
         Renvoie None si l'historique tient entièrement (pas de barre).
         """
         rect = self.history_rect
-        content_h = len(self.game.history) * _HISTORY_ROW_H + theme.s(8)
+        content_h = len(self.game.clues) * _HISTORY_ROW_H + theme.s(8)
         max_scroll = max(0.0, content_h - rect.height)
         if max_scroll <= 0:
             return None
@@ -283,8 +284,8 @@ class GameScreen:
             return
         if self._start_scroll_drag(pos):  # saisir/cliquer la barre de défilement (#79)
             return
-        # Zone de saisie ?
-        if self.input_rect.collidepoint(pos):
+        # Zone de saisie (désactivée en Coup Unique : aucune nouvelle question).
+        if not self.one_shot and self.input_rect.collidepoint(pos):
             self.input_active = True
             return
         self.input_active = False
@@ -475,6 +476,8 @@ class GameScreen:
             hypothesis_grid=self.hypothesis,
             timer_minutes=self.timer_minutes,
             max_proposals=self.game.max_proposals,
+            one_shot=self.game.one_shot,
+            given_shots=[(s.entry, s.direction) for s in self.game.given_shots],
             elapsed_seconds=self.elapsed,
         )
         try:
@@ -726,25 +729,37 @@ class GameScreen:
         mb = self.font_small.render(i18n.t("Retour au menu", "Back to menu"), True, theme.BTN_TEXT)
         surface.blit(mb, mb.get_rect(center=self.menu_rect.center))
 
-        surface.blit(self.font.render(i18n.t("Historique", "History"), True, theme.TEXT), (x, self.history_header_y))
-        # Score en direct (nombre de questions posées), aligné à droite sur la
-        # même ligne que « Historique ». La valeur finale est reprise à l'écran de fin.
-        score_img = self.font.render(
-            i18n.t(f"Score : {self.game.request_score}", f"Score: {self.game.request_score}"),
-            True, theme.SLOT_SELECTED,
-        )
-        surface.blit(score_img, score_img.get_rect(topright=(self.panel.right - s(18), self.history_header_y)))
+        hist_title = i18n.t("Indices", "Clues") if self.one_shot else i18n.t("Historique", "History")
+        surface.blit(self.font.render(hist_title, True, theme.TEXT), (x, self.history_header_y))
+        # À droite de l'en-tête : score en direct (requêtes) en mode normal ;
+        # badge « Coup Unique » en mode Coup Unique (score = distance, à la fin).
+        if self.one_shot:
+            tag_img = self.font.render(i18n.t("Coup Unique", "One Shot"), True, theme.SLOT_SELECTED)
+        else:
+            tag_img = self.font.render(
+                i18n.t(f"Score : {self.game.request_score}", f"Score: {self.game.request_score}"),
+                True, theme.SLOT_SELECTED,
+            )
+        surface.blit(tag_img, tag_img.get_rect(topright=(self.panel.right - s(18), self.history_header_y)))
         self._draw_history(surface)
 
-        # Zone de proposition (saisie d'un point d'entrée à interroger).
-        label = self.font_small.render(
-            i18n.t("Point de bord (5/C) ou case (A1) :", "Edge point (5/C) or cell (A1):"), True, theme.TEXT_DIM)
-        surface.blit(label, (x, self.input_rect.top - s(20)))
-        pygame.draw.rect(surface, theme.INPUT_BG, self.input_rect, border_radius=5)
-        edge = theme.INPUT_ACTIVE if self.input_active else theme.BOARD_BORDER
-        pygame.draw.rect(surface, edge, self.input_rect, width=2 if self.input_active else 1, border_radius=5)
-        shown = self.input_text + ("|" if self.input_active else "")
-        surface.blit(self.font.render(shown, True, theme.TEXT), (self.input_rect.x + s(8), self.input_rect.y + s(6)))
+        if self.one_shot:
+            # Pas de nouvelle question : on remplace la zone de saisie par un rappel.
+            note = self.font_small.render(
+                i18n.t("Déduis des indices, puis propose (1 essai).",
+                       "Deduce from the clues, then submit (1 try)."),
+                True, theme.TEXT_DIM)
+            surface.blit(note, (x, self.input_rect.top - s(20)))
+        else:
+            # Zone de proposition (saisie d'un point d'entrée à interroger).
+            label = self.font_small.render(
+                i18n.t("Point de bord (5/C) ou case (A1) :", "Edge point (5/C) or cell (A1):"), True, theme.TEXT_DIM)
+            surface.blit(label, (x, self.input_rect.top - s(20)))
+            pygame.draw.rect(surface, theme.INPUT_BG, self.input_rect, border_radius=5)
+            edge = theme.INPUT_ACTIVE if self.input_active else theme.BOARD_BORDER
+            pygame.draw.rect(surface, edge, self.input_rect, width=2 if self.input_active else 1, border_radius=5)
+            shown = self.input_text + ("|" if self.input_active else "")
+            surface.blit(self.font.render(shown, True, theme.TEXT), (self.input_rect.x + s(8), self.input_rect.y + s(6)))
 
         if self.message:
             msg = self.font_small.render(self.message, True, self.message_color)
@@ -902,7 +917,7 @@ class GameScreen:
         pygame.draw.rect(surface, theme.BOARD_BORDER, rect, width=1, border_radius=6)
 
         s = theme.s
-        actions = self.game.history
+        actions = self.game.clues
         if not actions:
             empty = self.font_small.render(i18n.t("Aucune question posée.", "No question asked yet."), True, theme.TEXT_DIM)
             surface.blit(empty, (rect.x + s(12), rect.y + s(10)))
@@ -1015,6 +1030,15 @@ _HELP: list[tuple[str, str, str, str]] = [
         "la réponse (vide, couleur, ou nom d'une extension) s'ajoute à l'Historique.",
         "Enter a cell “row-letter + column-number” (e.g. A1, C4) then Enter: the "
         "answer (empty, a color, or an extension name) is added to the History.",
+    ),
+    (
+        "Coup Unique", "One Shot",
+        "Dans ce mode, des tirs te sont donnés d'avance (les Indices) et tu ne peux "
+        "plus interroger la mine : déduis, place toutes les gemmes et propose une "
+        "seule fois. Le score est la distance à la vérité (affichée à la fin).",
+        "In this mode, beam tests are given up front (the Clues) and you can no "
+        "longer query the mine: deduce, place every gem and submit once. The score "
+        "is the distance to the truth (shown at the end).",
     ),
     (
         "Gemme mystère", "Mystery gem",

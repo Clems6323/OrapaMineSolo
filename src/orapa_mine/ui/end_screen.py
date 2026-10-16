@@ -31,11 +31,15 @@ class EndScreen:
         timer_minutes: int = 0,
         distance=None,
         lost: bool = False,
+        one_shot: bool = False,
+        given_shots=None,
     ) -> None:
         self.won = won
         self.lost = lost  # propositions épuisées sans trouver (#45)
         self.score = score
         self.distance = distance  # Score (model.distance) : proximité à la vérité (#45)
+        self.one_shot = one_shot   # Coup Unique : score = distance seule (#81)
+        self.given_shots = given_shots or []  # indices à ré-enregistrer au partage
         self.grid = hidden_grid
         self.palette_pieces = palette_pieces
         self.elapsed_seconds = max(0.0, elapsed_seconds)
@@ -87,6 +91,8 @@ class EndScreen:
             hidden_grid=self.grid,
             include_progress=False,
             timer_minutes=self.timer_minutes,
+            one_shot=self.one_shot,
+            given_shots=self.given_shots,
         )
         try:
             dialogs.write_json(path, data)
@@ -152,16 +158,20 @@ class EndScreen:
         title = self.font_big.render(banner, True, color)
         surface.blit(title, (x, self.panel.top + theme.s(20)))
 
-        # Deux scores (plus bas = meilleur), #45 : requêtes pondérées + distance.
-        score_line = i18n.t(f"Score requêtes : {self.score}", f"Request score: {self.score}")
-        surface.blit(self.font.render(score_line, True, theme.TEXT), (x, self.panel.top + theme.s(60)))
+        # Score(s) (plus bas = meilleur). En Coup Unique, seule la distance
+        # compte (#81) ; sinon on montre aussi le score de requêtes (#45).
+        dy = theme.s(60)
+        if not self.one_shot:
+            score_line = i18n.t(f"Score requêtes : {self.score}", f"Request score: {self.score}")
+            surface.blit(self.font.render(score_line, True, theme.TEXT), (x, self.panel.top + dy))
+            dy += theme.s(26)
         dist_value, perfect = self._distance_main()
         dist_line = i18n.t(f"Distance à la vérité : {dist_value}",
                            f"Distance to truth: {dist_value}")
         dist_color = theme.WIN_COLOR if perfect else theme.TEXT
-        surface.blit(self.font.render(dist_line, True, dist_color), (x, self.panel.top + theme.s(86)))
+        surface.blit(self.font.render(dist_line, True, dist_color), (x, self.panel.top + dy))
 
-        y = self.panel.top + theme.s(112)
+        y = self.panel.top + dy + theme.s(26)
         note = self._placed_note()
         if note is not None:  # ex. « 3/5 gemmes posées » quand l'hypothèse est incomplète
             surface.blit(self.font_small.render(note, True, theme.TEXT_DIM), (x, y))
