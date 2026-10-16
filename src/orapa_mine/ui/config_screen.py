@@ -8,7 +8,11 @@ from __future__ import annotations
 
 import pygame
 
-from orapa_mine.ai.generator import MAX_EXTENSIONS_BY_SIZE, Difficulty
+from orapa_mine.ai.generator import (
+    DISALLOWED_EXTENSIONS_BY_SIZE,
+    MAX_EXTENSIONS_BY_SIZE,
+    Difficulty,
+)
 from orapa_mine.model import gems_catalog as cat
 from orapa_mine.model import serialization
 from orapa_mine.model.serialization import LoadedGame
@@ -111,7 +115,7 @@ class ConfigScreen:
             for i, rect in enumerate(self.size_rects):
                 if rect.collidepoint(p):
                     self.size_index = i
-                    self._enforce_ext_limit()  # une grille plus petite plafonne moins d'extensions (#75)
+                    self._enforce_ext_rules()  # une grille plus petite restreint les extensions (#75)
 
     # --- Extensions : plafond par taille de grille (#75) -------------------
 
@@ -123,14 +127,30 @@ class ConfigScreen:
         """Nombre d'extensions actuellement cochées."""
         return sum(getattr(self, attr) for attr in self._EXT_ATTRS)
 
+    def _ext_allowed(self, attr: str) -> bool:
+        """Cette extension est-elle disponible pour la taille de grille courante ? (#75)"""
+        return attr not in DISALLOWED_EXTENSIONS_BY_SIZE[self.size_index]
+
+    def _ext_disabled(self, attr: str) -> bool:
+        """Case non cliquable : extension interdite, ou plafond atteint et non cochée."""
+        if not self._ext_allowed(attr):
+            return True
+        return self._ext_count() >= self._max_ext() and not getattr(self, attr)
+
     def _toggle_ext(self, attr: str) -> None:
-        """(Dé)coche une extension ; refuse d'en activer une de plus au plafond."""
-        if not getattr(self, attr) and self._ext_count() >= self._max_ext():
-            return  # plafond atteint : on n'active pas d'extension supplémentaire
+        """(Dé)coche une extension ; refuse si interdite ou si le plafond est atteint."""
+        if not getattr(self, attr) and self._ext_disabled(attr):
+            return
         setattr(self, attr, not getattr(self, attr))
 
-    def _enforce_ext_limit(self) -> None:
-        """Décoche les extensions au-delà du plafond (après passage à une plus petite grille)."""
+    def _enforce_ext_rules(self) -> None:
+        """Rétablit des extensions valides pour la taille courante (après resize) : #75.
+
+        Décoche d'abord les extensions interdites, puis rogne l'excédent au-delà
+        du plafond (en conservant les premières dans l'ordre d'affichage).
+        """
+        for attr in DISALLOWED_EXTENSIONS_BY_SIZE[self.size_index]:
+            setattr(self, attr, False)
         limit = self._max_ext()
         kept = 0
         for attr in self._EXT_ATTRS:
@@ -197,12 +217,12 @@ class ConfigScreen:
         ext_header = i18n.t("Extensions", "Extensions") + f"  ({self._ext_count()}/{self._max_ext()})"
         surface.blit(self.font.render(ext_header, True, theme.TEXT), (s(100), s(196)))
         d_txt, c_txt, w_txt, f_txt, r_txt = self._ext_label_texts()
-        locked = self._ext_count() >= self._max_ext()  # plafond atteint → cases décochées grisées (#75)
-        self._checkbox(surface, self.diamant_rect, self.diamant, d_txt, disabled=locked and not self.diamant)
-        self._checkbox(surface, self.corps_rect, self.corps_noir, c_txt, disabled=locked and not self.corps_noir)
-        self._checkbox(surface, self.wormhole_rect, self.wormhole, w_txt, disabled=locked and not self.wormhole)
-        self._checkbox(surface, self.filter_rect, self.filter, f_txt, disabled=locked and not self.filter)
-        self._checkbox(surface, self.rainbow_rect, self.rainbow, r_txt, disabled=locked and not self.rainbow)
+        # Cases grisées : extension interdite pour la taille, ou plafond atteint (#75).
+        self._checkbox(surface, self.diamant_rect, self.diamant, d_txt, disabled=self._ext_disabled("diamant"))
+        self._checkbox(surface, self.corps_rect, self.corps_noir, c_txt, disabled=self._ext_disabled("corps_noir"))
+        self._checkbox(surface, self.wormhole_rect, self.wormhole, w_txt, disabled=self._ext_disabled("wormhole"))
+        self._checkbox(surface, self.filter_rect, self.filter, f_txt, disabled=self._ext_disabled("filter"))
+        self._checkbox(surface, self.rainbow_rect, self.rainbow, r_txt, disabled=self._ext_disabled("rainbow"))
 
         surface.blit(self.font.render(i18n.t("Taille de la grille", "Grid size"), True, theme.TEXT), (s(100), s(422)))
         for i, rect in enumerate(self.size_rects):

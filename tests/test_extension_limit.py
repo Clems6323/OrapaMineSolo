@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pygame
 
-from orapa_mine.ai.generator import MAX_EXTENSIONS_BY_SIZE
+from orapa_mine.ai.generator import DISALLOWED_EXTENSIONS_BY_SIZE, MAX_EXTENSIONS_BY_SIZE
 from orapa_mine.ui.config_screen import ConfigScreen
 from orapa_mine.ui.creator_screen import CreatorScreen
 
@@ -20,6 +20,46 @@ def _click(pos: tuple[int, int]) -> pygame.event.Event:
 
 def test_mapping_is_small_standard_large():
     assert MAX_EXTENSIONS_BY_SIZE == (2, 4, 5)
+
+
+def test_rainbow_disallowed_only_on_small_grid():
+    assert "rainbow" in DISALLOWED_EXTENSIONS_BY_SIZE[0]       # Petit
+    assert "rainbow" not in DISALLOWED_EXTENSIONS_BY_SIZE[1]   # Standard
+    assert "rainbow" not in DISALLOWED_EXTENSIONS_BY_SIZE[2]   # Grand
+
+
+# --- Arc-en-ciel : carré 2×2 interdit sur la petite grille (#75) -------------
+
+
+def test_config_rainbow_not_selectable_on_small_grid():
+    cfg = ConfigScreen()
+    cfg.size_index = 0  # Petit
+    assert cfg._ext_disabled("rainbow") is True
+    cfg.handle_event(_click(cfg.rainbow_row.center))
+    assert cfg.rainbow is False
+    # Mais sélectionnable dès la grille standard.
+    cfg.size_index = 1
+    cfg.handle_event(_click(cfg.rainbow_row.center))
+    assert cfg.rainbow is True
+
+
+def test_config_shrinking_grid_unchecks_rainbow():
+    cfg = ConfigScreen()
+    cfg.size_index = 1  # Standard
+    cfg.rainbow = True
+    cfg.handle_event(_click(cfg.size_rects[0].center))  # → Petit
+    assert cfg.rainbow is False
+
+
+def test_creator_rainbow_not_selectable_on_small_grid():
+    cr = CreatorScreen(size_index=0)  # Petit
+    cr.handle_event(_click(cr.rainbow_row.center))
+    assert cr.rainbow is False
+
+
+def test_creator_constructed_with_rainbow_on_small_is_trimmed():
+    cr = CreatorScreen(size_index=0, rainbow=True)
+    assert cr.rainbow is False
 
 
 # --- Écran de configuration --------------------------------------------------
