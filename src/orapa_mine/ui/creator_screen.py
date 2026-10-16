@@ -15,11 +15,14 @@ from __future__ import annotations
 
 import pygame
 
+import random
+
 from orapa_mine.ai.generator import (
     DISALLOWED_EXTENSIONS_BY_SIZE,
     MAX_EXTENSIONS_BY_SIZE,
     configuration_problems,
     placement_is_legal,
+    random_edge_shots,
 )
 from orapa_mine.model.gems import GemColor, GemKind, Piece, Position
 from orapa_mine.model import gems_catalog as cat
@@ -27,7 +30,12 @@ from orapa_mine.model import serialization
 from orapa_mine.model.grid import Grid
 from orapa_mine.ui import board_render, dialogs, i18n, lang_toggle, theme, theme_toggle
 from orapa_mine.ui.beam_test import RayTester
-from orapa_mine.ui.config_screen import MAX_PROPOSALS, _proposals_text
+from orapa_mine.ui.config_screen import (
+    DEFAULT_TESTS,
+    MAX_PROPOSALS,
+    MAX_TESTS,
+    _proposals_text,
+)
 from orapa_mine.ui.game_screen import Slot
 from orapa_mine.ui.stepper_field import StepperField
 from orapa_mine.ui.timer_field import TimerField
@@ -62,6 +70,8 @@ class CreatorScreen:
         mystery: bool = False,
         timer_minutes: int = 0,
         max_proposals: int = 0,
+        one_shot: bool = False,
+        num_tests: int = 0,
     ) -> None:
         self.size_index = size_index
         self.diamant = diamant
@@ -73,6 +83,8 @@ class CreatorScreen:
         self.mystery_color = GemColor.BLUE
         self.timer = TimerField(timer_minutes)  # minuteur optionnel (0 = désactivé)
         self.proposals = StepperField(max_proposals, max_value=MAX_PROPOSALS)  # 0 = illimité
+        self.one_shot = one_shot  # mode Coup Unique (#81)
+        self.tests = StepperField(num_tests or DEFAULT_TESTS, min_value=1, max_value=MAX_TESTS)
 
         # Sélection / pose de pièces (même interaction que l'écran de jeu).
         self.selected: Piece | None = None
@@ -106,6 +118,11 @@ class CreatorScreen:
     def max_proposals(self) -> int:
         """Nombre max de propositions choisi (0 = illimité) — lu par l'app (#45)."""
         return self.proposals.value
+
+    @property
+    def num_tests(self) -> int:
+        """Nombre de tirs donnés d'avance en Coup Unique — lu par l'app (#81)."""
+        return self.tests.value
 
     # --- Construction ------------------------------------------------------
 
@@ -197,19 +214,28 @@ class CreatorScreen:
         # Minuteur : colonne de droite (aligné sur les extensions) pour ne pas
         # allonger le panneau. Label + stepper − valeur + (éditable au clavier).
         rx = inner + s(176)
-        self.timer_label_x = rx
-        self.timer_label_y = self.ext_label_y
+        self.ctrl_label_x = rx
+        # Bascule « Coup Unique » (haut de la colonne droite, #81).
+        self.oneshot_rect = pygame.Rect(rx, top + s(104), s(20), s(20))
+        self.oneshot_row = pygame.Rect(rx, top + s(102), s(132), s(24))
+        # Mode normal : Minuteur puis Propositions. Coup Unique : Tests de rayon.
+        self.timer_label_y = top + s(130)
         self.timer.set_rects(
-            pygame.Rect(rx, top + s(126), s(26), s(26)),
-            pygame.Rect(rx + s(30), top + s(126), s(68), s(26)),
-            pygame.Rect(rx + s(102), top + s(126), s(26), s(26)),
+            pygame.Rect(rx, top + s(150), s(26), s(26)),
+            pygame.Rect(rx + s(30), top + s(150), s(68), s(26)),
+            pygame.Rect(rx + s(102), top + s(150), s(26), s(26)),
         )
-        # Propositions max (droite, sous le minuteur). 0 = illimité (#45).
-        self.proposals_label_y = top + s(160)
+        self.proposals_label_y = top + s(182)
         self.proposals.set_rects(
-            pygame.Rect(rx, top + s(182), s(26), s(26)),
-            pygame.Rect(rx + s(30), top + s(182), s(68), s(26)),
-            pygame.Rect(rx + s(102), top + s(182), s(26), s(26)),
+            pygame.Rect(rx, top + s(202), s(26), s(26)),
+            pygame.Rect(rx + s(30), top + s(202), s(68), s(26)),
+            pygame.Rect(rx + s(102), top + s(202), s(26), s(26)),
+        )
+        self.tests_label_y = top + s(130)
+        self.tests.set_rects(
+            pygame.Rect(rx, top + s(150), s(26), s(26)),
+            pygame.Rect(rx + s(30), top + s(150), s(68), s(26)),
+            pygame.Rect(rx + s(102), top + s(150), s(26), s(26)),
         )
         self.status_y = top + s(250)
 
@@ -242,10 +268,17 @@ class CreatorScreen:
         if lang_toggle.handle_click(pos, self.size[0]):  # drapeaux FR / UK
             self._build_ext_rows()  # le texte change de langue → recalc des zones (#65)
             return
-        if self.timer.handle_click(pos):  # − / + / case du minuteur (valide la saisie)
+        if self.oneshot_row.collidepoint(pos):  # bascule Coup Unique (#81)
+            self.one_shot = not self.one_shot
             return
-        if self.proposals.handle_click(pos):  # − / + propositions max
-            return
+        if self.one_shot:
+            if self.tests.handle_click(pos):  # − / + tests de rayon
+                return
+        else:
+            if self.timer.handle_click(pos):  # − / + / case du minuteur (valide la saisie)
+                return
+            if self.proposals.handle_click(pos):  # − / + propositions max
+                return
         if self.save_rect.collidepoint(pos):
             self._save()
             return
@@ -438,6 +471,13 @@ class CreatorScreen:
         path = dialogs.ask_save_path()
         if not path:
             return
+        # En Coup Unique, on fige des tirs donnés d'avance (indices) tirés de la
+        # grille ; le minuteur est désactivé et une seule proposition est permise.
+        given_shots = None
+        if self.one_shot:
+            given_shots = random_edge_shots(
+                self.grid.width, self.grid.height, self.num_tests, random.Random()
+            )
         data = serialization.to_dict(
             width=self.grid.width,
             height=self.grid.height,
@@ -446,8 +486,10 @@ class CreatorScreen:
             include_progress=False,
             game=None,
             hypothesis_grid=None,
-            timer_minutes=self.timer_minutes,
-            max_proposals=self.max_proposals,
+            timer_minutes=0 if self.one_shot else self.timer_minutes,
+            max_proposals=1 if self.one_shot else self.max_proposals,
+            one_shot=self.one_shot,
+            given_shots=given_shots,
         )
         try:
             dialogs.write_json(path, data)
@@ -560,13 +602,19 @@ class CreatorScreen:
         self._checkbox(surface, self.filter_rect, self.filter, f_txt, disabled=self._ext_disabled("filter"))
         self._checkbox(surface, self.mystery_rect, self.mystery, r_txt, disabled=self._ext_disabled("mystery"))
 
-        # Minuteur (optionnel), colonne de droite.
-        surface.blit(self.font_small.render(i18n.t("Minuteur", "Timer"), True, theme.TEXT),
-                     (self.timer_label_x, self.timer_label_y))
-        self.timer.draw(surface, self.font_small, i18n.t("Désactivé", "Off"))
-        surface.blit(self.font_small.render(i18n.t("Propositions", "Proposals"), True, theme.TEXT),
-                     (self.timer_label_x, self.proposals_label_y))
-        self.proposals.draw(surface, self.font_small, _proposals_text(self.proposals.value))
+        # Colonne de droite : bascule Coup Unique + réglages selon le mode (#81).
+        self._checkbox(surface, self.oneshot_rect, self.one_shot, i18n.t("Coup Unique", "One Shot"))
+        if self.one_shot:
+            surface.blit(self.font_small.render(i18n.t("Tests de rayon", "Beam tests"), True, theme.TEXT),
+                         (self.ctrl_label_x, self.tests_label_y))
+            self.tests.draw(surface, self.font_small, str(self.tests.value))
+        else:
+            surface.blit(self.font_small.render(i18n.t("Minuteur", "Timer"), True, theme.TEXT),
+                         (self.ctrl_label_x, self.timer_label_y))
+            self.timer.draw(surface, self.font_small, i18n.t("Désactivé", "Off"))
+            surface.blit(self.font_small.render(i18n.t("Propositions", "Proposals"), True, theme.TEXT),
+                         (self.ctrl_label_x, self.proposals_label_y))
+            self.proposals.draw(surface, self.font_small, _proposals_text(self.proposals.value))
 
         # État de validité en direct.
         placed = len(self.grid.gems)

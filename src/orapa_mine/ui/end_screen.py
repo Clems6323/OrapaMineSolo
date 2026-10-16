@@ -31,12 +31,19 @@ class EndScreen:
         timer_minutes: int = 0,
         distance=None,
         lost: bool = False,
+        one_shot: bool = False,
+        given_shots=None,
+        guess_grid: Grid | None = None,
     ) -> None:
         self.won = won
         self.lost = lost  # propositions épuisées sans trouver (#45)
         self.score = score
         self.distance = distance  # Score (model.distance) : proximité à la vérité (#45)
+        self.one_shot = one_shot   # Coup Unique : score = distance seule (#81)
+        self.given_shots = given_shots or []  # indices à ré-enregistrer au partage
         self.grid = hidden_grid
+        self.guess_grid = guess_grid  # plateau proposé par le joueur (toggle de vue)
+        self.show_solution = True     # vue courante : solution (sinon, proposition)
         self.palette_pieces = palette_pieces
         self.elapsed_seconds = max(0.0, elapsed_seconds)
         self.timed_out = timed_out
@@ -55,6 +62,13 @@ class EndScreen:
         self.panel = theme.PANEL.copy()
         inner = self.panel.x + s(18)
         bw = theme.PANEL_WIDTH - s(36)
+        # Bascule de vue : Solution / Ta proposition (si une proposition existe).
+        # Placé assez bas pour laisser passer jusqu'à 4 lignes d'info au-dessus.
+        self.view_label_y = self.panel.top + s(166)
+        tgap = s(8)
+        tbw = (bw - tgap) // 2
+        self.solution_rect = pygame.Rect(inner, self.panel.top + s(188), tbw, s(36))
+        self.guess_rect = pygame.Rect(inner + tbw + tgap, self.panel.top + s(188), tbw, s(36))
         self.save_rect = pygame.Rect(inner, self.panel.bottom - s(164), bw, s(40))
         self.replay_rect = pygame.Rect(inner, self.panel.bottom - s(108), bw, s(44))
         self.quit_rect = pygame.Rect(inner, self.panel.bottom - s(56), bw, s(40))
@@ -68,6 +82,10 @@ class EndScreen:
             theme_toggle.toggle()
         elif lang_toggle.handle_click(event.pos, self.size[0]):  # drapeaux FR / UK
             pass
+        elif self.guess_grid is not None and self.solution_rect.collidepoint(event.pos):
+            self.show_solution = True
+        elif self.guess_grid is not None and self.guess_rect.collidepoint(event.pos):
+            self.show_solution = False
         elif self.save_rect.collidepoint(event.pos):
             self._save()
         elif self.replay_rect.collidepoint(event.pos):
@@ -87,6 +105,8 @@ class EndScreen:
             hidden_grid=self.grid,
             include_progress=False,
             timer_minutes=self.timer_minutes,
+            one_shot=self.one_shot,
+            given_shots=self.given_shots,
         )
         try:
             dialogs.write_json(path, data)
@@ -96,6 +116,14 @@ class EndScreen:
             return
         self.message = i18n.t("Configuration enregistrée.", "Configuration saved.")
         self.message_color = theme.WIN_COLOR
+
+    def _view_button(self, surface: pygame.Surface, rect: pygame.Rect, text: str, selected: bool) -> None:
+        bg = theme.SLOT_SELECTED if selected else theme.SLOT_BG
+        pygame.draw.rect(surface, bg, rect, border_radius=8)
+        pygame.draw.rect(surface, theme.BOARD_BORDER, rect, width=2 if selected else 1, border_radius=8)
+        fg = theme.ON_ACCENT if selected else theme.TEXT
+        label = self.font_small.render(text, True, fg)
+        surface.blit(label, label.get_rect(center=rect.center))
 
     def _distance_main(self) -> tuple[str, bool]:
         """(valeur de la distance, est-ce parfait ?).
@@ -131,10 +159,15 @@ class EndScreen:
         surface.fill(theme.BACKGROUND)
         theme_toggle.draw(surface)
         lang_toggle.draw(surface)
-        board_render.draw_board(surface, self.grid)
-        board_render.draw_gems(surface, self.grid)  # solution révélée
+        # Vue courante : solution révélée, ou plateau proposé par le joueur.
+        showing_solution = self.show_solution or self.guess_grid is None
+        board = self.grid if showing_solution else self.guess_grid
+        board_render.draw_board(surface, board)
+        board_render.draw_gems(surface, board)
 
-        caption = self.font.render(i18n.t("Voici la solution :", "Here is the solution:"), True, theme.TEXT_DIM)
+        cap = (i18n.t("Voici la solution :", "Here is the solution:") if showing_solution
+               else i18n.t("Ta proposition :", "Your submission:"))
+        caption = self.font.render(cap, True, theme.TEXT_DIM)
         surface.blit(caption, (theme.BOARD_X, theme.BOARD_Y - theme.s(34)))
 
         pygame.draw.rect(surface, theme.PANEL_BG, self.panel, border_radius=8)
@@ -152,16 +185,20 @@ class EndScreen:
         title = self.font_big.render(banner, True, color)
         surface.blit(title, (x, self.panel.top + theme.s(20)))
 
-        # Deux scores (plus bas = meilleur), #45 : requêtes pondérées + distance.
-        score_line = i18n.t(f"Score requêtes : {self.score}", f"Request score: {self.score}")
-        surface.blit(self.font.render(score_line, True, theme.TEXT), (x, self.panel.top + theme.s(60)))
+        # Score(s) (plus bas = meilleur). En Coup Unique, seule la distance
+        # compte (#81) ; sinon on montre aussi le score de requêtes (#45).
+        dy = theme.s(60)
+        if not self.one_shot:
+            score_line = i18n.t(f"Score requêtes : {self.score}", f"Request score: {self.score}")
+            surface.blit(self.font.render(score_line, True, theme.TEXT), (x, self.panel.top + dy))
+            dy += theme.s(26)
         dist_value, perfect = self._distance_main()
         dist_line = i18n.t(f"Distance à la vérité : {dist_value}",
                            f"Distance to truth: {dist_value}")
         dist_color = theme.WIN_COLOR if perfect else theme.TEXT
-        surface.blit(self.font.render(dist_line, True, dist_color), (x, self.panel.top + theme.s(86)))
+        surface.blit(self.font.render(dist_line, True, dist_color), (x, self.panel.top + dy))
 
-        y = self.panel.top + theme.s(112)
+        y = self.panel.top + dy + theme.s(26)
         note = self._placed_note()
         if note is not None:  # ex. « 3/5 gemmes posées » quand l'hypothèse est incomplète
             surface.blit(self.font_small.render(note, True, theme.TEXT_DIM), (x, y))
@@ -170,6 +207,15 @@ class EndScreen:
             i18n.t(f"Temps passé : {_duration(self.elapsed_seconds)}",
                    f"Time spent: {_duration(self.elapsed_seconds)}"), True, theme.TEXT_DIM)
         surface.blit(spent, (x, y))
+
+        # Bascule de vue du plateau : Solution / Ta proposition (si elle existe).
+        if self.guess_grid is not None:
+            surface.blit(self.font_small.render(i18n.t("Affichage :", "View:"), True, theme.TEXT_DIM),
+                         (x, self.view_label_y))
+            self._view_button(surface, self.solution_rect, i18n.t("Solution", "Solution"),
+                              selected=showing_solution)
+            self._view_button(surface, self.guess_rect, i18n.t("Ta proposition", "Your board"),
+                              selected=not showing_solution)
 
         # Bouton « Sauvegarder la configuration » (partage de l'énigme jouée).
         pygame.draw.rect(surface, theme.BTN_SAVE, self.save_rect, border_radius=8)

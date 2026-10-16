@@ -75,6 +75,10 @@ class GameState:
     won: bool = False
     invalid_submissions: int = 0  # propositions incorrectes (pénalité au score)
     max_proposals: int = 0  # nb max de propositions (#45) ; 0 = illimité
+    # Mode « Coup Unique » (#81) : des tirs sont donnés d'avance (clues), le
+    # joueur ne peut plus interroger la mine et ne propose qu'une fois.
+    one_shot: bool = False
+    given_shots: list[RayShot] = field(default_factory=list)
 
     def play_shot(self, entry: Position, direction: Direction) -> RayShot:
         """Envoie un rayon, enregistre le tir dans l'historique, le retourne."""
@@ -82,6 +86,19 @@ class GameState:
         shot = RayShot(entry=entry, direction=direction, result=result)
         self.history.append(shot)
         return shot
+
+    def add_given_shot(self, entry: Position, direction: Direction) -> RayShot:
+        """Ajoute un tir **donné d'avance** (indice de Coup Unique), hors score."""
+        result = fire_beam(self.hidden_grid, entry, direction)
+        shot = RayShot(entry=entry, direction=direction, result=result)
+        self.given_shots.append(shot)
+        return shot
+
+    @property
+    def clues(self) -> list[RayShot | CellQuery]:
+        """Entrées à afficher dans l'historique : indices donnés (Coup Unique)
+        sinon les actions jouées."""
+        return list(self.given_shots) if self.one_shot else self.history
 
     def query_cell(self, position: Position) -> CellQuery:
         """Répond à « Qu'y a-t-il en `position` ? » et l'enregistre."""

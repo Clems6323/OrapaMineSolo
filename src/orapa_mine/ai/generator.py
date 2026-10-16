@@ -69,6 +69,8 @@ class Difficulty:
     name: str = "base"
     timer_minutes: int = 0  # minuteur optionnel (0 = désactivé)
     max_proposals: int = 0  # nb max de propositions (#45) ; 0 = illimité
+    one_shot: bool = False  # mode Coup Unique (#81)
+    num_tests: int = 0      # nb de tirs donnés d'avance en Coup Unique
 
     @staticmethod
     def base() -> Difficulty:
@@ -144,6 +146,27 @@ def _random_valid_placement(
     if not candidates:
         return None
     return rng.choice(candidates)
+
+
+def random_edge_shots(
+    width: int, height: int, count: int, rng: random.Random | None = None
+) -> list[tuple[Position, Direction]]:
+    """Tire `count` tirs de rayon **distincts** depuis les bords (Coup Unique, #81).
+
+    Chaque tir = (case de bordure d'entrée, direction entrante). On énumère les
+    quatre bords puis on en prélève un échantillon aléatoire sans doublon (borné
+    par le nombre d'entrées possibles).
+    """
+    rng = rng or random.Random()
+    candidates: list[tuple[Position, Direction]] = []
+    for row in range(height):
+        candidates.append((Position(row, 0), Direction.RIGHT))
+        candidates.append((Position(row, width - 1), Direction.LEFT))
+    for col in range(width):
+        candidates.append((Position(0, col), Direction.DOWN))
+        candidates.append((Position(height - 1, col), Direction.UP))
+    rng.shuffle(candidates)
+    return candidates[: max(0, min(count, len(candidates)))]
 
 
 def _touches_orthogonally(gem: PlacedGem, occupied: set[Position]) -> bool:

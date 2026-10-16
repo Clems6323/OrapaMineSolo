@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pygame
 
-from orapa_mine.ai.generator import Difficulty, generate_hidden_grid
+from orapa_mine.ai.generator import Difficulty, generate_hidden_grid, random_edge_shots
 from orapa_mine.model import gems_catalog as cat
 from orapa_mine.model.distance import board_distance
 from orapa_mine.model.game import GameState
@@ -130,7 +130,8 @@ class OrapaMineApp:
             self._start_game(screen.result)
         elif isinstance(screen, CreatorScreen) and screen.play is not None:
             self._start_from_grid(
-                screen.play, screen.palette_pieces, screen.timer_minutes, screen.max_proposals
+                screen.play, screen.palette_pieces, screen.timer_minutes, screen.max_proposals,
+                one_shot=screen.one_shot, num_tests=screen.num_tests,
             )
         elif isinstance(screen, CreatorScreen) and screen.back:
             self.current = ConfigScreen()
@@ -149,7 +150,9 @@ class OrapaMineApp:
                 outcome == "win", score, screen.game.hidden_grid, screen.palette_pieces,
                 elapsed_seconds=screen.elapsed, timed_out=(outcome == "timeout"),
                 timer_minutes=screen.timer_minutes, distance=distance,
-                lost=(outcome == "lost"),
+                lost=(outcome == "lost"), one_shot=screen.game.one_shot,
+                given_shots=[(s.entry, s.direction) for s in screen.game.given_shots],
+                guess_grid=screen.hypothesis,
             )
         elif isinstance(screen, EndScreen):
             if screen.restart:
@@ -161,11 +164,25 @@ class OrapaMineApp:
     def _start_game(self, difficulty: Difficulty) -> None:
         rng = random.Random(self.seed)
         grid = generate_hidden_grid(difficulty=difficulty, rng=rng)
-        game = GameState(hidden_grid=grid, max_proposals=difficulty.max_proposals)
-        self.current = GameScreen(
-            game, palette_pieces=difficulty.pieces, timer_minutes=difficulty.timer_minutes
-        )
+        game = self._make_game(grid, rng, difficulty.one_shot, difficulty.num_tests,
+                               difficulty.max_proposals)
+        timer = 0 if difficulty.one_shot else difficulty.timer_minutes
+        self.current = GameScreen(game, palette_pieces=difficulty.pieces, timer_minutes=timer)
         self._resize(self.current.size)
+
+    def _make_game(
+        self, grid, rng, one_shot: bool, num_tests: int, max_proposals: int
+    ) -> GameState:
+        """Construit la partie ; en Coup Unique, tire les indices (#81) et force 1 essai."""
+        game = GameState(
+            hidden_grid=grid,
+            max_proposals=1 if one_shot else max_proposals,
+            one_shot=one_shot,
+        )
+        if one_shot:
+            for entry, direction in random_edge_shots(grid.width, grid.height, num_tests, rng):
+                game.add_given_shot(entry, direction)
+        return game
 
     def _start_creator(self, difficulty: Difficulty) -> None:
         # Reprend la sélection du menu comme valeurs de départ ; l'utilisateur
@@ -184,14 +201,19 @@ class OrapaMineApp:
             mystery=cat.MYSTERY in difficulty.pieces,
             timer_minutes=difficulty.timer_minutes,
             max_proposals=difficulty.max_proposals,
+            one_shot=difficulty.one_shot,
+            num_tests=difficulty.num_tests,
         )
         self._resize(self.current.size)
 
     def _start_from_grid(
-        self, grid, palette_pieces, timer_minutes: int = 0, max_proposals: int = 0
+        self, grid, palette_pieces, timer_minutes: int = 0, max_proposals: int = 0,
+        one_shot: bool = False, num_tests: int = 0,
     ) -> None:
-        game = GameState(hidden_grid=grid, max_proposals=max_proposals)
-        self.current = GameScreen(game, palette_pieces=palette_pieces, timer_minutes=timer_minutes)
+        rng = random.Random(self.seed)
+        game = self._make_game(grid, rng, one_shot, num_tests, max_proposals)
+        timer = 0 if one_shot else timer_minutes
+        self.current = GameScreen(game, palette_pieces=palette_pieces, timer_minutes=timer)
         self._resize(self.current.size)
 
     def _start_loaded(self, loaded) -> None:
@@ -210,11 +232,13 @@ class OrapaMineApp:
     def _show_end(
         self, won: bool, score: int, hidden_grid, palette_pieces,
         elapsed_seconds: float = 0.0, timed_out: bool = False, timer_minutes: int = 0,
-        distance=None, lost: bool = False,
+        distance=None, lost: bool = False, one_shot: bool = False, given_shots=None,
+        guess_grid=None,
     ) -> None:
         self.current = EndScreen(
             won=won, score=score, hidden_grid=hidden_grid, palette_pieces=palette_pieces,
             elapsed_seconds=elapsed_seconds, timed_out=timed_out, timer_minutes=timer_minutes,
-            distance=distance, lost=lost,
+            distance=distance, lost=lost, one_shot=one_shot, given_shots=given_shots,
+            guess_grid=guess_grid,
         )
         self._resize(self.current.size)

@@ -199,6 +199,15 @@ les diagrammes du livret :
     progression ; l'écran de fin affiche donc plutôt `placed_total` (somme finie
     sur les gemmes **posées**) et le compte `missing` — p. ex. « 2.40 cases,
     3/5 gemmes posées ». Calculée à l'écran de fin.
+- **Mode « Coup Unique »** (#81) : une grille aléatoire est générée, puis un
+  **jeu de tirs de rayon tirés au hasard** est donné d'avance (nombre réglable).
+  Le joueur **ne peut plus interroger la mine** (ni tir ni question de case) :
+  il déduit uniquement à partir de ces indices, place **toutes** les gemmes et
+  ne fait **qu'une seule proposition**. Le score est la **distance à la vérité**
+  (Earth Mover). Les indices sont **figés et sauvegardés** avec le puzzle (même
+  partie pour tout le monde). Activable à la configuration et en mode créateur.
+  Côté modèle : `GameState.one_shot` + `given_shots` (tirs donnés, hors score) ;
+  `generator.random_edge_shots` tire les entrées.
 - **Propositions limitées** (#45) : réglage `max_proposals` (0 = illimité, par
   défaut). Chaque **proposition incorrecte** consomme un essai ; à 0 essai
   restant sans avoir trouvé, la partie est **perdue** (« Plus d'essais », la

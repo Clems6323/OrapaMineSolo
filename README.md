@@ -83,6 +83,13 @@ un fichier `.json` ; coche **Progression** pour y inclure aussi l'historique et
 tes pièces posées (sinon seule la configuration à deviner est enregistrée).
 Recharge une partie depuis le menu de départ avec **Charger…**.
 
+**Mode « Coup Unique »** : au menu de départ, bascule sur **Coup Unique**. Une
+grille aléatoire est générée et un nombre réglable de **tirs de rayon** t'est
+donné d'avance. Impossible d'en demander d'autres : tu **déduis** à partir de
+ces seuls indices, places **toutes** les gemmes et n'as **qu'une seule
+proposition**. Le score est la **distance à la vérité**. Les indices sont figés
+et voyagent avec le puzzle (créable aussi en mode créateur, partageable).
+
 **Mode créateur** : depuis le menu de départ, **Mode créateur** ouvre un plateau
 où tu places toi-même les gemmes. La **taille de la grille** et les
 **extensions** se règlent directement dans l'écran (changer la taille repart
