@@ -152,6 +152,7 @@ class OrapaMineApp:
                 timer_minutes=screen.timer_minutes, distance=distance,
                 lost=(outcome == "lost"), one_shot=screen.game.one_shot,
                 given_shots=[(s.entry, s.direction) for s in screen.game.given_shots],
+                guess_grid=screen.hypothesis,
             )
         elif isinstance(screen, EndScreen):
             if screen.restart:
@@ -232,10 +233,12 @@ class OrapaMineApp:
         self, won: bool, score: int, hidden_grid, palette_pieces,
         elapsed_seconds: float = 0.0, timed_out: bool = False, timer_minutes: int = 0,
         distance=None, lost: bool = False, one_shot: bool = False, given_shots=None,
+        guess_grid=None,
     ) -> None:
         self.current = EndScreen(
             won=won, score=score, hidden_grid=hidden_grid, palette_pieces=palette_pieces,
             elapsed_seconds=elapsed_seconds, timed_out=timed_out, timer_minutes=timer_minutes,
             distance=distance, lost=lost, one_shot=one_shot, given_shots=given_shots,
+            guess_grid=guess_grid,
         )
         self._resize(self.current.size)
