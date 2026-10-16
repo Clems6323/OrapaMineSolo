@@ -186,9 +186,24 @@ les diagrammes du livret :
 
 ## Variantes solo (spécifiques à cette implémentation) ✅
 
-- **Score = nombre de rayons** (mode retenu) : rayons illimités, le joueur
-  soumet sa solution quand il veut ; le score est le nombre de tirs (et de
-  questions « qu'y a-t-il en X ? ») utilisés — moins il y en a, mieux c'est.
+- **Deux scores** (#45), **plus bas = meilleur** :
+  - **Score de requêtes** (`GameState.request_score`) : barème pondéré des
+    actions — un **tir de rayon** (interroge toute une ligne/colonne) vaut
+    `SHOT_COST` (1), une **question de case** (ciblée) `CELL_QUERY_COST` (3), et
+    chaque **proposition incorrecte** `INVALID_SUBMISSION_COST` (5). Constantes
+    isolées dans `model/game.py`.
+  - **Distance à la vérité** (`model/distance.board_distance`) : distance
+    **Earth Mover** (Wasserstein W1) entre l'hypothèse finale et la vraie
+    grille, en « cases » (déplacement moyen par brin de matière). 0 = parfait.
+    `Score.total` vaut `∞` dès qu'une gemme manque, ce qui masquerait la
+    progression ; l'écran de fin affiche donc plutôt `placed_total` (somme finie
+    sur les gemmes **posées**) et le compte `missing` — p. ex. « 2.40 cases,
+    3/5 gemmes posées ». Calculée à l'écran de fin.
+- **Propositions limitées** (#45) : réglage `max_proposals` (0 = illimité, par
+  défaut). Chaque **proposition incorrecte** consomme un essai ; à 0 essai
+  restant sans avoir trouvé, la partie est **perdue** (« Plus d'essais », la
+  solution est révélée). Réglable à la configuration **et** en mode créateur,
+  sauvegardé avec la partie. Mettre 1 ne laisse qu'**une seule chance**.
 - **Difficulté** : contrôle du nombre de gemmes (5 base / 7 complet), de la
   taille de grille, et de l'activation des extensions.
 - **Plafond d'extensions par taille de grille** (#75) : au-delà d'un certain

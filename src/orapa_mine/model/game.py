@@ -4,10 +4,14 @@ Deux types d'action (règles officielles) :
 - **tir** : envoyer un rayon depuis un point de bordure (`play_shot`) ;
 - **question de case** : « Qu'y a-t-il en X ? » (`query_cell`).
 
-Score solo = nombre d'actions (tirs + questions) avant une proposition
-correcte : moins il y en a, mieux c'est (voir docs/RULES.md, « Variantes
-solo »). La proposition de solution (`submit_guess`) ne compte pas dans le
-score.
+Deux scores (issue #45), **plus bas = meilleur** :
+- **score de requêtes** (`request_score`) : barème pondéré des actions — un tir
+  de rayon (interroge toute une ligne/colonne) coûte peu, une question de case
+  (ciblée) coûte plus, et chaque proposition incorrecte est pénalisée ;
+- **distance à la vérité** : voir `model.distance.board_distance` (Earth Mover),
+  calculée à la fin de partie sur la grille d'hypothèse.
+
+Le simple décompte d'actions reste disponible via `score`.
 """
 
 from __future__ import annotations
@@ -17,6 +21,12 @@ from dataclasses import dataclass, field
 from orapa_mine.model.beam import BeamResult, fire_beam
 from orapa_mine.model.gems import Direction, GemColor, GemKind, PlacedGem, Position
 from orapa_mine.model.grid import Grid
+
+# Barème du score « requêtes » (issue #45) — isolé et documenté pour être
+# ajusté facilement. Plus bas = meilleur.
+SHOT_COST = 1             # tir de rayon : interroge toute une ligne/colonne
+CELL_QUERY_COST = 3       # question de case : information ciblée, plus « chère »
+INVALID_SUBMISSION_COST = 5  # pénalité par proposition de solution incorrecte
 
 
 @dataclass(frozen=True)
@@ -63,6 +73,8 @@ class GameState:
     hidden_grid: Grid
     history: list[RayShot | CellQuery] = field(default_factory=list)
     won: bool = False
+    invalid_submissions: int = 0  # propositions incorrectes (pénalité au score)
+    max_proposals: int = 0  # nb max de propositions (#45) ; 0 = illimité
 
     def play_shot(self, entry: Position, direction: Direction) -> RayShot:
         """Envoie un rayon, enregistre le tir dans l'historique, le retourne."""
@@ -93,12 +105,43 @@ class GameState:
         couleur/nature de chaque gemme (via la signature par case).
         """
         self.won = _signature(guessed_gems) == _signature(self.hidden_grid.gems)
+        if not self.won:
+            self.invalid_submissions += 1  # proposition incorrecte : pénalité au score
         return self.won
 
     @property
     def score(self) -> int:
-        """Score = nombre d'actions (tirs + questions de case)."""
+        """Nombre d'actions (tirs + questions de case). Décompte brut."""
         return len(self.history)
+
+    @property
+    def request_score(self) -> int:
+        """Score « requêtes » pondéré (issue #45) : tirs + questions + pénalités.
+
+        Plus bas = meilleur. Les tirs de rayon coûtent `SHOT_COST`, les questions
+        de case `CELL_QUERY_COST`, et chaque proposition incorrecte
+        `INVALID_SUBMISSION_COST`.
+        """
+        total = self.invalid_submissions * INVALID_SUBMISSION_COST
+        for action in self.history:
+            total += CELL_QUERY_COST if isinstance(action, CellQuery) else SHOT_COST
+        return total
+
+    @property
+    def remaining_proposals(self) -> int | None:
+        """Propositions restantes, ou None si illimité (`max_proposals == 0`)."""
+        if self.max_proposals <= 0:
+            return None
+        return max(0, self.max_proposals - self.invalid_submissions)
+
+    @property
+    def proposals_exhausted(self) -> bool:
+        """Vrai si le joueur a épuisé ses propositions sans trouver (#45)."""
+        return (
+            self.max_proposals > 0
+            and not self.won
+            and self.invalid_submissions >= self.max_proposals
+        )
 
     @property
     def shots(self) -> list[RayShot]:

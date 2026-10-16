@@ -67,6 +67,7 @@ def to_dict(
     game: GameState | None = None,
     hypothesis_grid: Grid | None = None,
     timer_minutes: int = 0,
+    max_proposals: int = 0,
     elapsed_seconds: float = 0.0,
 ) -> dict:
     """Sérialise une partie en dict. `include_progress` ajoute historique + board.
@@ -85,11 +86,13 @@ def to_dict(
         "hidden": [_gem_to_dict(g) for g in hidden_grid.gems],
         "progress": bool(include_progress),
         "timer": int(timer_minutes),
+        "max_proposals": int(max_proposals),
     }
     if include_progress:
         data["history"] = _history_to_list(game)
         data["hypothesis"] = [_gem_to_dict(g) for g in hypothesis_grid.gems]
         data["elapsed"] = round(float(elapsed_seconds), 3)
+        data["invalid"] = int(game.invalid_submissions)  # pénalités de score (#45)
     return data
 
 
@@ -103,6 +106,7 @@ class LoadedGame:
     game: GameState
     hypothesis: Grid
     timer_minutes: int = 0
+    max_proposals: int = 0
     elapsed_seconds: float = 0.0
 
 
@@ -118,7 +122,8 @@ def from_dict(data: dict) -> LoadedGame:
     for gem_data in data["hidden"]:
         hidden.place_gem(_gem_from_dict(gem_data))
 
-    game = GameState(hidden_grid=hidden)
+    max_proposals = int(data.get("max_proposals", 0))
+    game = GameState(hidden_grid=hidden, max_proposals=max_proposals)
     hypothesis = Grid(width=width, height=height)
     if data.get("progress"):
         for action in data.get("history", []):
@@ -128,8 +133,9 @@ def from_dict(data: dict) -> LoadedGame:
                 game.query_cell(Position(*action["pos"]))
         for gem_data in data.get("hypothesis", []):
             hypothesis.place_gem(_gem_from_dict(gem_data))
+        game.invalid_submissions = int(data.get("invalid", 0))
 
     return LoadedGame(
         width, height, palette, game, hypothesis,
-        int(data.get("timer", 0)), float(data.get("elapsed", 0.0)),
+        int(data.get("timer", 0)), max_proposals, float(data.get("elapsed", 0.0)),
     )

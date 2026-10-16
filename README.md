@@ -72,8 +72,11 @@ uv run pytest                 # lance les tests
 4. **Teste** : clique un point d'entrée sur le bord pour envoyer un rayon qui
    rebondit sur **tes** pièces posées, et compare sa sortie/couleur à
    l'Historique.
-5. **Propose la solution** quand tu es sûr. Le score est le nombre de questions
-   posées — moins il y en a, mieux c'est.
+5. **Propose la solution** quand tu es sûr. Deux scores (plus bas = mieux) : le
+   **score de requêtes** (tir de rayon = 1, question de case = 3, proposition
+   ratée = 5) et, à l'écran de fin, la **distance à la vérité** (Earth Mover,
+   en cases ; 0 = parfait). Le **nombre de propositions** peut être limité
+   (réglage **Propositions**, 0 = illimité ; mets 1 pour n'avoir qu'une chance).
 
 **Sauvegarder / charger** : le bouton **Sauvegarder** enregistre la partie dans
 un fichier `.json` ; coche **Progression** pour y inclure aussi l'historique et
@@ -107,7 +110,9 @@ src/orapa_mine/model/            # Logique de jeu pure (aucune dépendance UI)
   ├── gems.py / gems_catalog.py  #   géométrie des pièces (demi-cases)
   ├── grid.py                    #   grille, placement
   ├── beam.py                    #   trajectoire + mélange des couleurs
-  └── game.py                    #   actions, historique, score, victoire
+  ├── game.py                    #   actions, historique, score, victoire
+  ├── distance.py                #   distance Earth Mover (score de proximité)
+  └── serialization.py           #   sauvegarde / chargement JSON
 src/orapa_mine/ai/generator.py   # Génération + validation d'une grille cachée
 src/orapa_mine/ui/               # Interface Pygame (config → jeu/créateur → fin)
 tests/                           # Tests unitaires (modèle 100 % testable)

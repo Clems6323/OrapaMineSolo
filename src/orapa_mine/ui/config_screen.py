@@ -17,7 +17,15 @@ from orapa_mine.model import gems_catalog as cat
 from orapa_mine.model import serialization
 from orapa_mine.model.serialization import LoadedGame
 from orapa_mine.ui import dialogs, i18n, lang_toggle, theme, theme_toggle
+from orapa_mine.ui.stepper_field import StepperField
 from orapa_mine.ui.timer_field import TimerField
+
+MAX_PROPOSALS = 10  # plafond du réglage « propositions max » (0 = illimité)
+
+
+def _proposals_text(value: int) -> str:
+    """Texte de la case « propositions max » : « ∞ » pour 0 (illimité)."""
+    return "∞" if value <= 0 else str(value)
 
 SIZE = (760, 798)  # taille logique ; mise à l'échelle DPI dans __init__
 
@@ -39,6 +47,7 @@ class ConfigScreen:
         self.sizes = [("Petit", 8, 6), ("Standard", 10, 8), ("Grand", 12, 10)]
         self.size_index = 1
         self.timer = TimerField()  # minuteur optionnel (0 = désactivé)
+        self.proposals = StepperField(max_value=MAX_PROPOSALS)  # 0 = propositions illimitées
         self.result: Difficulty | None = None
         self.loaded: LoadedGame | None = None
         self.creator: Difficulty | None = None  # lancer le mode créateur
@@ -64,12 +73,20 @@ class ConfigScreen:
         self.size_rects = [
             pygame.Rect(start_x + i * (bw + gap), s(462), bw, s(60)) for i in range(3)
         ]
-        # Minuteur (stepper − valeur + éditable), centré sous le total de gemmes.
+        # Deux réglages côte à côte sous le total de gemmes : Minuteur (gauche,
+        # éditable) et Propositions max (droite, stepper). Même ligne (y=620).
         self.timer.set_rects(
-            pygame.Rect(s(271), s(620), s(44), s(40)),
-            pygame.Rect(s(325), s(620), s(110), s(40)),
-            pygame.Rect(s(445), s(620), s(44), s(40)),
+            pygame.Rect(s(144), s(620), s(34), s(40)),
+            pygame.Rect(s(186), s(620), s(104), s(40)),
+            pygame.Rect(s(298), s(620), s(34), s(40)),
         )
+        self.proposals.set_rects(
+            pygame.Rect(s(428), s(620), s(34), s(40)),
+            pygame.Rect(s(470), s(620), s(104), s(40)),
+            pygame.Rect(s(582), s(620), s(34), s(40)),
+        )
+        self._timer_cx = s(238)       # centre du bloc Minuteur (label aligné)
+        self._proposals_cx = s(522)   # centre du bloc Propositions
 
         bw2, gap2 = s(224), s(16)
         total2 = 3 * bw2 + 2 * gap2
@@ -94,6 +111,8 @@ class ConfigScreen:
             self._build_ext_rows()  # le texte change de langue → recalc des zones (#65)
             return
         if self.timer.handle_click(p):  # − / + / case du minuteur
+            return
+        if self.proposals.handle_click(p):  # − / + propositions max
             return
         if self.diamant_row.collidepoint(p):
             self._toggle_ext("diamant")
@@ -184,7 +203,7 @@ class ConfigScreen:
         name, width, height = self.sizes[self.size_index]
         return Difficulty(
             pieces=pieces, width=width, height=height, name=name.lower(),
-            timer_minutes=self.timer.minutes,
+            timer_minutes=self.timer.minutes, max_proposals=self.proposals.value,
         )
 
     def _begin(self) -> None:
@@ -244,10 +263,13 @@ class ConfigScreen:
             i18n.t(f"Total : {total} gemmes à trouver", f"Total: {total} gems to find"), True, theme.TEXT_DIM)
         surface.blit(count, count.get_rect(centerx=cx, y=s(564)))
 
-        # Minuteur (optionnel) : label + stepper − valeur + (éditable au clavier).
+        # Minuteur (gauche) + Propositions max (droite), même ligne.
         timer_label = self.font.render(i18n.t("Minuteur", "Timer"), True, theme.TEXT)
-        surface.blit(timer_label, timer_label.get_rect(centerx=cx, y=s(590)))
+        surface.blit(timer_label, timer_label.get_rect(centerx=self._timer_cx, y=s(590)))
         self.timer.draw(surface, self.font, i18n.t("Désactivé", "Off"))
+        prop_label = self.font.render(i18n.t("Propositions", "Proposals"), True, theme.TEXT)
+        surface.blit(prop_label, prop_label.get_rect(centerx=self._proposals_cx, y=s(590)))
+        self.proposals.draw(surface, self.font, _proposals_text(self.proposals.value))
 
         self._button(surface, self.start_rect, theme.BTN_GREEN, i18n.t("Commencer", "Start"), theme.BTN_TEXT)
         self._button(surface, self.creator_rect, theme.BTN_BLUE, i18n.t("Mode créateur", "Creator mode"), theme.BTN_TEXT)
