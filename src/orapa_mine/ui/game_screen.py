@@ -292,7 +292,7 @@ class GameScreen:
             self._submit()
             return
         if self.abandon_rect.collidepoint(pos):
-            self.finished = ("giveup", self.game.score)
+            self.finished = ("giveup", self.game.request_score)
             return
         if self.progress_row.collidepoint(pos):  # case OU libellé « Progression »
             self.save_progress = not self.save_progress
@@ -548,7 +548,7 @@ class GameScreen:
     def _submit(self) -> None:
         won = self.game.submit_guess(list(self.hypothesis.gems))
         if won:
-            self.finished = ("win", self.game.score)
+            self.finished = ("win", self.game.request_score)
         else:
             self.message = i18n.t("Proposition incorrecte, réessaie.", "Incorrect guess, try again.")
             self.message_color = theme.LOSE_COLOR
@@ -577,7 +577,7 @@ class GameScreen:
         self.elapsed += dt
         if self.time_limit and self.elapsed >= self.time_limit:
             self.elapsed = self.time_limit
-            self.finished = ("timeout", self.game.score)
+            self.finished = ("timeout", self.game.request_score)
 
     def _remaining(self) -> float:
         """Secondes restantes avant la fin du minuteur (0 si désactivé/écoulé)."""
@@ -714,7 +714,7 @@ class GameScreen:
         # Score en direct (nombre de questions posées), aligné à droite sur la
         # même ligne que « Historique ». La valeur finale est reprise à l'écran de fin.
         score_img = self.font.render(
-            i18n.t(f"Score : {self.game.score}", f"Score: {self.game.score}"),
+            i18n.t(f"Score : {self.game.request_score}", f"Score: {self.game.request_score}"),
             True, theme.SLOT_SELECTED,
         )
         surface.blit(score_img, score_img.get_rect(topright=(self.panel.right - s(18), self.history_header_y)))
@@ -1018,10 +1018,12 @@ _HELP: list[tuple[str, str, str, str]] = [
     ),
     (
         "Gagner", "Win",
-        "Quand tu es sûr de toi, clique « Proposer la solution ». Le score est le "
-        "nombre de questions posées.",
-        "When you're confident, click “Submit solution”. Your score is the number "
-        "of questions asked.",
+        "Quand tu es sûr de toi, clique « Proposer la solution ». Deux scores "
+        "(plus bas = mieux) : le score de requêtes (tir = 1, question de case = 3, "
+        "proposition ratée = 5) et, en fin de partie, la distance à la vérité.",
+        "When you're confident, click “Submit solution”. Two scores (lower is "
+        "better): the request score (beam = 1, cell query = 3, wrong guess = 5) "
+        "and, at the end, the distance to the truth.",
     ),
     (
         "Sauvegarder / charger", "Save / load",

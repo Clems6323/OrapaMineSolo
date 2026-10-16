@@ -90,6 +90,7 @@ def to_dict(
         data["history"] = _history_to_list(game)
         data["hypothesis"] = [_gem_to_dict(g) for g in hypothesis_grid.gems]
         data["elapsed"] = round(float(elapsed_seconds), 3)
+        data["invalid"] = int(game.invalid_submissions)  # pénalités de score (#45)
     return data
 
 
@@ -128,6 +129,7 @@ def from_dict(data: dict) -> LoadedGame:
                 game.query_cell(Position(*action["pos"]))
         for gem_data in data.get("hypothesis", []):
             hypothesis.place_gem(_gem_from_dict(gem_data))
+        game.invalid_submissions = int(data.get("invalid", 0))
 
     return LoadedGame(
         width, height, palette, game, hypothesis,

@@ -186,9 +186,16 @@ les diagrammes du livret :
 
 ## Variantes solo (spécifiques à cette implémentation) ✅
 
-- **Score = nombre de rayons** (mode retenu) : rayons illimités, le joueur
-  soumet sa solution quand il veut ; le score est le nombre de tirs (et de
-  questions « qu'y a-t-il en X ? ») utilisés — moins il y en a, mieux c'est.
+- **Deux scores** (#45), **plus bas = meilleur** :
+  - **Score de requêtes** (`GameState.request_score`) : barème pondéré des
+    actions — un **tir de rayon** (interroge toute une ligne/colonne) vaut
+    `SHOT_COST` (1), une **question de case** (ciblée) `CELL_QUERY_COST` (3), et
+    chaque **proposition incorrecte** `INVALID_SUBMISSION_COST` (5). Constantes
+    isolées dans `model/game.py`.
+  - **Distance à la vérité** (`model/distance.board_distance`) : distance
+    **Earth Mover** (Wasserstein W1) entre l'hypothèse finale et la vraie
+    grille, en « cases » (déplacement moyen par brin de matière). 0 = parfait ;
+    `∞` si une gemme n'a pas été posée. Calculée à l'écran de fin.
 - **Difficulté** : contrôle du nombre de gemmes (5 base / 7 complet), de la
   taille de grille, et de l'activation des extensions.
 - **Plafond d'extensions par taille de grille** (#75) : au-delà d'un certain

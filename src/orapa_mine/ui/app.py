@@ -17,7 +17,13 @@ import pygame
 
 from orapa_mine.ai.generator import Difficulty, generate_hidden_grid
 from orapa_mine.model import gems_catalog as cat
+from orapa_mine.model.distance import board_distance
 from orapa_mine.model.game import GameState
+
+# Pénalité (en « cases ») d'une gemme mystère de mauvaise couleur dans le score
+# de distance de fin de partie — finie (plutôt que l'inf par défaut) pour que
+# l'indicateur « proximité » reste lisible (#45).
+_MYSTERY_COLOR_PENALTY = 1.0
 from orapa_mine.ui import theme
 from orapa_mine.ui.config_screen import ConfigScreen
 from orapa_mine.ui.creator_screen import CreatorScreen
@@ -132,10 +138,15 @@ class OrapaMineApp:
             self._resize(self.current.size)
         elif isinstance(screen, GameScreen) and screen.finished is not None:
             outcome, score = screen.finished
+            # Distance Earth Mover entre l'hypothèse finale et la vérité (#45).
+            distance = board_distance(
+                screen.hypothesis, screen.game.hidden_grid,
+                mystery_color_penalty=_MYSTERY_COLOR_PENALTY,
+            )
             self._show_end(
                 outcome == "win", score, screen.game.hidden_grid, screen.palette_pieces,
                 elapsed_seconds=screen.elapsed, timed_out=(outcome == "timeout"),
-                timer_minutes=screen.timer_minutes,
+                timer_minutes=screen.timer_minutes, distance=distance,
             )
         elif isinstance(screen, EndScreen):
             if screen.restart:
@@ -193,9 +204,11 @@ class OrapaMineApp:
     def _show_end(
         self, won: bool, score: int, hidden_grid, palette_pieces,
         elapsed_seconds: float = 0.0, timed_out: bool = False, timer_minutes: int = 0,
+        distance=None,
     ) -> None:
         self.current = EndScreen(
             won=won, score=score, hidden_grid=hidden_grid, palette_pieces=palette_pieces,
             elapsed_seconds=elapsed_seconds, timed_out=timed_out, timer_minutes=timer_minutes,
+            distance=distance,
         )
         self._resize(self.current.size)

@@ -9,6 +9,8 @@ Signale son choix à l'app via `self.restart` / `self.quit`.
 
 from __future__ import annotations
 
+import math
+
 import pygame
 
 from orapa_mine.model.gems import Piece
@@ -29,9 +31,11 @@ class EndScreen:
         elapsed_seconds: float = 0.0,
         timed_out: bool = False,
         timer_minutes: int = 0,
+        distance=None,
     ) -> None:
         self.won = won
         self.score = score
+        self.distance = distance  # Score (model.distance) : proximité à la vérité (#45)
         self.grid = hidden_grid
         self.palette_pieces = palette_pieces
         self.elapsed_seconds = max(0.0, elapsed_seconds)
@@ -93,6 +97,26 @@ class EndScreen:
         self.message = i18n.t("Configuration enregistrée.", "Configuration saved.")
         self.message_color = theme.WIN_COLOR
 
+    def _is_perfect(self) -> bool:
+        """Vrai si l'hypothèse finale colle exactement à la vérité (distance nulle)."""
+        return self.distance is not None and self.distance.total == 0.0
+
+    def _distance_text(self) -> str:
+        """Valeur de la distance à la vérité (Earth Mover, en cases)."""
+        if self.distance is None:
+            return "—"
+        total = self.distance.total
+        if math.isinf(total):  # au moins une gemme non posée : distance non finie
+            return "∞"
+        return f"{total:.2f} " + i18n.t("cases", "cells")
+
+    def _distance_note(self) -> str | None:
+        """Précision affichée sous la distance quand elle est infinie."""
+        if self.distance is None or not math.isinf(self.distance.total):
+            return None
+        n = self.distance.missing
+        return i18n.t(f"{n} gemme(s) non posée(s)", f"{n} gem(s) not placed")
+
     def update(self, dt: float) -> None:  # noqa: D401 - rien à animer
         pass
 
@@ -114,23 +138,30 @@ class EndScreen:
 
         if self.won:
             banner, color = i18n.t("Gagné !", "You win!"), theme.WIN_COLOR
-            detail = i18n.t(f"Résolu en {self.score} tir(s)/question(s).",
-                            f"Solved in {self.score} shot(s)/question(s).")
         elif self.timed_out:
             banner, color = i18n.t("Temps écoulé !", "Time's up!"), theme.LOSE_COLOR
-            detail = i18n.t(f"{self.score} tir(s)/question(s) joués.",
-                            f"{self.score} shot(s)/question(s) played.")
         else:
             banner, color = i18n.t("Partie abandonnée", "Game abandoned"), theme.LOSE_COLOR
-            detail = i18n.t(f"{self.score} tir(s)/question(s) joués.",
-                            f"{self.score} shot(s)/question(s) played.")
         title = self.font_big.render(banner, True, color)
         surface.blit(title, (x, self.panel.top + theme.s(20)))
-        surface.blit(self.font.render(detail, True, theme.TEXT), (x, self.panel.top + theme.s(64)))
-        spent = self.font.render(
+
+        # Deux scores (plus bas = meilleur), #45 : requêtes pondérées + distance.
+        score_line = i18n.t(f"Score requêtes : {self.score}", f"Request score: {self.score}")
+        surface.blit(self.font.render(score_line, True, theme.TEXT), (x, self.panel.top + theme.s(60)))
+        dist_line = i18n.t(f"Distance à la vérité : {self._distance_text()}",
+                           f"Distance to truth: {self._distance_text()}")
+        dist_color = theme.WIN_COLOR if self._is_perfect() else theme.TEXT
+        surface.blit(self.font.render(dist_line, True, dist_color), (x, self.panel.top + theme.s(86)))
+
+        y = self.panel.top + theme.s(112)
+        note = self._distance_note()
+        if note is not None:  # ex. « 1 gemme non posée » quand la distance est infinie
+            surface.blit(self.font_small.render(note, True, theme.TEXT_DIM), (x, y))
+            y += theme.s(22)
+        spent = self.font_small.render(
             i18n.t(f"Temps passé : {_duration(self.elapsed_seconds)}",
                    f"Time spent: {_duration(self.elapsed_seconds)}"), True, theme.TEXT_DIM)
-        surface.blit(spent, (x, self.panel.top + theme.s(92)))
+        surface.blit(spent, (x, y))
 
         # Bouton « Sauvegarder la configuration » (partage de l'énigme jouée).
         pygame.draw.rect(surface, theme.BTN_SAVE, self.save_rect, border_radius=8)
