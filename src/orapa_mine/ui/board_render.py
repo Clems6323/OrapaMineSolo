@@ -55,25 +55,44 @@ def darken(color: tuple[int, int, int], amount: float) -> tuple[int, int, int]:
     return tuple(max(0, int(c * (1 - amount))) for c in color)  # type: ignore[return-value]
 
 
-def _polys_centroid(polys: list) -> tuple[float, float]:
-    """Centre approché d'un groupe de polygones (moyenne de leurs sommets)."""
+def _eye_params(polys: list) -> tuple[tuple[float, float], float, bool]:
+    """Centre, taille et orientation de l'œil à partir des polygones de la gemme.
+
+    L'œil suit l'orientation de la pièce : il est **vertical** quand l'empreinte
+    est plus haute que large (triangle pointant à gauche/droite), horizontal
+    sinon. Sa taille est bornée par la plus petite dimension pour rester à
+    l'intérieur quelle que soit la rotation (#77 suivi).
+    """
     pts = [pt for poly in polys for pt in poly]
-    n = max(1, len(pts))
-    return (sum(x for x, _ in pts) / n, sum(y for _, y in pts) / n)
+    xs = [x for x, _ in pts]
+    ys = [y for _, y in pts]
+    cx = sum(xs) / len(xs)
+    cy = sum(ys) / len(ys)
+    span_x, span_y = max(xs) - min(xs), max(ys) - min(ys)
+    short = min(span_x, span_y)
+    return (cx, cy), short, span_y > span_x
 
 
-def draw_eye(surface: pygame.Surface, center: tuple[float, float], width: float, *, faded: bool = False) -> None:
-    """Dessine un petit œil (symbole de la gemme mystère) centré sur `center`."""
+def draw_eye(
+    surface: pygame.Surface, center: tuple[float, float], extent: float,
+    *, vertical: bool = False, faded: bool = False,
+) -> None:
+    """Dessine un petit œil (symbole de la gemme mystère) centré sur `center`.
+
+    `extent` = plus petite dimension de la gemme ; l'œil (plus petit qu'avant)
+    s'inscrit dedans et pivote de 90° quand `vertical` est vrai.
+    """
     cx, cy = int(center[0]), int(center[1])
-    w = max(7, int(width))
-    h = max(5, int(w * 0.62))
+    length = max(6, int(extent * 0.78))   # grand axe (un peu plus petit qu'avant)
+    thick = max(4, int(extent * 0.46))    # petit axe
+    w, h = (thick, length) if vertical else (length, thick)
     white = (208, 210, 220) if faded else (240, 242, 248)
     dark = (72, 74, 84) if faded else (26, 28, 36)
     rect = pygame.Rect(0, 0, w, h)
     rect.center = (cx, cy)
     pygame.draw.ellipse(surface, white, rect)
-    pygame.draw.ellipse(surface, dark, rect, width=max(1, int(w * 0.07)))
-    pupil = max(2, int(h * 0.42))
+    pygame.draw.ellipse(surface, dark, rect, width=max(1, int(min(w, h) * 0.12)))
+    pupil = max(2, int(thick * 0.4))
     pygame.draw.circle(surface, dark, (cx, cy), pupil)
     glint = max(1, int(pupil * 0.4))
     pygame.draw.circle(surface, white, (cx - glint, cy - glint), glint)
@@ -196,7 +215,8 @@ def _draw_slot_icon(
             for poly in polys:
                 pygame.draw.polygon(surface, base, poly)
                 pygame.draw.polygon(surface, darken(base, 0.4), poly, width=1)
-            draw_eye(surface, _polys_centroid(polys), cell_size * 0.95, faded=faded)
+            eye_center, eye_extent, eye_vert = _eye_params(polys)
+            draw_eye(surface, eye_center, eye_extent, vertical=eye_vert, faded=faded)
         elif piece.kind is GemKind.FILTER:  # icône translucide
             base = faded_piece_color(piece) if faded else piece_color(piece)
             overlay = pygame.Surface(rect.size, pygame.SRCALPHA)
@@ -239,7 +259,8 @@ def draw_ghost(surface: pygame.Surface, gem, ok: bool, is_inside) -> None:
                 pygame.draw.polygon(overlay, (*darken(base, 0.4), 170), poly, width=1)
         surface.blit(overlay, (0, 0))
         if polys:
-            draw_eye(surface, _polys_centroid(polys), theme.CELL * 0.95)
+            eye_center, eye_extent, eye_vert = _eye_params(polys)
+            draw_eye(surface, eye_center, eye_extent, vertical=eye_vert)
         _outline_footprint(surface, gem, edge, is_inside)
         return
     for pos, half in gem.absolute_cells().items():
@@ -279,7 +300,8 @@ def draw_gems(surface: pygame.Surface, grid: Grid) -> None:
                 polys.append(poly)
                 pygame.draw.polygon(surface, base, poly)
                 pygame.draw.polygon(surface, darken(base, 0.4), poly, width=1)
-            draw_eye(surface, _polys_centroid(polys), theme.CELL * 0.95)
+            eye_center, eye_extent, eye_vert = _eye_params(polys)
+            draw_eye(surface, eye_center, eye_extent, vertical=eye_vert)
             continue
         base = piece_color(gem.piece)
         for pos, half in gem.absolute_cells().items():
