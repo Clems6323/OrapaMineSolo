@@ -76,6 +76,19 @@ def test_missing_gem_is_infinite_and_counted():
     assert score.placed_total == 0.0  # la seule gemme posée est correcte
 
 
+def test_placed_total_stays_finite_while_incomplete():
+    # Progression lisible même avec une gemme manquante (#45) : placed_total est
+    # fini (ici le jaune posé est décalé d'une case), et missing compte l'absent.
+    truth = _truth()
+    guess = Grid(width=8, height=8)
+    guess.place_gem(cat.YELLOW.at(Position(2, 3)))  # posé, décalé de 1 ; bleu absent
+    score = board_distance(guess, truth)
+    assert math.isinf(score.total)        # score strict : infini
+    assert score.placed_total == pytest.approx(1.0)  # mais progression finie
+    assert score.missing == 1
+    assert len(score.matches) == 2        # 2 gemmes à deviner -> « 1/2 posées »
+
+
 def test_mystery_wrong_color_uses_finite_penalty():
     truth = Grid(width=8, height=8)
     truth.place_gem(cat.MYSTERY.at(Position(3, 3), color=GemColor.BLUE))

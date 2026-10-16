@@ -9,8 +9,6 @@ Signale son choix à l'app via `self.restart` / `self.quit`.
 
 from __future__ import annotations
 
-import math
-
 import pygame
 
 from orapa_mine.model.gems import Piece
@@ -97,25 +95,30 @@ class EndScreen:
         self.message = i18n.t("Configuration enregistrée.", "Configuration saved.")
         self.message_color = theme.WIN_COLOR
 
-    def _is_perfect(self) -> bool:
-        """Vrai si l'hypothèse finale colle exactement à la vérité (distance nulle)."""
-        return self.distance is not None and self.distance.total == 0.0
+    def _distance_main(self) -> tuple[str, bool]:
+        """(valeur de la distance, est-ce parfait ?).
 
-    def _distance_text(self) -> str:
-        """Valeur de la distance à la vérité (Earth Mover, en cases)."""
+        On affiche le **déplacement moyen des gemmes posées** (`placed_total`),
+        toujours fini, plutôt que l'inf qui masque la progression dès qu'une
+        gemme manque (#45). « — » quand rien n'est posé.
+        """
         if self.distance is None:
-            return "—"
-        total = self.distance.total
-        if math.isinf(total):  # au moins une gemme non posée : distance non finie
-            return "∞"
-        return f"{total:.2f} " + i18n.t("cases", "cells")
+            return "—", False
+        d = self.distance
+        placed = len(d.matches) - d.missing
+        if placed == 0:
+            return "—", False
+        value = f"{d.placed_total:.2f} " + i18n.t("cases", "cells")
+        perfect = d.missing == 0 and d.total == 0.0
+        return value, perfect
 
-    def _distance_note(self) -> str | None:
-        """Précision affichée sous la distance quand elle est infinie."""
-        if self.distance is None or not math.isinf(self.distance.total):
+    def _placed_note(self) -> str | None:
+        """« N/T gemmes posées » quand l'hypothèse est incomplète (sinon None)."""
+        if self.distance is None or self.distance.missing == 0:
             return None
-        n = self.distance.missing
-        return i18n.t(f"{n} gemme(s) non posée(s)", f"{n} gem(s) not placed")
+        total = len(self.distance.matches)
+        placed = total - self.distance.missing
+        return i18n.t(f"{placed}/{total} gemmes posées", f"{placed}/{total} gems placed")
 
     def update(self, dt: float) -> None:  # noqa: D401 - rien à animer
         pass
@@ -148,14 +151,15 @@ class EndScreen:
         # Deux scores (plus bas = meilleur), #45 : requêtes pondérées + distance.
         score_line = i18n.t(f"Score requêtes : {self.score}", f"Request score: {self.score}")
         surface.blit(self.font.render(score_line, True, theme.TEXT), (x, self.panel.top + theme.s(60)))
-        dist_line = i18n.t(f"Distance à la vérité : {self._distance_text()}",
-                           f"Distance to truth: {self._distance_text()}")
-        dist_color = theme.WIN_COLOR if self._is_perfect() else theme.TEXT
+        dist_value, perfect = self._distance_main()
+        dist_line = i18n.t(f"Distance à la vérité : {dist_value}",
+                           f"Distance to truth: {dist_value}")
+        dist_color = theme.WIN_COLOR if perfect else theme.TEXT
         surface.blit(self.font.render(dist_line, True, dist_color), (x, self.panel.top + theme.s(86)))
 
         y = self.panel.top + theme.s(112)
-        note = self._distance_note()
-        if note is not None:  # ex. « 1 gemme non posée » quand la distance est infinie
+        note = self._placed_note()
+        if note is not None:  # ex. « 3/5 gemmes posées » quand l'hypothèse est incomplète
             surface.blit(self.font_small.render(note, True, theme.TEXT_DIM), (x, y))
             y += theme.s(22)
         spent = self.font_small.render(

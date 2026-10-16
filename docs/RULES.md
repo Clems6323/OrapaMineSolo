@@ -194,8 +194,11 @@ les diagrammes du livret :
     isolées dans `model/game.py`.
   - **Distance à la vérité** (`model/distance.board_distance`) : distance
     **Earth Mover** (Wasserstein W1) entre l'hypothèse finale et la vraie
-    grille, en « cases » (déplacement moyen par brin de matière). 0 = parfait ;
-    `∞` si une gemme n'a pas été posée. Calculée à l'écran de fin.
+    grille, en « cases » (déplacement moyen par brin de matière). 0 = parfait.
+    `Score.total` vaut `∞` dès qu'une gemme manque, ce qui masquerait la
+    progression ; l'écran de fin affiche donc plutôt `placed_total` (somme finie
+    sur les gemmes **posées**) et le compte `missing` — p. ex. « 2.40 cases,
+    3/5 gemmes posées ». Calculée à l'écran de fin.
 - **Difficulté** : contrôle du nombre de gemmes (5 base / 7 complet), de la
   taille de grille, et de l'activation des extensions.
 - **Plafond d'extensions par taille de grille** (#75) : au-delà d'un certain
