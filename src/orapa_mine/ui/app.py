@@ -72,19 +72,32 @@ class OrapaMineApp:
             pass  # icône absente : on garde celle par défaut de pygame
 
     def _resize(self, size: tuple[int, int]) -> None:
-        """`size` est en pixels physiques (déjà mis à l'échelle DPI)."""
+        """Crée la fenêtre pour un écran de taille `size` (pixels physiques).
+
+        `size` est la taille « naturelle » voulue par l'écran courant. On la
+        rétrécit si elle dépasse le bureau disponible, pour qu'elle tienne
+        toujours sur le moniteur (petit portable / forte mise à l'échelle DPI) :
+        on dessine alors l'UI sur un canevas à sa taille naturelle que l'on
+        recopie, réduit, vers une fenêtre plus petite — le rendu reste complet,
+        juste à une échelle moindre. Sur macOS Retina, la fenêtre est par
+        ailleurs mesurée en points (sur-échantillonnage, net).
+        """
+        # Fenêtre voulue : taille naturelle, sauf macOS Retina (mesurée en points).
         if _MAC_SUPERSAMPLE:
             scale = theme.UI_SCALE
             window = (max(1, round(size[0] / scale)), max(1, round(size[1] / scale)))
-            self.screen = pygame.display.set_mode(window)
-            self.canvas = pygame.Surface(size)
         else:
-            self.screen = pygame.display.set_mode(size)
-            self.canvas = self.screen
+            window = (size[0], size[1])
+        # Réduction pour tenir dans le bureau disponible (sinon la fenêtre est
+        # plus grande que l'écran et se fait rogner — #86).
+        window = theme.fit_window(window)
+        self.screen = pygame.display.set_mode(window)
+        # Canevas plein format dès que la fenêtre n'est pas à l'échelle 1:1.
+        self.canvas = self.screen if window == (size[0], size[1]) else pygame.Surface(size)
 
     def _scaled_event(self, event: pygame.event.Event) -> pygame.event.Event:
-        """Convertit les coordonnées souris (points fenêtre) vers le canevas physique."""
-        if not _MAC_SUPERSAMPLE or event.type not in (
+        """Convertit les coordonnées souris (fenêtre) vers le canevas plein format."""
+        if self.canvas is self.screen or event.type not in (
             pygame.MOUSEMOTION, pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP
         ):
             return event
@@ -111,7 +124,7 @@ class OrapaMineApp:
                     self.current.handle_event(self._scaled_event(event))  # type: ignore[attr-defined]
             self.current.update(dt)  # type: ignore[attr-defined]
             self.current.render(self.canvas)  # type: ignore[attr-defined]
-            if _MAC_SUPERSAMPLE:
+            if self.canvas is not self.screen:  # fenêtre réduite : recopie à l'échelle
                 pygame.transform.smoothscale(self.canvas, self.screen.get_size(), self.screen)
             pygame.display.flip()
             self._handle_transitions()
