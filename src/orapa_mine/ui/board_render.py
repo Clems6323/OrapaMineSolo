@@ -112,6 +112,27 @@ def draw_board(surface: pygame.Surface, grid: Grid) -> None:
     pygame.draw.rect(surface, theme.BOARD_BORDER, rect, width=2, border_radius=6)
 
 
+def draw_cross(surface: pygame.Surface, pos, color=None, width: int = 1) -> None:
+    """Dessine une croix (X) dans la case `pos` : marque « pas de gemme ici ».
+
+    Même couleur et même épaisseur que les lignes de la grille par défaut
+    (aide à la déduction du joueur, #84). Un léger retrait l'inscrit dans la
+    case sans recouvrir exactement les lignes du quadrillage.
+    """
+    if color is None:
+        color = theme.GRID_LINE
+    x, y, w, h = theme.cell_rect(pos)
+    inset = theme.s(3)
+    pygame.draw.line(surface, color, (x + inset, y + inset), (x + w - inset, y + h - inset), width)
+    pygame.draw.line(surface, color, (x + w - inset, y + inset), (x + inset, y + h - inset), width)
+
+
+def draw_crosses(surface: pygame.Surface, crosses) -> None:
+    """Dessine toutes les croix d'un ensemble de positions."""
+    for pos in crosses:
+        draw_cross(surface, pos)
+
+
 def draw_wormhole(
     surface: pygame.Surface,
     center: tuple[float, float],

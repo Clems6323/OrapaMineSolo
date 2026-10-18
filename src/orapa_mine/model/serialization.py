@@ -71,6 +71,7 @@ def to_dict(
     one_shot: bool = False,
     given_shots: list[tuple[Position, Direction]] | None = None,
     elapsed_seconds: float = 0.0,
+    crosses=None,
 ) -> dict:
     """Sérialise une partie en dict. `include_progress` ajoute historique + board.
 
@@ -100,6 +101,7 @@ def to_dict(
         data["hypothesis"] = [_gem_to_dict(g) for g in hypothesis_grid.gems]
         data["elapsed"] = round(float(elapsed_seconds), 3)
         data["invalid"] = int(game.invalid_submissions)  # pénalités de score (#45)
+        data["crosses"] = [[c.row, c.col] for c in (crosses or [])]  # croix « pas de gemme » (#84)
     return data
 
 
@@ -116,6 +118,7 @@ class LoadedGame:
     max_proposals: int = 0
     one_shot: bool = False
     elapsed_seconds: float = 0.0
+    crosses: list[Position] = None  # type: ignore[assignment]  # croix « pas de gemme » (#84)
 
 
 def from_dict(data: dict) -> LoadedGame:
@@ -136,6 +139,7 @@ def from_dict(data: dict) -> LoadedGame:
     for sh in data.get("given_shots", []):  # indices donnés du Coup Unique (#81)
         game.add_given_shot(Position(*sh["entry"]), Direction[sh["dir"]])
     hypothesis = Grid(width=width, height=height)
+    crosses: list[Position] = []
     if data.get("progress"):
         for action in data.get("history", []):
             if action["type"] == "shot":
@@ -145,8 +149,10 @@ def from_dict(data: dict) -> LoadedGame:
         for gem_data in data.get("hypothesis", []):
             hypothesis.place_gem(_gem_from_dict(gem_data))
         game.invalid_submissions = int(data.get("invalid", 0))
+        crosses = [Position(row, col) for row, col in data.get("crosses", [])]
 
     return LoadedGame(
         width, height, palette, game, hypothesis,
         int(data.get("timer", 0)), max_proposals, one_shot, float(data.get("elapsed", 0.0)),
+        crosses,
     )

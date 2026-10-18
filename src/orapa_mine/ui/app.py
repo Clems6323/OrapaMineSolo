@@ -222,6 +222,7 @@ class OrapaMineApp:
         )
         screen.elapsed = loaded.elapsed_seconds  # reprend le temps déjà écoulé
         screen.hypothesis = loaded.hypothesis
+        screen.crosses = set(loaded.crosses or [])  # croix « pas de gemme » (#84)
         counts: dict[str, int] = {}
         for gem in loaded.hypothesis.gems:
             counts[gem.piece.name] = counts.get(gem.piece.name, 0) + 1
