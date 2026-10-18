@@ -158,8 +158,8 @@ def board_bottom(rows: int) -> int:
     return BOARD_Y + rows * CELL
 
 
-def available_screen() -> tuple[int, int]:
-    """Taille d'écran utilisable (résolution du **bureau** moins les marges).
+def _raw_desktop() -> tuple[int, int]:
+    """Résolution brute du **bureau** (moniteur principal), en pixels physiques.
 
     On utilise `get_desktop_sizes()` et non `Info().current_w/h` : ce dernier
     renvoie le *mode vidéo courant* (donc la taille de la fenêtre déjà ouverte,
@@ -181,7 +181,44 @@ def available_screen() -> tuple[int, int]:
             pass
     if w <= 0 or h <= 0:
         w, h = _FALLBACK_SCREEN
-    return max(s(760), w - _SCREEN_MARGIN_W), max(s(560), h - _SCREEN_MARGIN_H)
+    return int(w), int(h)
+
+
+def usable_desktop() -> tuple[int, int]:
+    """Place réellement disponible pour une fenêtre (bureau moins les marges).
+
+    Sans plancher : sert à **rétrécir** une fenêtre trop grande pour qu'elle
+    tienne entièrement à l'écran (barre des tâches / barre de titre comprises).
+    """
+    w, h = _raw_desktop()
+    return max(1, w - _SCREEN_MARGIN_W), max(1, h - _SCREEN_MARGIN_H)
+
+
+def fit_window(
+    window: tuple[int, int], avail: tuple[int, int] | None = None
+) -> tuple[int, int]:
+    """Rétrécit `window` (uniformément) pour qu'elle tienne dans `avail`.
+
+    Renvoie `window` inchangée si elle tient déjà ; sinon une version réduite du
+    même ratio. `avail` par défaut = `usable_desktop()`. Sert à garantir qu'une
+    fenêtre tient toujours sur le moniteur (#86).
+    """
+    if avail is None:
+        avail = usable_desktop()
+    fit = min(1.0, avail[0] / window[0], avail[1] / window[1])
+    if fit >= 1.0:
+        return window
+    return (max(1, int(window[0] * fit)), max(1, int(window[1] * fit)))
+
+
+def available_screen() -> tuple[int, int]:
+    """Taille d'écran utilisable pour dimensionner le plateau (avec plancher).
+
+    Comme `usable_desktop()` mais bornée à une taille minimale : le plateau est
+    calculé pour cette surface, puis l'app rétrécit la fenêtre si besoin.
+    """
+    w, h = usable_desktop()
+    return max(s(760), w), max(s(560), h)
 
 
 def palette_region_width(palette_cols: int) -> int:
