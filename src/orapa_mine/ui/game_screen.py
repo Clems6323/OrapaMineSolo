@@ -32,6 +32,7 @@ from orapa_mine.ui import board_render, dialogs, i18n, lang_toggle, theme, theme
 from orapa_mine.ui.beam_test import RayTester
 
 _HISTORY_ROW_H = theme.s(22)  # hauteur d'une ligne d'historique (px, échelle DPI)
+_DOUBLE_CLICK_MS = 400  # fenêtre max entre deux clics pour un double-clic (#84)
 
 # Extensions : on annonce le NOM de la pièce (et non une couleur) en réponse à
 # une question de case. Clés = libellés français, traduits par `i18n.piece`.
@@ -67,6 +68,10 @@ class GameScreen:
         self.grid = game.hidden_grid  # cachée (debug uniquement)
         self.palette_pieces = palette_pieces
         self.hypothesis = Grid(width=self.grid.width, height=self.grid.height)
+        # Croix « pas de gemme ici » posées par le joueur (aide à la déduction, #84).
+        self.crosses: set[Position] = set()
+        self._last_click_cell: Position | None = None  # suivi du double-clic
+        self._last_click_ms = 0
         self.reveal = False
         self.save_progress = True  # sauver aussi historique + pièces posées
 
@@ -314,7 +319,31 @@ class GameScreen:
             return
         cell = self._cell_at(pos)
         if cell is not None:
+            # Double-clic sur une case vide, sans pièce en main : (dé)pose une
+            # croix « pas de gemme ici » (#84). Sinon, pose/reprise habituelle.
+            double = self._register_cell_click(cell)
+            if double and self.selected is None and self.hypothesis.gem_at(cell) is None:
+                self._toggle_cross(cell)
+                return
             self._place_or_pick(cell)
+
+    def _register_cell_click(self, cell: Position) -> bool:
+        """Mémorise le clic et indique s'il complète un double-clic sur `cell`."""
+        now = pygame.time.get_ticks()
+        is_double = (self._last_click_cell == cell
+                     and now - self._last_click_ms <= _DOUBLE_CLICK_MS)
+        # On réinitialise après un double-clic pour qu'un 3e clic rapide ne
+        # rebascule pas aussitôt la croix.
+        self._last_click_cell = None if is_double else cell
+        self._last_click_ms = now
+        return is_double
+
+    def _toggle_cross(self, cell: Position) -> None:
+        """Ajoute ou retire la croix « pas de gemme » sur `cell`."""
+        if cell in self.crosses:
+            self.crosses.discard(cell)
+        else:
+            self.crosses.add(cell)
 
     def _on_key(self, event: pygame.event.Event) -> None:
         if self.show_leave_prompt:
@@ -390,6 +419,7 @@ class GameScreen:
         # rouge par l'aperçu (avertissement, voir `_draw_ghost`).
         if self.hypothesis.can_place(gem):
             self.hypothesis.place_gem(gem)
+            self.crosses.difference_update(gem.absolute_cells())  # une gemme efface la croix (#84)
             name = self.selected.name
             self.placed_counts[name] = self.placed_counts.get(name, 0) + 1
             # On garde la pièce sélectionnée tant qu'il en reste à poser (trou de ver).
@@ -479,6 +509,7 @@ class GameScreen:
             one_shot=self.game.one_shot,
             given_shots=[(s.entry, s.direction) for s in self.game.given_shots],
             elapsed_seconds=self.elapsed,
+            crosses=self.crosses,
         )
         try:
             dialogs.write_json(path, data)
@@ -602,6 +633,7 @@ class GameScreen:
         board_render.draw_board(surface, self.grid)
         self.ray.draw_beam(surface)  # rayon SOUS les gemmes (réflexion masquée par la pièce)
         board_render.draw_gems(surface, self.hypothesis)
+        board_render.draw_crosses(surface, self.crosses)  # croix « pas de gemme » (#84)
         if self.reveal:
             self._draw_hidden_outline(surface)
         self._draw_ghost(surface)
@@ -766,8 +798,8 @@ class GameScreen:
             surface.blit(msg, (x, self.input_rect.bottom + s(10)))
 
         hint = i18n.t(
-            "clic=choisir/poser, clic sur une pièce=reprendre, [R] tourner, [C] couleur mystère, clic droit=retirer, [H] aide, [Maj+D] debug",
-            "click=select/place, click a piece=pick up, [R] rotate, [C] mystery color, right-click=remove, [H] help, [Shift+D] debug",
+            "clic=choisir/poser, double-clic=croix, clic sur une pièce=reprendre, [R] tourner, [C] couleur mystère, clic droit=retirer, [H] aide, [Maj+D] debug",
+            "click=select/place, double-click=cross, click a piece=pick up, [R] rotate, [C] mystery color, right-click=remove, [H] help, [Shift+D] debug",
         )
         surface.blit(
             self.font_small.render(hint, True, theme.TEXT_DIM),
@@ -1006,9 +1038,12 @@ _HELP: list[tuple[str, str, str, str]] = [
     (
         "Poser des hypothèses", "Place hypotheses",
         "Choisis une pièce dans la palette, puis clique sur le plateau pour la poser. "
-        "Clique une pièce déjà posée pour la reprendre et la déplacer ; le clic droit la retire.",
+        "Clique une pièce déjà posée pour la reprendre et la déplacer ; le clic droit la retire. "
+        "Double-clique une case vide (sans pièce en main) pour y poser une croix « pas de "
+        "gemme » ; double-clique encore pour l'enlever.",
         "Pick a piece from the palette, then click the board to place it. Click a placed "
-        "piece to pick it up and move it; right-click removes it.",
+        "piece to pick it up and move it; right-click removes it. Double-click an empty cell "
+        "(with no piece held) to mark a “no gem” cross; double-click again to clear it.",
     ),
     (
         "Tester ton hypothèse", "Test your hypothesis",
