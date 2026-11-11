@@ -1,0 +1,219 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/Clems6323/OrapaMineSolo/schema/hackathon_protocol.schema.json",
+  "title": "Orapa Mine solver hackathon protocol (v1)",
+  "description": "One JSON object per line. Every message is one of the definitions below, discriminated by `type`.",
+  "oneOf": [
+    {"$ref": "#/$defs/hello"},
+    {"$ref": "#/$defs/pieces"},
+    {"$ref": "#/$defs/inventory"},
+    {"$ref": "#/$defs/shoot"},
+    {"$ref": "#/$defs/shot"},
+    {"$ref": "#/$defs/query"},
+    {"$ref": "#/$defs/cell"},
+    {"$ref": "#/$defs/place"},
+    {"$ref": "#/$defs/remove"},
+    {"$ref": "#/$defs/ack"},
+    {"$ref": "#/$defs/reject"},
+    {"$ref": "#/$defs/submit"},
+    {"$ref": "#/$defs/result"},
+    {"$ref": "#/$defs/give_up"},
+    {"$ref": "#/$defs/end"}
+  ],
+  "$defs": {
+    "position": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["row", "col"],
+      "properties": {
+        "row": {"type": "integer", "minimum": 0},
+        "col": {"type": "integer", "minimum": 0}
+      }
+    },
+    "direction": {"enum": ["UP", "DOWN", "LEFT", "RIGHT"]},
+    "pieceId": {
+      "enum": ["red", "yellow", "blue", "white-big", "white-small",
+               "diamond", "filter", "black-body", "wormhole", "mystery"]
+    },
+    "gemColor": {"enum": ["red", "yellow", "blue", "white"]},
+    "rayColor": {
+      "enum": ["red", "yellow", "blue", "white", "orange", "green", "purple",
+               "pink", "light-yellow", "light-blue", "black", "light-green",
+               "light-orange", "light-purple", "gray"]
+    },
+    "extensionKind": {"enum": ["diamond", "filter", "black-body", "wormhole"]},
+    "halfCell": {"enum": ["full", "ra_nw", "ra_ne", "ra_sw", "ra_se"]},
+    "shape": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["row", "col", "half"],
+        "properties": {
+          "row": {"type": "integer", "minimum": 0},
+          "col": {"type": "integer", "minimum": 0},
+          "half": {"$ref": "#/$defs/halfCell"}
+        }
+      }
+    },
+    "inventoryItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["piece", "quantity", "orientations"],
+      "properties": {
+        "piece": {"$ref": "#/$defs/pieceId"},
+        "quantity": {"type": "integer", "minimum": 1},
+        "orientations": {"type": "array", "items": {"$ref": "#/$defs/shape"}, "minItems": 1}
+      }
+    },
+
+    "hello": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "protocol", "width", "height", "extensions", "max_proposals", "inventory", "limits"],
+      "properties": {
+        "type": {"const": "hello"},
+        "protocol": {"type": "integer", "const": 1},
+        "width": {"type": "integer", "minimum": 1},
+        "height": {"type": "integer", "minimum": 1},
+        "extensions": {"type": "array", "items": {"enum": ["diamond", "filter", "black-body", "wormhole", "mystery"]}},
+        "max_proposals": {"type": "integer", "minimum": 1},
+        "inventory": {"type": "array", "items": {"$ref": "#/$defs/inventoryItem"}, "minItems": 1},
+        "limits": {
+          "type": "object",
+          "properties": {
+            "move_timeout_ms": {"type": "integer", "minimum": 1},
+            "cpu_time_ms": {"type": "integer", "minimum": 1}
+          }
+        }
+      }
+    },
+    "pieces": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {"type": {"const": "pieces"}}
+    },
+    "inventory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "pieces", "mystery_color"],
+      "properties": {
+        "type": {"const": "inventory"},
+        "pieces": {"type": "array", "items": {"$ref": "#/$defs/inventoryItem"}, "minItems": 1},
+        "mystery_color": {"type": "null"}
+      }
+    },
+    "shoot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "entry", "direction"],
+      "properties": {
+        "type": {"const": "shoot"},
+        "entry": {"$ref": "#/$defs/position"},
+        "direction": {"$ref": "#/$defs/direction"}
+      }
+    },
+    "shot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "exit", "color", "absorbed"],
+      "properties": {
+        "type": {"const": "shot"},
+        "exit": {"oneOf": [{"$ref": "#/$defs/position"}, {"type": "null"}]},
+        "color": {"oneOf": [{"$ref": "#/$defs/rayColor"}, {"type": "null"}]},
+        "absorbed": {"type": "boolean"}
+      }
+    },
+    "query": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "cell"],
+      "properties": {
+        "type": {"const": "query"},
+        "cell": {"$ref": "#/$defs/position"}
+      }
+    },
+    "cell": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "occupied", "color", "kind"],
+      "properties": {
+        "type": {"const": "cell"},
+        "occupied": {"type": "boolean"},
+        "color": {"oneOf": [{"$ref": "#/$defs/gemColor"}, {"type": "null"}]},
+        "kind": {"oneOf": [{"$ref": "#/$defs/extensionKind"}, {"type": "null"}]}
+      }
+    },
+    "place": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "piece", "anchor", "orient"],
+      "properties": {
+        "type": {"const": "place"},
+        "piece": {"$ref": "#/$defs/pieceId"},
+        "anchor": {"$ref": "#/$defs/position"},
+        "orient": {"type": "integer", "minimum": 0},
+        "color": {"$ref": "#/$defs/gemColor"}
+      }
+    },
+    "remove": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "cell"],
+      "properties": {
+        "type": {"const": "remove"},
+        "cell": {"$ref": "#/$defs/position"}
+      }
+    },
+    "ack": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {"type": {"const": "ack"}}
+    },
+    "reject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "reason"],
+      "properties": {
+        "type": {"const": "reject"},
+        "reason": {"enum": ["unknown_piece", "illegal_move", "incomplete_board", "session_finished"]}
+      }
+    },
+    "submit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {"type": {"const": "submit"}}
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "won", "points", "remaining_proposals"],
+      "properties": {
+        "type": {"const": "result"},
+        "won": {"type": "boolean"},
+        "points": {"type": "integer", "minimum": 0},
+        "remaining_proposals": {"type": "integer", "minimum": 0}
+      }
+    },
+    "give_up": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {"type": {"const": "give_up"}}
+    },
+    "end": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "solved", "points", "cpu_time_ms"],
+      "properties": {
+        "type": {"const": "end"},
+        "solved": {"type": "boolean"},
+        "points": {"type": "integer", "minimum": 0},
+        "cpu_time_ms": {"type": "integer", "minimum": 0}
+      }
+    }
+  }
+}
