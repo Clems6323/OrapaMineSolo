@@ -1,0 +1,21 @@
+# CI minimale : vérifie que la soumission compile et que l'image se construit.
+# (Le vrai test — résoudre des grilles — se fait en local avec le serveur de test.)
+
+stages: [check]
+
+syntax:
+  stage: check
+  image: python:3.12-slim
+  script:
+    - python -m py_compile orapa_client.py main.py
+    - echo "OK : les fichiers compilent."
+
+docker-build:
+  stage: check
+  image: docker:27
+  services: [docker:27-dind]
+  script:
+    - docker build -t orapa-submission .
+    - echo "OK : l'image se construit."
+  rules:
+    - if: '$CI_PIPELINE_SOURCE'   # n'exécute que si Docker-in-Docker est dispo

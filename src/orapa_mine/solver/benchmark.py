@@ -203,14 +203,21 @@ def _candidate_gems(
     return out
 
 
-def _query_consistent_boards(
-    grid: Grid, pieces: list[Piece], *, cap: int = _COVER_CAP
-) -> list[list[PlacedGem]]:
-    """Toutes les configurations complètes compatibles avec les questions de case.
+def observed_from_grid(grid: Grid) -> dict[Position, tuple[str | None, str | None]]:
+    """Carte des cases occupées -> signature de question (couleur/nature visible)."""
+    return {cell: _query_signature(grid.owner[cell]) for cell in grid.surface}
 
-    Pave exactement les cases occupées avec l'inventaire (couleurs/natures
-    correspondantes). La vraie grille en fait toujours partie. Borné par `cap`."""
-    observed = {cell: _query_signature(grid.owner[cell]) for cell in grid.surface}
+
+def query_consistent_boards_from_observed(
+    observed: dict[Position, tuple[str | None, str | None]],
+    pieces: list[Piece],
+    *,
+    cap: int = _COVER_CAP,
+) -> list[list[PlacedGem]]:
+    """Configurations complètes compatibles avec des observations de case.
+
+    `observed` : case occupée -> (couleur visible, nature visible). Réutilisable
+    par un solveur (qui construit `observed` à partir de ses questions)."""
     all_cells = set(observed)
     types = {p.name: p for p in pieces}
     counts: Counter = Counter()
@@ -250,6 +257,13 @@ def _query_consistent_boards(
 
     backtrack()
     return boards
+
+
+def _query_consistent_boards(
+    grid: Grid, pieces: list[Piece], *, cap: int = _COVER_CAP
+) -> list[list[PlacedGem]]:
+    """Comme ci-dessus, mais à partir de la vraie grille (observations déduites)."""
+    return query_consistent_boards_from_observed(observed_from_grid(grid), pieces, cap=cap)
 
 
 def ray_signature(grid: Grid) -> tuple:
