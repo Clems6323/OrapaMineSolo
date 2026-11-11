@@ -1,0 +1,39 @@
+# Serveur officiel du hackathon : UI Streamlit + worker d'évaluation.
+# Démarrage :  docker compose -f deploy/docker-compose.yml up -d --build
+#
+# Prérequis (une fois, par l'organisateur) : générer les 9 grilles officielles
+# dans ./data/official_grids et garder ce dossier privé :
+#   python -m orapa_mine.solver.benchmark official --seed 2027 --out-dir ./data/official_grids
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    image: orapa-server
+    ports:
+      - "8501:8501"
+    environment:
+      ORAPA_DB: /data/orapa.sqlite3
+    volumes:
+      - ./data:/data            # base SQLite partagée + grilles officielles
+    restart: unless-stopped
+
+  worker:
+    image: orapa-server         # même image
+    depends_on: [app]
+    environment:
+      ORAPA_DB: /data/orapa.sqlite3
+    # Draine la file : clone + build (réseau) puis évalue en bac à sable (sans réseau).
+    command: >
+      python -m orapa_mine.server.worker
+      --db /data/orapa.sqlite3 --grids /data/official_grids --interval 5
+    volumes:
+      - ./data:/data
+      # Le worker construit/exécute les images des soumissions -> accès au démon Docker.
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+
+# Note : donner le socket Docker au worker lui confère des privilèges élevés.
+# Pour une isolation plus forte, exécuter le worker sur un hôte dédié, ou via un
+# démon Docker distant / rootless. Voir docs/SANDBOX.md et docs/SERVER.md.
